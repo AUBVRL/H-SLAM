@@ -33,7 +33,7 @@ cd $SCRIPTPATH/Thirdparty/opencv-${cvVersion} && mkdir -p build && cd build &&cm
 #=====================
 echo -e "Compiling Pangolin\n"
 cd $SCRIPTPATH/Thirdparty/Pangolin
-mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir && make -j $(nproc) && make install && cd .. && rm -r build
+mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DDISPLAY_WAYLAND=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF && make -j $(nproc) && make install && cd .. && rm -r build
 
 echo -e "Compiling G2O\n"
 cd $SCRIPTPATH/Thirdparty/g2o
@@ -43,3 +43,9 @@ make -j $(nproc) && make install && cd .. && rm -r build
 echo -e "Compiling DBoW3\n"
 cd $SCRIPTPATH/Thirdparty/DBow3
 mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DUSE_CONTRIB=true -DOpenCV_DIR=$InstallDir/share/OpenCV && make -j $(nproc) && make install && cd .. && rm -r build
+
+#set environment settings
+#==========================
+echo 'PATH=${PATH}'":${InstallDir}/bin" >> ~/.bashrc 
+echo 'LD_LIBRARY_PATH=${LD_LIBRARY_PATH}'":${InstallDir}/lib" >> ~/.bashrc 
+

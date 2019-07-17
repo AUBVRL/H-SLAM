@@ -209,7 +209,7 @@ else()
         elseif(_LINUX_)
             # Wayland
             find_package(Wayland QUIET)
-            if(DISPLAY_WAYLAND OR WAYLAND_CLIENT_FOUND)
+            if(DISPLAY_WAYLAND AND WAYLAND_CLIENT_FOUND)
                 find_package(Wayland REQUIRED)
                 find_package(PkgConfig)
                 pkg_check_modules(xkbcommon REQUIRED xkbcommon)
