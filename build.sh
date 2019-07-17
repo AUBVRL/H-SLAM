@@ -26,8 +26,7 @@ if [ ! -d "$SCRIPTPATH/Thirdparty/opencv-${cvVersion}" ]; then
   wget -O opencv_contrib.zip -nc "${DL_contrib}" && unzip opencv_contrib.zip && rm opencv_contrib.zip
 fi
 
-cd $SCRIPTPATH/Thirdparty/opencv-${cvVersion} && mkdir -p build && cd build &&
-cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DWITH_V4L=ON -DWITH_CUDA=OFF -DWITH_QT=ON -DOPENCV_EXTRA_MODULES_PATH=$SCRIPTPATH/Thirdparty/opencv-${cvVersion}/opencv_contrib-${cvVersion}/modules && make -j $(nproc) && make install && cd .. && rm -r build
+cd $SCRIPTPATH/Thirdparty/opencv-${cvVersion} && mkdir -p build && cd build &&cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DWITH_V4L=ON -DWITH_CUDA=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DWITH_QT=ON -DOPENCV_EXTRA_MODULES_PATH=$SCRIPTPATH/Thirdparty/opencv-${cvVersion}/opencv_contrib-${cvVersion}/modules && make -j $(nproc) && make install && cd .. && rm -r build
 #end comment out OpenCV
 
 #Build Thirdparty libs	
@@ -38,7 +37,7 @@ mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INS
 
 echo -e "Compiling G2O\n"
 cd $SCRIPTPATH/Thirdparty/g2o
-mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DG2O_BUILD_APPS=false -DG2O_BUILD_EXAMPLES=false #-DG2O_USE_OPENMP=true
+mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF  #-DG2O_USE_OPENMP=true
 make -j $(nproc) && make install && cd .. && rm -r build
 
 echo -e "Compiling DBoW3\n"

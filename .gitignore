@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+Thirdparty/CompiledLibs/
+
+Thirdparty/opencv-*
