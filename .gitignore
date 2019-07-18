@@ -34,3 +34,5 @@
 Thirdparty/CompiledLibs/
 
 Thirdparty/opencv-*
+
+build/
