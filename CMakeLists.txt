@@ -13,12 +13,19 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 # required libraries
 find_package(SuiteParse REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Boost COMPONENTS system thread) 
-find_package(OpenCV REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/share/OpenCV)
+#find_package(Boost COMPONENTS system thread) 
+find_package(OpenCV 3.4.6 REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/share/OpenCV)
 find_package(Pangolin REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/lib/cmake/Pangolin)
-find_package(LibZip REQUIRED)
 find_package(G2O REQUIRED)
 find_package(DBoW3 REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/lib/cmake/DBoW3)
+find_package(LibZip QUIET)
+
+if (LIBZIP_LIBRARY)
+  add_definitions(-DHAS_ZIPLIB=1)
+  include_directories( ${LIBZIP_INCLUDE_DIR_ZIP} ${LIBZIP_INCLUDE_DIR_ZIPCONF} )
+else()
+  set(LIBZIP_LIBRARY "")
+endif()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations") #-fno-omit-frame-pointer"
@@ -30,6 +37,7 @@ endif (MSVC)
 # Sources files
 set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/System.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
 
 )
 
@@ -37,39 +45,35 @@ include_directories(
   ${PROJECT_SOURCE_DIR}
   ${PROJECT_SOURCE_DIR}/Include
   ${PROJECT_SOURCE_DIR}/Thirdparty/sse2neon
-  ${PROJECT_SOURCE_DIR}/Thirdparty/DBow3
+  ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
   ${DBoW3_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${OpenCV_INCLUDE_DIRS}
-  ${LIBZIP_INCLUDE_DIR_ZIP}
-  ${LIBZIP_INCLUDE_DIR_ZIPCONF}
   ${Pangolin_INCLUDE_DIRS}
   ${G2O_INCLUDE_DIR}
+  ${CSPARSE_INCLUDE_DIR}
+  ${CHOLMOD_INCLUDE_DIR}
 ) 
 
-include_directories( ${Pangolin_INCLUDE_DIRS} ) 
-
 # compile library.
-include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR}) 
 add_library(FSLAM ${fslam_SOURCE})
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(BOOST_THREAD_LIBRARY boost_thread-mt)
-else()
-    set(BOOST_THREAD_LIBRARY boost_thread)
-endif()
-message (STATUS ${G2O_LIB})
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+#    set(BOOST_THREAD_LIBRARY boost_thread-mt)
+#else()
+#    set(BOOST_THREAD_LIBRARY boost_thread)
+#endif()
+
 # build executables
 set(LIBS
   ${OpenCV_LIBS}
   ${EIGEN3_LIBS}
   ${G2O_LIBS}
-  ${BOOST_THREAD_LIBRARY} 
   ${LIBZIP_LIBRARY} 
   ${Pangolin_LIBRARIES}
   ${DBoW3_LIB_DIR}/libDBoW3.so
-)
+) #${BOOST_THREAD_LIBRARY} 
 add_executable(Monocular ${PROJECT_SOURCE_DIR}/Examples/Monocular.cpp )
-target_link_libraries(Monocular FSLAM boost_system cxsparse ${LIBS} )
+target_link_libraries(Monocular FSLAM cxsparse ${LIBS} ) #boost_system
 
 

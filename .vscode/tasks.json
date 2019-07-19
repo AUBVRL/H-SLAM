@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "FSLAM",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/bin/Monocular",
+            "args": [ "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip", ///mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_03/images.zip";
+                      "dataset=Euroc", //Euroc, TumMono or Kitti
+                      "sensor=Monocular", //Monocular, Stereo or RGBD
+                      "intrinsics=path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
+                      "vocabulary=pathtovocab",
+                      "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
+                      "gamma=",
+                      "vignette=",
+                      "start=0",
+                      "end=9999999",
+                      "reverse=0",
+                      "nogui=0",
+                      "prefetch=0",
+
+
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
