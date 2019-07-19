@@ -61,16 +61,21 @@ int main(int argc, char **argv)
             DataReader->getImage(Img, sensor_, i);
         }
 
-
         cv::Mat Dest;
-        if(sensor_ == Stereo)
-            cv::hconcat(Img->ImageL, Img->ImageR, Dest);
+        if (sensor_ == Stereo)
+        {
+            if (dataset_ != Kitti)
+                cv::hconcat(Img->ImageL, Img->ImageR, Dest);
+            else
+                cv::vconcat(Img->ImageL, Img->ImageR, Dest);
+        }
         else if (sensor_ == RGBD)
             cv::hconcat(Img->ImageL, Img->Depth, Dest);
-        else Dest = Img->ImageL;
+        else
+            Dest = Img->ImageL;
 
         cv::imshow("Img", Dest);
-        cv::waitKey(1);
+        cv::waitKey(0);
     }
 
     return 0;

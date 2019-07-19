@@ -22,7 +22,6 @@ public:
     std::vector<std::string> filesL;
     std::vector<std::string> filesR;
     std::vector<std::string> filesD;
-
     std::vector<double> timestamps;
     std::vector<float> exposures;
 
