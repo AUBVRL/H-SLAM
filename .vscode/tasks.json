@@ -5,9 +5,10 @@
             "label": "FSLAM",
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/Monocular",
-            "args": [ "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip", ///mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_03/images.zip";
+            "args": [ //"path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip",
+                      "path=  /mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
                       "dataset=Euroc", //Euroc, TumMono or Kitti
-                      "sensor=Monocular", //Monocular, Stereo or RGBD
+                      "sensor=Stereo", //Monocular, Stereo or RGBD
                       "intrinsics=path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
                       "vocabulary=pathtovocab",
                       "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
@@ -15,11 +16,9 @@
                       "vignette=",
                       "start=0",
                       "end=9999999",
-                      "reverse=0",
+                      "reverse=1",
                       "nogui=0",
-                      "prefetch=0",
-
-
+                      "prefetch=0"
             ],
             "problemMatcher": []
         }
