@@ -6,6 +6,38 @@
 #include "DatasetLoader.h"
 #include "GlobalTypes.h"
 
+#ifdef MSVC
+#include <Windows.h>
+#include <stdint.h> // portable: uint64_t   MSVC: __int64 
+#include <time.h>
+
+typedef struct timeval {
+    long tv_sec;
+    long tv_usec;
+} timeval;
+
+int gettimeofday(struct timeval * tp, struct timezone * tzp)
+{
+ 
+    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+
+    SYSTEMTIME  system_time;
+    FILETIME    file_time;
+    uint64_t    time;
+
+    GetSystemTime( &system_time );
+    SystemTimeToFileTime( &system_time, &file_time );
+    time =  ((uint64_t)file_time.dwLowDateTime )      ;
+    time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+    tp->tv_sec  = (long) ((time - EPOCH) / 10000000L);
+    tp->tv_usec = (long) (system_time.wMilliseconds * 1000);
+    return 0;
+}
+#else
+#include <sys/time.h>
+#endif
+
 Dataset dataset_= Emptyd;
 Sensor sensor_= Emptys;
 PhotoUnDistMode phoDistMode_ = Emptyp;
@@ -18,6 +50,7 @@ std::string Path = "";
 bool Reverse = false;
 bool Nogui = false;
 bool Prefetch = false;
+float PlaybackSpeed = 0;
 int Start = 0;
 int End = 9999999;
 int Mode = 0;
@@ -97,6 +130,12 @@ void parseargument(char * arg)
 			Prefetch = true;
 			printf("Preload images!\n");
 		}
+		return;
+	}
+    else if(1==sscanf(arg,"playbackspeed=%f",&foption))
+	{
+		PlaybackSpeed = foption;
+		printf("playback speed %f!\n",PlaybackSpeed);
 		return;
 	}
     else if (1==sscanf(arg,"dataset=%s",buf))

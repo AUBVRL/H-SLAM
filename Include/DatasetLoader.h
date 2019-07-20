@@ -23,13 +23,17 @@ public:
     std::vector<std::string> filesR;
     std::vector<std::string> filesD;
     std::vector<double> timestamps;
-    std::vector<float> exposures;
+
+    std::vector<float> exposuresL;
+    std::vector<float> exposuresR;
+
 
     int nImgL;
     int nImgR;
     int nImgD;
 
     Sensor sensor;
+    Dataset dataset;
 
     bool isZipped;
     
@@ -38,9 +42,9 @@ public:
     char *databuffer;
 #endif
 
-    DatasetReader(Dataset Dataset_t, Sensor Sensor_t,  std::string Path, std::string IntrCalib, std::string Gamma, std::string Vignette)
+    DatasetReader(Dataset Dataset_t, Sensor Sensor_t,  std::string Path, std::string IntrCalib, std::string Gamma, std::string Vignette):
+    dataset(Dataset_t),sensor(Sensor_t)
     {
-        this->sensor = Sensor_t;
         #if HAS_ZIPLIB
         ziparchive = 0;
         databuffer = 0;
@@ -122,12 +126,14 @@ public:
             else if (Dataset_t == Dataset::Euroc)
             {
                 getdir(Path + "mav0/cam0/data/", filesL);
-                getdir(Path + "mav0/cam1/data/", filesR);
+                if(sensor == Stereo)
+                    getdir(Path + "mav0/cam1/data/", filesR);
             }
             else if (Dataset_t == Dataset::Kitti)
             {
                 getdir(Path + "image_0/", filesL);
-                getdir(Path + "image_1/", filesR);
+                if(sensor == Stereo)
+                    getdir(Path + "image_1/", filesR);
             }
         }
 
@@ -136,15 +142,16 @@ public:
         if (Sensor_t == Stereo)
             if (nImgL == 0 || nImgR == 0 || nImgL != nImgR)
             {
-                printf("There is something wrong with the loaded stereo data");
+                printf("There is something wrong with the loaded stereo data: didn't load any or Left and Right images does not match!\n");
                 exit(-1);
             }
         if (Sensor_t == Monocular)
             if (filesL.size() == 0)
             {
-                printf("There is something wrong with the loaded monocular images");
+                printf("There is something wrong with the images - didn't load any!\n");
                 exit(-1);
             }
+        loadtimestamps(Path);
     }
 
     ~DatasetReader() 
@@ -155,8 +162,144 @@ public:
         #endif
     }
 
-    inline void loadtimestamps()
+    inline void loadtimestamps(std::string Path)
     {
+        if (dataset == Kitti)
+        {
+            if (Path.at(Path.length() - 1) != '/')
+                Path = Path + "/";
+            std::ifstream fTimes;
+            std::string strPathTimeFile = Path + "times.txt";
+            fTimes.open(strPathTimeFile.c_str());
+            if (!fTimes)
+            {
+                printf("could not find timestamps file at %s - turning off real timestamps!\n",strPathTimeFile.c_str());
+                return;
+            }
+            while (!fTimes.eof())
+            {
+                std::string s;
+                getline(fTimes, s);
+                if (!s.empty())
+                {
+                    std::stringstream ss;
+                    ss << s;
+                    double t;
+                    ss >> t;
+                    timestamps.push_back(t);
+                }
+            }
+            fTimes.close();
+        }
+        else if (dataset == Euroc)
+        {
+            if (Path.at(Path.length() - 1) != '/')
+                Path = Path + "/";
+            std::ifstream fTimes;
+            std::string strPathTimeFile = Path + "mav0/cam0/data.csv";
+   
+            fTimes.open(strPathTimeFile.c_str());
+            if (!fTimes)
+            {
+                printf("could not find timestamps file at %s - turning off real timestamps!\n",strPathTimeFile.c_str());
+                return;
+            }
+
+            while (!fTimes.eof())
+            {
+                std::string line;
+                char buf[1000];
+                fTimes.getline(buf, 1000);
+
+                double stamp;
+                char filename[256];
+                if (line[0] == '#')
+                    continue;
+
+                if (2 == sscanf(buf, "%lf,%s", &stamp, filename))
+                    timestamps.push_back(stamp * 1e-9);
+            }
+            fTimes.close();
+        }
+        else if (dataset == Tum_mono)
+        {
+            std::ifstream tr;
+            std::string timesFile = Path.substr(0, Path.find_last_of('/')) + "/times.txt";
+            tr.open(timesFile.c_str());
+
+            while (!tr.eof())
+            {
+                std::string line;
+                char buf[1000];
+                tr.getline(buf, 1000);
+
+                int id;
+                double stamp;
+                float exposure = 0;
+
+                if (3 == sscanf(buf, "%d %lf %f", &id, &stamp, &exposure))
+                {
+                    timestamps.push_back(stamp);
+                    exposuresL.push_back(exposure);
+                }
+                else if (2 == sscanf(buf, "%d %lf", &id, &stamp))
+                {
+                    timestamps.push_back(stamp);
+                    exposuresL.push_back(exposure);
+                }
+            }
+            tr.close();
+
+            // check if exposures are correct, (possibly skip)
+            bool exposuresGood = ((int)exposuresL.size() == nImgL);
+            for (int i = 0; i < (int)exposuresL.size(); i++)
+            {
+                if (exposuresL[i] == 0)
+                {
+                    // fix!
+                    float sum = 0, num = 0;
+                    if (i > 0 && exposuresL[i - 1] > 0)
+                    {
+                        sum += exposuresL[i - 1];
+                        num++;
+                    }
+                    if (i + 1 < (int)exposuresL.size() && exposuresL[i + 1] > 0)
+                    {
+                        sum += exposuresL[i + 1];
+                        num++;
+                    }
+
+                    if (num > 0)
+                        exposuresL[i] = sum / num;
+                }
+
+                if (exposuresL[i] == 0)
+                    exposuresGood = false;
+            }
+
+            if (nImgL != (int)timestamps.size())
+            {
+                printf("set timestamps and exposures to zero!\n");
+                exposuresL.clear();
+                timestamps.clear();
+            }
+
+            if (nImgL != (int)exposuresL.size() || !exposuresGood)
+            {
+                printf("set EXPOSURES to zero!\n");
+                exposuresL.clear();
+            }
+        }
+
+        printf("got %d images and %d timestamps and %d exposures.!\n", nImgL, (int)timestamps.size(), (int)exposuresL.size());
+    }
+
+    inline double getTimestamp(int id) 
+    {
+        if (timestamps.size() == 0) return id * 0.1f;
+        if (id >= (int) timestamps.size()) return 0;
+        if (id < 0) return 0;
+        return timestamps[id];
     }
 
     inline int getdir(std::string dir, std::vector<std::string> &files)
