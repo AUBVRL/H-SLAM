@@ -10,6 +10,15 @@ set(EXECUTABLE_OUTPUT_PATH bin)
 set(LIBRARY_OUTPUT_PATH lib)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
+# C++ standard
+if(${CMAKE_VERSION} VERSION_LESS "3.2.0")
+  set( CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}" )
+else()
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
 # required libraries
 find_package(SuiteParse REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -28,7 +37,7 @@ else()
 endif()
 
 add_definitions("-DENABLE_SSE")
-set(CMAKE_CXX_FLAGS "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations") #-fno-omit-frame-pointer"
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O3 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations ") #-fno-omit-frame-pointer"
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
@@ -73,7 +82,7 @@ set(LIBS
   ${Pangolin_LIBRARIES}
   ${DBoW3_LIB_DIR}/libDBoW3.so
 ) #${BOOST_THREAD_LIBRARY} 
-add_executable(Monocular ${PROJECT_SOURCE_DIR}/Examples/Monocular.cpp )
-target_link_libraries(Monocular FSLAM cxsparse ${LIBS} ) #boost_system
+add_executable(Dataset ${PROJECT_SOURCE_DIR}/Examples/Dataset.cpp )
+target_link_libraries(Dataset FSLAM cxsparse ${LIBS} ) #boost_system
 
 

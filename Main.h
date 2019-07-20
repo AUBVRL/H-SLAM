@@ -4,7 +4,6 @@
 #include <string>
 
 #include "DatasetLoader.h"
-#include "GlobalTypes.h"
 
 #ifdef MSVC
 #include <Windows.h>

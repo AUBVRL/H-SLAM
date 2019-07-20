@@ -4,7 +4,7 @@
         {
             "label": "FSLAM",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/Monocular",
+            "command": "${workspaceFolder}/build/bin/Dataset",
             "args": [ 
                       "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono
                       //"path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/21/",        //Kitti
@@ -29,7 +29,7 @@
         {
             "label": "FSLAM_alien",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/Monocular",
+            "command": "${workspaceFolder}/build/bin/Dataset",
             "args": [ 
                       //"path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono
                     //   "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/",        //Kitti
@@ -46,7 +46,7 @@
                       "reverse=0",
                       "nogui=0",
                       "prefetch=0",
-                      "playbackspeed=0"
+                      "playbackspeed=1"
             ],
             "problemMatcher": []
         }
