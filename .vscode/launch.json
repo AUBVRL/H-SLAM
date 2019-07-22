@@ -8,8 +8,22 @@
             "name": "g++ build and debug active file",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/bin/Monocular",
+            "program": "${workspaceFolder}/build/bin/Dataset",
             "args": [
+                      "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy",          //Euroc
+                      "dataset=Euroc", //Euroc, TumMono or Kitti
+                      "sensor=Stereo", //Monocular, Stereo or RGBD
+                      "intrinsics=/home/gy/devel/git/FSLAM/Examples/Extras/EuRoC.yaml",
+                      "vocabulary=pathtovocab",
+                      "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
+                      "gamma=",
+                      "vignette=",
+                      "start=0",
+                      "end=9999999",
+                      "reverse=0",
+                      "nogui=0",
+                      "prefetch=0",
+                      "playbackspeed=0"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -4,6 +4,7 @@
 # include <sstream>
 #include <vector>
 #include "Settings.h"
+#include<opencv2/core/core.hpp>
 #include <opencv2/imgproc.hpp>
 
 namespace FSLAM
@@ -15,199 +16,135 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 	remapX = 0;
 	remapY = 0;
 
+    cv::FileStorage CalibIn(GeomCalibPath, cv::FileStorage::READ);
+    if(!CalibIn.isOpened())
+    {printf("could not read Geometric calibration data from %s \n", GeomCalibPath.c_str()); exit(1); }
+    
+    wOrg = CalibIn["Input.width"]; hOrg = CalibIn["Input.height"];
+    w = CalibIn["Output.width"]; h = CalibIn["Output.height"];
+    WidthOri = wOrg; HeightOri = hOrg;
+    cv::Mat K_l, distM;
+    float atanDist;
+
+    CalibIn["CameraL.K"] >> K_l;
+
     Cameramodel = CamModel::Empty;
-	std::ifstream f(GeomCalibPath.c_str());
-	if (!f.good())
-	{
-		printf(" ... not found. Cannot operate without calibration, shutting down.\n");
-		f.close();
-		exit(1) ;
-	}
-    printf("calibration file found at %s!\n", GeomCalibPath.c_str());
+    std::string Calibmodel = CalibIn["Calibration.model"];
+    if(Calibmodel == "RadTan")
+    { Cameramodel = CamModel::RadTan; CalibIn["CameraL.distM"] >> distM; }
+    else if (Calibmodel == "Atan")
+    { Cameramodel = CamModel::Atan; atanDist = CalibIn["CameraL.dist"];}
+    else if (Calibmodel == "Pinhole")
+    { Cameramodel = CamModel::Pinhole; atanDist = 0.0f; } 
+    else if (Calibmodel == "EquiDistant")
+    { Cameramodel = CamModel::EquiDistant; CalibIn["CameraL.distM"] >> distM; }
+    else if (Calibmodel == "KannalaBrandt")
+    { Cameramodel = CamModel::KannalaBrandt; CalibIn["CameraL.distM"] >> distM; }
     
-    std::string line;
-    while (std::getline(f, line))
-    {
-        std::stringstream ss(line);
-        std::vector<std::string> vec;
-        std::string word;
-        while (ss >> word)
-            vec.push_back(word);
-        
-        Words.push_back(vec);
-    }
-    f.close();
+    if(Cameramodel==CamModel::Empty || K_l.empty() || wOrg <=0 || hOrg <= 0 || w <=0 || h<= 0)
+    {printf("Reading camera calibration failed! exit.\n"); exit(1);}
+    if( (Cameramodel == CamModel::EquiDistant || Cameramodel == CamModel::RadTan || Cameramodel== CamModel::KannalaBrandt) && distM.empty())
+    {printf("Error reading camera distortion! exit.\n"); exit(1);}
 
-    try
+    if(Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
+        ic[4] = atanDist;
+    else 
     {
-        //first word is a float
-        for(int i = 0 ; i < Words[0].size();i++)
-            ic[i] = std::stof(Words[0][i]);
-        if(Words[0].size()==8)
-            Cameramodel = CamModel::RadTan;
-        else if (Words[0].size()==5)
-        {
-            if( ic[4] == 0)
-                Cameramodel = CamModel::Pinhole;
-            else
-                Cameramodel = CamModel::Atan;
-        }
+        ic[4] = distM.at<float>(0, 0);
+        ic[5] = distM.at<float>(0, 1);
+        ic[6] = distM.at<float>(0, 2);
+        ic[7] = distM.at<float>(0, 3);
     }
-    catch(std::exception& e) //first word is a string
-	{
-        for(int i = 1 ; i < Words[0].size();i++)
-            ic[i-1] = std::stof(Words[0][i]);
-        
-        if(Words[0][0] == "RadTan")
-        {
-            if(Words[0].size()-1 != 8)
-                { printf("Invalid combination of model name and parameters!\n"); exit(1);}
-            Cameramodel = CamModel::RadTan;
-        }
-        else if (Words[0][0] == "FOV")
-        {
-            if(Words[0].size()-1 != 5)
-                { printf("Invalid combination of model name and parameters!\n"); exit(1);}
-            Cameramodel = CamModel::Atan;
-        }
-        else if (Words[0][0] == "Pinhole")
-        {
-            if(Words[0].size()-1 != 5)
-                { printf("Invalid combination of model name and parameters!\n"); exit(1);}
-            Cameramodel = CamModel::Pinhole;
-        }
-        else if (Words[0][0] == "EquiDistant")
-        {
-             if(Words[0].size()-1 != 8)
-                { printf("Invalid combination of model name and parameters!\n"); exit(1);}
-            Cameramodel = CamModel::EquiDistant;
-        }
-        else if (Words[0][0] == "KannalaBrandt")
-        {
-             if(Words[0].size()-1 != 8)
-                { printf("Invalid combination of model name and parameters!\n"); exit(1);}
-            Cameramodel = CamModel::KannalaBrandt;
-        }
-
-        if(Cameramodel == Empty)
-        {printf("Geometric calibration not valid!\n"); exit(1);}
+    if(K_l.at<float>(0,2) < 1 && K_l.at<float>(1,2) < 1)
+    {
+        K_l.at<float>(0,0) *= wOrg; //fx
+        K_l.at<float>(1,1) *= hOrg; //fy
+        K_l.at<float>(0,2) *= wOrg; //-0.5 //cx
+        K_l.at<float>(1,2) *= hOrg; //-0.5 //cy
     }
 
-    try 
-    {
-        wOrg = std::stoi(Words[1][0]);
-        hOrg = std::stoi(Words[1][1]);
-        w = std::stoi(Words[3][0]);
-        h = std::stoi(Words[3][1]);
-        WidthOri = wOrg; HeightOri = hOrg;
-    }
-    catch(std::exception &e)
-    { printf("Could not read input or output resolution! exiting.\n"); exit(1);}
-
-    if(ic[2] < 1 && ic[3] < 1)
-    {
-        ic[0] *= wOrg; ic[1]*=hOrg;
-        ic[2] = ic[2]* wOrg; //-0.5;
-        ic[3] = ic[3]*hOrg; //-0.5
-    }
+    ic[0] = K_l.at<float>(0,0); ic[1] = K_l.at<float>(1,1);
+    ic[2] = K_l.at<float>(0,2); ic[3] = K_l.at<float>(1,2);
     
-    if(Sensortype == Stereo)
+    std::string CalibProcess = CalibIn["Calib.process"];
+    std::string StereoState = CalibIn["Stereo.State"];
+    bool needStereoRect = (Sensortype == Stereo && StereoState == "rectify");
+
+    if(Sensortype == Sensor::Stereo && StereoState == "prerectified")
     {
-        if(Words.size()<6) {printf("Stereo system requires more info than provided! \n"); exit(1);}
-        if(Words[4][0] == "prerectified")
-        {
-            try {baseline = std::stof(Words[5][0])/ic[0];} catch(std::exception &e) {printf("could not read baseline*f! exiting\n"); exit(1);}
-            Cameramodel = CamModel::Pinhole;
-        }
-        else if (Words[4][0]=="rectify") //rectification is required
-        {
-            if(Cameramodel == CamModel::Empty || Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
-                {printf("Distortion parameters provided are not supported with unrectified images! \n"); exit(1);}
-             if(Words.size()<11) {printf("Stereo rectification requires more info than provided! \n"); exit(1);}
-            try {baseline = std::stof(Words[5][0])/ic[0];} catch(std::exception &e) {printf("could not read baseline*f! exiting\n"); exit(1);}
-            
-            //need to insert checks for these but so many !!
-            cv::Mat DistL = (cv::Mat_<float>(4,1) << ic[4], ic[5],ic[6], ic[7]);
-            cv::Mat IntL = (cv::Mat_<float>(3,3) << ic[0], 0, ic[2], 0, ic[1], ic[3],0,0,1);
-            
-            cv::Mat R_L = (cv::Mat_<float>(3,3) <<std::stof(Words[6][0]),std::stof(Words[6][1]),std::stof(Words[6][2]),std::stof(Words[6][3]),
-                            std::stof(Words[6][4]),std::stof(Words[6][5]),std::stof(Words[6][6]),std::stof(Words[6][7]),std::stof(Words[6][8]));
-            
-            cv::Mat IntR = (cv::Mat_<float>(3,3) <<std::stof(Words[7][0]),std::stof(Words[7][1]),std::stof(Words[7][2]),std::stof(Words[7][3]),
-                            std::stof(Words[7][4]),std::stof(Words[7][5]),std::stof(Words[7][6]),std::stof(Words[7][7]),std::stof(Words[7][8]));
-
-            cv::Mat DistR = (cv::Mat_<float>(4,1) << std::stof(Words[8][0]),std::stof(Words[8][1]),std::stof(Words[8][2]),std::stof(Words[8][3]));
-
-            cv::Mat R_R = (cv::Mat_<float>(3,3) <<std::stof(Words[9][0]),std::stof(Words[9][1]),std::stof(Words[9][2]),std::stof(Words[9][3]),
-                            std::stof(Words[9][4]),std::stof(Words[9][5]),std::stof(Words[9][6]),std::stof(Words[9][7]),std::stof(Words[9][8]));
-
-            cv::Mat NewInt = (cv::Mat_<float>(3,3) <<std::stof(Words[10][0]),std::stof(Words[10][1]),std::stof(Words[10][2]),std::stof(Words[10][3]),
-                            std::stof(Words[10][4]),std::stof(Words[10][5]),std::stof(Words[10][6]),std::stof(Words[10][7]),std::stof(Words[10][8]));
-
-            cv::initUndistortRectifyMap(IntL, DistL, R_L, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1l, M2l);
-            cv::initUndistortRectifyMap(IntR, DistR, R_R, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1r, M2r);
-            Words[2][0] = "none";
-            hOrg = h; wOrg=w;
-            Cameramodel = CamModel::Pinhole;
-            ic[0] = NewInt.at<float>(0,0);
-            ic[1] = NewInt.at<float>(1,1);
-            ic[2] = NewInt.at<float>(0,2);
-            ic[3] = NewInt.at<float>(1,2);
-            std::cout<<NewInt<<std::endl;
-        }
-        else {printf("Your stereo calibration file is not right! exiting.\n");exit(1);}
+        baseline = CalibIn["Stereo.bf"];
+        Cameramodel = CamModel::Pinhole;
+        if(baseline<=0){printf("failed to read stereo baseline!\n"); exit(1);} 
+        baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
     }
-    
+
     remapX = new float[w*h];
     remapY = new float[w*h];
 
-    float OutputCalibration[5];
-    try
-    {   // an output calibration is specified
-        for(int i = 0 ; i < Words[2].size(); i ++)
-            OutputCalibration[i] = std::stof(Words[2][i]);
-
-        if(OutputCalibration[2] > 1 && OutputCalibration[3] > 1)
-        {printf("calibration should be given relative to image width and height! exiting.\n"); exit(1);}
-        
-        K.setIdentity();
-        K(0,0) = OutputCalibration[0] * w;
-        K(1,1) = OutputCalibration[1] * h;
-        K(0,2) = OutputCalibration[2] * w;// - 0.5;
-        K(1,2) = OutputCalibration[3] * h;// - 0.5;
-    }
-    catch(const std::exception& e) // a crop model is specified
+    if (!needStereoRect)
     {
-        if(Words[2][0] == "crop")
+        if (CalibProcess == "crop")
         {
             makeOptimalK_crop();
         }
-        else if (Words[2][0] == "full")
-        {
-            printf("Cannot handle full should use none instead!\n"); exit(1);
-           // this kept for backward compatibility from DSO.
-        }
-        else if (Words[2][0] == "none")
+        else if (CalibProcess == "none")
         {
             if (w != wOrg || h != hOrg)
-            {
-                printf("ERROR: rectification mode none requires input and output dimenstions to match!\n\n");
-                exit(1);
-            }
+            {printf("ERROR: rectification mode none requires input and output dimenstions to match!\n\n"); exit(1); }
             K.setIdentity();
-            K(0, 0) = ic[0];
-            K(1, 1) = ic[1];
-            K(0, 2) = ic[2];
-            K(1, 2) = ic[3];
-
+            ic[0] = K(0, 0) = K_l.at<float>(0, 0);
+            ic[1] = K(1, 1) = K_l.at<float>(1, 1);
+            ic[2] = K(0, 2) = K_l.at<float>(0, 2); //-0.5
+            ic[3] = K(1, 2) = K_l.at<float>(1, 2); //-0.5
             passthrough = true;
         }
+        else if (CalibProcess == "useK")
+        {
+            cv::Mat DesiredK;
+            CalibIn["Calib.desiK"] >> DesiredK;
+            if (DesiredK.empty() || DesiredK.at<float>(0,2) > 1 || DesiredK.at<float>(0,3) > 1)
+            {printf("Error reading desired camera calibration! it should be fx fy cx cy relative to the width and height exit.\n"); exit(1);}
+
+            K.setIdentity();
+            ic[0] = K(0, 0) = DesiredK.at<float>(0, 0) * w;
+            ic[1] = K(1, 1) = DesiredK.at<float>(0, 1) * h;
+            ic[2] = K(0, 2) = DesiredK.at<float>(0, 2) * w; // - 0.5;
+            ic[3] = K(1, 2) = DesiredK.at<float>(0, 3) * h; // - 0.5;
+        }
+    }
+    else //rquire stereo rectification
+    {
+        if(Cameramodel == CamModel::Empty || Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
+            {printf("Distortion parameters provided are not supported with unrectified images! \n"); exit(1);}
+
+        Cameramodel = CamModel::Pinhole;
+        CalibProcess = "none";
+        
+        cv::Mat R_L,IntR, DistR, R_R ,NewInt;
+        CalibIn["CameraL.R"] >> R_L;
+        CalibIn["CameraR.K"] >> IntR;
+        CalibIn["CameraR.DistM"] >> DistR;
+        CalibIn["CameraR.R"] >> R_R;
+        CalibIn["New.Intrin"] >> NewInt;
+        if(R_L.empty() || IntR.empty()|| DistR.empty() || R_R.empty() || NewInt.empty())
+        {printf("failed to read required calibration for stereo rectification! exiting.\n");exit(1);}
+        hOrg = h; wOrg=w;
+        K.setIdentity();
+        ic[0] = K(0, 0) = NewInt.at<float>(0,0);
+        ic[1] = K(1, 1) = NewInt.at<float>(1,1);
+        ic[2] = K(0, 2) = NewInt.at<float>(0,2);
+        ic[3] = K(1, 2) = NewInt.at<float>(1,2);
+
+        baseline = CalibIn["Stereo.bf"];
+        if(baseline<=0){printf("failed to read stereo baseline!\n"); exit(1);} 
+        baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
+        cv::initUndistortRectifyMap(K_l, distM, R_L, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1l, M2l);
+        cv::initUndistortRectifyMap(IntR, DistR, R_R, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1r, M2r);
     }
 
     if(Sensortype == Stereo)
-            baseline*=K(0,0); //for vertical baseline this should be K(1,1)
+        baseline*=K(0,0); //for vertical baseline this should be K(1,1)
 
-        
     for(int y=0;y<h;y++)
 	    for(int x=0;x<w;x++)
 		{
@@ -240,15 +177,12 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 				remapY[x+y*w] = -1;
 			}
 		}
-    
-
     std::cout << K << "\n\n";
-
 }
 
 void Undistorter::makeOptimalK_crop()
 {
-	printf("finding CROP optimal new model!\n");
+	// printf("finding CROP optimal new model!\n");
 	K.setIdentity();
 
 	// 1. stretch the center lines as far as possible, to get initial coarse quess.

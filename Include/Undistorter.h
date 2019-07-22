@@ -7,7 +7,6 @@
 namespace FSLAM
 {
 
-
 class Undistorter
 {
 
@@ -23,21 +22,20 @@ public:
 	    if(remapX != 0) delete[] remapX;
 	    if(remapY != 0) delete[] remapY;
     }
-
-    std::vector<std::vector<std::string>> Words; //Stores geometric calibration data
-
-    float ic[10];
     enum CamModel {RadTan = 0, Pinhole, Atan, KannalaBrandt, EquiDistant, Empty};
     CamModel Cameramodel;
     void LoadGeometricCalibration(std::string GeomCalib);
     void makeOptimalK_crop();
     void distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n);
+    cv::Mat M1l, M2l, M1r, M2r; //rectification and remapping matrices for stereo rectification
+    float ic[10];
 
-    void LoadPhotometricCalibration(std::string Gamma, std::string Vignette);
-    cv::Mat M1l, M2l, M1r, M2r;
+    // void LoadPhotometricCalibration(std::string Gamma, std::string Vignette);
+    
 protected:
-    float baseline;
+
     int w, h, wOrg, hOrg;
+    float baseline;
     Mat33 K;
     bool passthrough;
     float* remapX;

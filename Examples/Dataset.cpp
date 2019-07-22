@@ -1,6 +1,7 @@
 
 #include "Main.h"
 #include <unistd.h>
+#include <chrono>
 
 
 int main(int argc, char **argv)
@@ -74,8 +75,10 @@ int main(int argc, char **argv)
             Img = Images[ii];
         else
         {
+            std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
             Img = std::make_shared<ImageData>();
             DataReader->getImage(Img, i);
+            std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
         }
 
         bool skipFrame = false;
@@ -112,7 +115,7 @@ int main(int argc, char **argv)
             Dest = Img->ImageL;
 
         cv::imshow("Img", Dest);
-        cv::waitKey(1);
+        cv::waitKey(0);
     }
 
     return 0;

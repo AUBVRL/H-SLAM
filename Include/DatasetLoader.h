@@ -341,11 +341,8 @@ public:
             {
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
                 ImgData->ImageR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
-                cv::Mat TempL; cv::Mat TempR;
-                cv::remap(ImgData->ImageL, TempL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
-                cv::remap(ImgData->ImageR, TempR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
-                ImgData->ImageL = TempL;
-                ImgData->ImageR = TempR;
+                cv::remap(ImgData->ImageL, ImgData->ImageL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
+                cv::remap(ImgData->ImageR, ImgData->ImageR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
             }
             else if(Sensortype == Monocular)
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);

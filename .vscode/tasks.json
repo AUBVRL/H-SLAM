@@ -6,12 +6,12 @@
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/Dataset",
             "args": [ 
-                      "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono
+                    //   "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono
                       //"path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/21/",        //Kitti
-                      //"path=  /mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",          //Euroc
-                      "dataset=TumMono", //Euroc, TumMono or Kitti
-                      "sensor=Monocular", //Monocular, Stereo or RGBD
-                      "intrinsics=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
+                      "path=  /mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",          //Euroc
+                      "dataset=Euroc", //Euroc, TumMono or Kitti
+                      "sensor=Stereo", //Monocular, Stereo or RGBD
+                      "intrinsics=/home/gy/devel/git/FSLAM/Examples/Extras/EuRoC.yaml",
                       "vocabulary=pathtovocab",
                       "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
                       "gamma=",
