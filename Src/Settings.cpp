@@ -2,6 +2,9 @@
 
 namespace FSLAM
 {
-    int WidthOri = 1280; 
-    int HeightOri = 1024; 
+    std::shared_ptr<Undistorter> UndistorterL;
+    std::shared_ptr<Undistorter> UndistorterR;
+    Sensor Sensortype = Emptys;
+    int WidthOri; 
+    int HeightOri; 
 }

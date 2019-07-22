@@ -7,6 +7,8 @@
 
 #include "GlobalTypes.h"
 #include "Settings.h"
+#include "Undistorter.h"
+#include <opencv2/imgproc.hpp>
 
 #if HAS_ZIPLIB
 #include "zip.h"
@@ -32,7 +34,6 @@ public:
     int nImgR;
     int nImgD;
 
-    Sensor sensor;
     Dataset dataset;
 
     bool isZipped;
@@ -42,8 +43,8 @@ public:
     char *databuffer;
 #endif
 
-    DatasetReader(Dataset Dataset_t, Sensor Sensor_t,  std::string Path, std::string IntrCalib, std::string Gamma, std::string Vignette):
-    dataset(Dataset_t),sensor(Sensor_t)
+    DatasetReader(Dataset Dataset_t,  std::string Path, std::string IntrCalib, std::string Gamma, std::string Vignette):
+    dataset(Dataset_t)
     {
         #if HAS_ZIPLIB
         ziparchive = 0;
@@ -96,7 +97,7 @@ public:
                     else if (RightDir.compare(0, 15, nstr, 0, 15) == 0)
                         filesR.push_back(nstr);
                 }
-                if ((filesL.size() != filesR.size()) && Sensor_t == Stereo)
+                if ((filesL.size() != filesR.size()) && Sensortype == Stereo)
                 {
                     printf("number of left images not equal number of right images!");
                     exit(-1);
@@ -126,32 +127,33 @@ public:
             else if (Dataset_t == Dataset::Euroc)
             {
                 getdir(Path + "mav0/cam0/data/", filesL);
-                if(sensor == Stereo)
+                if(Sensortype == Stereo)
                     getdir(Path + "mav0/cam1/data/", filesR);
             }
             else if (Dataset_t == Dataset::Kitti)
             {
                 getdir(Path + "image_0/", filesL);
-                if(sensor == Stereo)
+                if(Sensortype == Stereo)
                     getdir(Path + "image_1/", filesR);
             }
         }
 
         nImgL = filesL.size(); nImgR = filesR.size(); nImgD = filesD.size();
 
-        if (Sensor_t == Stereo)
+        if (Sensortype == Stereo)
             if (nImgL == 0 || nImgR == 0 || nImgL != nImgR)
             {
                 printf("There is something wrong with the loaded stereo data: didn't load any or Left and Right images does not match!\n");
                 exit(-1);
             }
-        if (Sensor_t == Monocular)
+        if (Sensortype == Monocular)
             if (filesL.size() == 0)
             {
                 printf("There is something wrong with the images - didn't load any!\n");
                 exit(-1);
             }
         loadtimestamps(Path);
+
     }
 
     ~DatasetReader() 
@@ -331,29 +333,39 @@ public:
         return files.size();
     }
 
-    inline void getImage(std::shared_ptr<ImageData> ImgData, Sensor sensor, int id )
+    inline void getImage(std::shared_ptr<ImageData> ImgData, int id )
     {
         if (!isZipped)
         {
-            if(sensor == Stereo)
+            if(Sensortype == Stereo)
             {
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
                 ImgData->ImageR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
+                cv::Mat TempL; cv::Mat TempR;
+                cv::remap(ImgData->ImageL, TempL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
+                cv::remap(ImgData->ImageR, TempR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
+                ImgData->ImageL = TempL;
+                ImgData->ImageR = TempR;
             }
-            else if(sensor == Monocular)
+            else if(Sensortype == Monocular)
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
         }
         else
         {
             #if HAS_ZIPLIB
-            if(sensor == Stereo)
+            if(Sensortype == Stereo)
             {
                 long readsize = ReadZipBuffer(filesL[id]);
                 ImgData->ImageL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
                 readsize = ReadZipBuffer(filesR[id]);
                 ImgData->ImageR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
+                cv::Mat TempL; cv::Mat TempR;
+                cv::remap(ImgData->ImageL, TempL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
+                cv::remap(ImgData->ImageR, TempR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
+                ImgData->ImageL = TempL;
+                ImgData->ImageR = TempR;
             }
-            else if(sensor == Monocular)
+            else if(Sensortype == Monocular)
             {
                 long readsize = ReadZipBuffer(filesL[id]);
                 ImgData->ImageL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 

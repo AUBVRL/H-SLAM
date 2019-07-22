@@ -38,7 +38,6 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
 #endif
 
 Dataset dataset_= Emptyd;
-Sensor sensor_= Emptys;
 PhotoUnDistMode phoDistMode_ = Emptyp;
 std::string IntrinCalib = "";
 std::string Gamma = "";
@@ -151,11 +150,11 @@ void parseargument(char * arg)
     {
         std::string data = buf;
         if(data == "Monocular")
-            sensor_ = Monocular;
+            Sensortype = Monocular;
         else if (data == "Stereo")
-            sensor_ = Stereo;
+            Sensortype = Stereo;
         else if (data == "RGBD")
-            sensor_= RGBD;
+            Sensortype= RGBD;
     }
     else if (1==sscanf(arg,"photoCalibmodel=%s",buf))
     {
@@ -176,7 +175,7 @@ void ValidateInput()
         printf("you did not specify a dataset\n");
         exit(1);
     }
-    if(sensor_ == Emptys)
+    if(Sensortype == Emptys)
     {
         printf("you did not specify a sensor type\n");
         exit(1);
@@ -207,12 +206,12 @@ void ValidateInput()
         printf("Turning off photometric undistortion as the required data is not available\n");
 
     }
-    if(dataset_ == Tum_mono && sensor_ != Monocular)
+    if(dataset_ == Tum_mono && Sensortype != Monocular)
     {
         printf("Tum_mono is a monocular dataset only\n");
         exit(1);
     }
-    if( (dataset_ == Tum_mono || dataset_ == Euroc || dataset_ == Kitti) && (sensor_ == RGBD))
+    if( (dataset_ == Tum_mono || dataset_ == Euroc || dataset_ == Kitti) && (Sensortype == RGBD))
     {
         printf("the dataset used does not contain RGBD data\n");
         exit(1);

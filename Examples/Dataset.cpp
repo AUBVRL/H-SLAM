@@ -10,7 +10,11 @@ int main(int argc, char **argv)
 
     ValidateInput();
 
-    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(dataset_, sensor_, Path, Path, Path, Path);
+     //Initialize undistorters
+        UndistorterL = std::make_shared<Undistorter>(IntrinCalib, Gamma, Vignette);
+        // if(Sensortype == Stereo || Sensortype == RGBD)
+        //     UndistorterR = std::make_shared<Undistorter>(IntrCalib, GammaR, VignetteR);
+    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(dataset_, Path, IntrinCalib, Gamma, Vignette);
 
     if (Reverse)
     {
@@ -46,7 +50,7 @@ int main(int argc, char **argv)
         {
             int i = idsToPlay[ii];
             std::shared_ptr<ImageData> Img = std::make_shared<ImageData>();
-            DataReader->getImage(Img, sensor_, i);
+            DataReader->getImage(Img, i);
             Images.push_back(Img);
         }
     }
@@ -71,7 +75,7 @@ int main(int argc, char **argv)
         else
         {
             Img = std::make_shared<ImageData>();
-            DataReader->getImage(Img, sensor_, i);
+            DataReader->getImage(Img, i);
         }
 
         bool skipFrame = false;
@@ -95,14 +99,14 @@ int main(int argc, char **argv)
             
 
         cv::Mat Dest;
-        if (sensor_ == Stereo)
+        if (Sensortype == Stereo)
         {
             if (dataset_ != Kitti)
                 cv::hconcat(Img->ImageL, Img->ImageR, Dest);
             else
                 cv::vconcat(Img->ImageL, Img->ImageR, Dest);
         }
-        else if (sensor_ == RGBD)
+        else if (Sensortype == RGBD)
             cv::hconcat(Img->ImageL, Img->Depth, Dest);
         else
             Dest = Img->ImageL;

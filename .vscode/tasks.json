@@ -11,7 +11,7 @@
                       //"path=  /mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",          //Euroc
                       "dataset=TumMono", //Euroc, TumMono or Kitti
                       "sensor=Monocular", //Monocular, Stereo or RGBD
-                      "intrinsics=path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
+                      "intrinsics=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
                       "vocabulary=pathtovocab",
                       "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
                       "gamma=",
@@ -35,8 +35,8 @@
                     //   "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/",        //Kitti
                       "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",          //Euroc
                       "dataset=Euroc", //Euroc, TumMono or Kitti
-                      "sensor=Monocular", //Monocular, Stereo or RGBD
-                      "intrinsics=path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
+                      "sensor=Stereo", //Monocular, Stereo or RGBD
+                      "intrinsics=/media/gy/Drive/devel/FSLAM/Examples/Extras/Euroc.txt",
                       "vocabulary=pathtovocab",
                       "photoCalibmodel=HaveCalib", //HaveCalib, OnlineCalib, NoCalib
                       "gamma=",
@@ -46,7 +46,7 @@
                       "reverse=0",
                       "nogui=0",
                       "prefetch=0",
-                      "playbackspeed=1"
+                      "playbackspeed=0"
             ],
             "problemMatcher": []
         }
