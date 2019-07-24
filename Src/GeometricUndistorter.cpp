@@ -1,6 +1,5 @@
 #include <fstream>
 # include <sstream>
-#include <vector>
 #include <opencv2/imgproc.hpp>
 
 #include "GeometricUndistorter.h"
