@@ -4,11 +4,8 @@
 #include <fstream>
 #include <dirent.h>
 #include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc.hpp>
 
-#include "Main.h"
 #include "GeometricUndistorter.h"
-#include "Settings.h"
 
 #if HAS_ZIPLIB
 #include "zip.h"
