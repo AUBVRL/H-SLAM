@@ -13,6 +13,9 @@
 #include "sophus/se3.hpp"
 #include "sophus/sim3.hpp"
 
+namespace FSLAM
+{
+
 enum Dataset {Tum_mono = 0, Euroc, Kitti, Emptyd};
 enum Sensor {Monocular = 0, Stereo, RGBD, Emptys};
 enum PhotoUnDistMode {HaveCalib = 0, OnlineCalib, NoCalib, Emptyp};
@@ -145,5 +148,5 @@ typedef std::vector<Vec2, Eigen::aligned_allocator<Vec2>> VecVec2;
 typedef std::vector<Vec3, Eigen::aligned_allocator<Vec3>> VecVec3;
 typedef std::vector<Vec2f, Eigen::aligned_allocator<Vec2f>> VecVec2f;
 typedef std::vector<Vec3f, Eigen::aligned_allocator<Vec3f>> VecVec3f;
-
+}
 #endif

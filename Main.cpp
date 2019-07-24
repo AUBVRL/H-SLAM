@@ -1,34 +1,33 @@
-
-#include "Main.h"
 #include <unistd.h>
+#include <memory>
 #include <chrono>
 
+#include "Main.h"
+#include "DatasetLoader.h"
+
+using namespace FSLAM;
 
 int main(int argc, char **argv)
 {
-    for (int i = 1; i < argc; i++)
-        parseargument(argv[i]);
-
-    ValidateInput();
+    std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv);
 
      //Initialize undistorters
-        UndistorterL = std::make_shared<Undistorter>(IntrinCalib, Gamma, Vignette);
-        // if(Sensortype == Stereo || Sensortype == RGBD)
-        //     UndistorterR = std::make_shared<Undistorter>(IntrCalib, GammaR, VignetteR);
-    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(dataset_, Path, IntrinCalib, Gamma, Vignette);
+    std::shared_ptr<GeometricUndistorter> GeomUndistorter = std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
 
-    if (Reverse)
+    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_, GeomUndistorter);
+    
+    if (Input_->Reverse)
     {
-        int temp = Start;
-        Start = End - 1;
-        if (Start >= DataReader->nImgL)
-            Start = DataReader->nImgL - 1;
-        End = temp;
+        int temp = Input_->Start;
+        Input_->Start = Input_->End - 1;
+        if (Input_->Start >= DataReader->nImgL)
+            Input_->Start = DataReader->nImgL - 1;
+        Input_->End = temp;
     }
 
     std::vector<int> idsToPlay;
     std::vector<double> timesToPlayAt;
-    for (int i = Start; i >= 0 && i < DataReader->nImgL && linc * i < linc * End; i += linc)
+    for (int i = Input_->Start; i >= 0 && i < DataReader->nImgL && Input_->linc * i < Input_->linc * Input_->End; i += Input_->linc)
     {
         idsToPlay.push_back(i);
         if (timesToPlayAt.size() == 0)
@@ -39,12 +38,12 @@ int main(int argc, char **argv)
         {
             double tsThis = DataReader->getTimestamp(idsToPlay[idsToPlay.size()-1]);
             double tsPrev = DataReader->getTimestamp(idsToPlay[idsToPlay.size()-2]);
-            timesToPlayAt.push_back(timesToPlayAt.back() +  fabs(tsThis-tsPrev)/PlaybackSpeed);
+            timesToPlayAt.push_back(timesToPlayAt.back() +  fabs(tsThis-tsPrev)/Input_->PlaybackSpeed);
         }
     }
 
     std::vector<std::shared_ptr<ImageData>> Images;
-    if (Prefetch && Images.empty())
+    if (Input_->Prefetch && Images.empty())
     {
         printf("LOADING ALL IMAGES!\n");
         for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
@@ -71,7 +70,7 @@ int main(int argc, char **argv)
         // }
         int i = idsToPlay[ii];
         std::shared_ptr<ImageData> Img;
-        if (Prefetch)
+        if (Input_->Prefetch)
             Img = Images[ii];
         else
         {
@@ -82,7 +81,7 @@ int main(int argc, char **argv)
         }
 
         bool skipFrame = false;
-            if (PlaybackSpeed != 0) {
+            if (Input_->PlaybackSpeed != 0) {
                 struct timeval tv_now;
                 gettimeofday(&tv_now, NULL);
                 double sSinceStart = sInitializerOffset + ((tv_now.tv_sec - tv_start.tv_sec) +
@@ -99,12 +98,10 @@ int main(int argc, char **argv)
             if (skipFrame)
                 continue;
 
-            
-
         cv::Mat Dest;
         if (Sensortype == Stereo)
         {
-            if (dataset_ != Kitti)
+            if (Input_->dataset_ != Kitti)
                 cv::hconcat(Img->ImageL, Img->ImageR, Dest);
             else
                 cv::vconcat(Img->ImageL, Img->ImageR, Dest);

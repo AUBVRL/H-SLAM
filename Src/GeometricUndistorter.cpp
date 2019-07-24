@@ -1,4 +1,4 @@
-#include "Undistorter.h"
+#include "GeometricUndistorter.h"
 
 #include <fstream>
 # include <sstream>
@@ -10,7 +10,7 @@
 namespace FSLAM
 {
 
-void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
+void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 {
     passthrough=false;
 	remapX = 0;
@@ -28,7 +28,6 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
     CalibIn["CameraL.K"] >> K_l;
 
-    Cameramodel = CamModel::Empty;
     std::string Calibmodel = CalibIn["Calibration.model"];
     if(Calibmodel == "RadTan")
     { Cameramodel = CamModel::RadTan; CalibIn["CameraL.distM"] >> distM; }
@@ -40,9 +39,9 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     { Cameramodel = CamModel::EquiDistant; CalibIn["CameraL.distM"] >> distM; }
     else if (Calibmodel == "KannalaBrandt")
     { Cameramodel = CamModel::KannalaBrandt; CalibIn["CameraL.distM"] >> distM; }
+    else {printf("Camera calibration model not specified! exit,\n"); exit(1);}
     
-    if(Cameramodel==CamModel::Empty || K_l.empty() || wOrg <=0 || hOrg <= 0 || w <=0 || h<= 0)
-    {printf("Reading camera calibration failed! exit.\n"); exit(1);}
+    if(K_l.empty() || wOrg <=0 || hOrg <= 0 || w <=0 || h<= 0) {printf("Reading camera calibration failed! exit.\n"); exit(1);}
     if( (Cameramodel == CamModel::EquiDistant || Cameramodel == CamModel::RadTan || Cameramodel== CamModel::KannalaBrandt) && distM.empty())
     {printf("Error reading camera distortion! exit.\n"); exit(1);}
 
@@ -67,7 +66,8 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     ic[2] = K_l.at<float>(0,2); ic[3] = K_l.at<float>(1,2);
     
     std::string CalibProcess = CalibIn["Calib.process"];
-    std::string StereoState = CalibIn["Stereo.State"];
+    CalibIn["Stereo.State"] >> StereoState;
+
     bool needStereoRect = (Sensortype == Stereo && StereoState == "rectify");
 
     if(Sensortype == Sensor::Stereo && StereoState == "prerectified")
@@ -114,7 +114,7 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     }
     else //rquire stereo rectification
     {
-        if(Cameramodel == CamModel::Empty || Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
+        if(Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
             {printf("Distortion parameters provided are not supported with unrectified images! \n"); exit(1);}
 
         Cameramodel = CamModel::Pinhole;
@@ -180,7 +180,7 @@ void Undistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     std::cout << K << "\n\n";
 }
 
-void Undistorter::makeOptimalK_crop()
+void GeometricUndistorter::makeOptimalK_crop()
 {
 	// printf("finding CROP optimal new model!\n");
 	K.setIdentity();
@@ -294,7 +294,7 @@ void Undistorter::makeOptimalK_crop()
 
 }
 
-void Undistorter::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n)
+void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n)
 {
     // current camera parameters
     float fx = ic[0];

@@ -4,18 +4,17 @@
 #include <fstream>
 #include <dirent.h>
 #include <opencv2/highgui/highgui.hpp>
-
-#include "GlobalTypes.h"
-#include "Settings.h"
-#include "Undistorter.h"
 #include <opencv2/imgproc.hpp>
+
+#include "Main.h"
+#include "GeometricUndistorter.h"
+#include "Settings.h"
 
 #if HAS_ZIPLIB
 #include "zip.h"
 #endif
 
 using namespace FSLAM;
-enum CameraModel {Radtan, Opencv};
 
 class DatasetReader
 {
@@ -25,49 +24,43 @@ public:
     std::vector<std::string> filesR;
     std::vector<std::string> filesD;
     std::vector<double> timestamps;
-
     std::vector<float> exposuresL;
     std::vector<float> exposuresR;
-
 
     int nImgL;
     int nImgR;
     int nImgD;
 
-    Dataset dataset;
-
     bool isZipped;
+    Dataset dataset;
+    std::shared_ptr<GeometricUndistorter> GeomUndist;
     
 #if HAS_ZIPLIB
     zip_t *ziparchive;
     char *databuffer;
 #endif
 
-    DatasetReader(Dataset Dataset_t,  std::string Path, std::string IntrCalib, std::string Gamma, std::string Vignette):
-    dataset(Dataset_t)
+    DatasetReader(std::shared_ptr<Input> In_, std::shared_ptr<GeometricUndistorter> GeomUndistorter): dataset(In_->dataset_), GeomUndist(GeomUndistorter)
     {
         #if HAS_ZIPLIB
         ziparchive = 0;
         databuffer = 0;
         #endif
-        isZipped = (Path.length() > 4 && Path.substr(Path.length() - 4) == ".zip");
+        isZipped = (In_->Path.length() > 4 && In_->Path.substr(In_->Path.length() - 4) == ".zip");
+
         if (isZipped)
         {
-            
             #if HAS_ZIPLIB
             int ziperror = 0;
-            ziparchive = zip_open(Path.c_str(), ZIP_RDONLY, &ziperror);
+            ziparchive = zip_open(In_->Path.c_str(), ZIP_RDONLY, &ziperror);
             if (ziperror != 0)
-            {
-                printf("ERROR %d reading archive %s!\n", ziperror, Path.c_str());
-                exit(1);
-            }
+            {printf("ERROR %d reading archive %s!\n", ziperror, In_->Path.c_str()); exit(1);}
 
             filesL.clear();
             filesR.clear();
             filesD.clear();
             int numEntries;
-            if (Dataset_t == Dataset::Tum_mono)
+            if (dataset == Dataset::Tum_mono)
             {
                 numEntries = zip_get_num_entries(ziparchive, 0);
                 for (int k = 0; k < numEntries; k++)
@@ -80,7 +73,7 @@ public:
                 }
                 std::sort(filesL.begin(), filesL.end());
             }
-            else if (Dataset_t == Dataset::Euroc)
+            else if (dataset == Dataset::Euroc)
             {
                 numEntries = zip_get_num_entries(ziparchive, 0);
                 std::string LeftDir = "mav0/cam0/data/";
@@ -97,7 +90,7 @@ public:
                     else if (RightDir.compare(0, 15, nstr, 0, 15) == 0)
                         filesR.push_back(nstr);
                 }
-                if ((filesL.size() != filesR.size()) && Sensortype == Stereo)
+                if ((filesL.size() != filesR.size()) && Sensortype == Stereo )
                 {
                     printf("number of left images not equal number of right images!");
                     exit(-1);
@@ -119,22 +112,22 @@ public:
         }
         else
         {
-            if (Path.at(Path.length() - 1) != '/')
-                Path = Path + "/";
+            if (In_->Path.at(In_->Path.length() - 1) != '/')
+                In_->Path = In_->Path + "/";
 
-            if (Dataset_t == Dataset::Tum_mono)
-                getdir(Path, filesL);
-            else if (Dataset_t == Dataset::Euroc)
+            if (dataset == Dataset::Tum_mono)
+                getdir(In_->Path, filesL);
+            else if (dataset == Dataset::Euroc)
             {
-                getdir(Path + "mav0/cam0/data/", filesL);
+                getdir(In_->Path + "mav0/cam0/data/", filesL);
                 if(Sensortype == Stereo)
-                    getdir(Path + "mav0/cam1/data/", filesR);
+                    getdir(In_->Path + "mav0/cam1/data/", filesR);
             }
-            else if (Dataset_t == Dataset::Kitti)
+            else if (dataset == Dataset::Kitti)
             {
-                getdir(Path + "image_0/", filesL);
+                getdir(In_->Path + "image_0/", filesL);
                 if(Sensortype == Stereo)
-                    getdir(Path + "image_1/", filesR);
+                    getdir(In_->Path + "image_1/", filesR);
             }
         }
 
@@ -152,8 +145,7 @@ public:
                 printf("There is something wrong with the images - didn't load any!\n");
                 exit(-1);
             }
-        loadtimestamps(Path);
-
+        loadtimestamps(In_->timestampsL);
     }
 
     ~DatasetReader() 
@@ -164,14 +156,14 @@ public:
         #endif
     }
 
-    inline void loadtimestamps(std::string Path)
+    inline void loadtimestamps(std::string path)
     {
         if (dataset == Kitti)
         {
-            if (Path.at(Path.length() - 1) != '/')
-                Path = Path + "/";
+            // if (path.at(path.length() - 1) != '/')
+            //     path = path + "/";
             std::ifstream fTimes;
-            std::string strPathTimeFile = Path + "times.txt";
+            std::string strPathTimeFile = path ;//+ "times.txt";
             fTimes.open(strPathTimeFile.c_str());
             if (!fTimes)
             {
@@ -195,10 +187,10 @@ public:
         }
         else if (dataset == Euroc)
         {
-            if (Path.at(Path.length() - 1) != '/')
-                Path = Path + "/";
+            // if (path.at(path.length() - 1) != '/')
+            //     path = path + "/";
             std::ifstream fTimes;
-            std::string strPathTimeFile = Path + "mav0/cam0/data.csv";
+            std::string strPathTimeFile = path ;//+ "mav0/cam0/data.csv";
    
             fTimes.open(strPathTimeFile.c_str());
             if (!fTimes)
@@ -222,11 +214,14 @@ public:
                     timestamps.push_back(stamp * 1e-9);
             }
             fTimes.close();
+            if(timestamps.size() != nImgL)
+            { printf("timestamps don't match number of images. disabling timestamps!\n"); timestamps.clear(); return;}
         }
         else if (dataset == Tum_mono)
         {
             std::ifstream tr;
-            std::string timesFile = Path.substr(0, Path.find_last_of('/')) + "/times.txt";
+            std::string timesFile = path;
+            // std::string timesFile = path.substr(0, path.find_last_of('/')) + "/times.txt";
             tr.open(timesFile.c_str());
 
             while (!tr.eof())
@@ -341,8 +336,11 @@ public:
             {
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
                 ImgData->ImageR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
-                cv::remap(ImgData->ImageL, ImgData->ImageL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
-                cv::remap(ImgData->ImageR, ImgData->ImageR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
+                if(GeomUndist->StereoState == "rectify")
+                {
+                    cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
+                    cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
+                }
             }
             else if(Sensortype == Monocular)
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
@@ -356,11 +354,11 @@ public:
                 ImgData->ImageL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
                 readsize = ReadZipBuffer(filesR[id]);
                 ImgData->ImageR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
-                cv::Mat TempL; cv::Mat TempR;
-                cv::remap(ImgData->ImageL, TempL, UndistorterL->M1l, UndistorterL->M2l, cv::INTER_LINEAR);
-                cv::remap(ImgData->ImageR, TempR, UndistorterL->M1r, UndistorterL->M2r, cv::INTER_LINEAR);
-                ImgData->ImageL = TempL;
-                ImgData->ImageR = TempR;
+                if(GeomUndist->StereoState == "rectify")
+                {
+                    cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
+                    cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
+                }
             }
             else if(Sensortype == Monocular)
             {

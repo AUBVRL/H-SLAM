@@ -3,7 +3,8 @@
 #include <sstream>
 #include <string>
 
-#include "DatasetLoader.h"
+#include "GlobalTypes.h"
+#include "Settings.h"
 
 #ifdef MSVC
 #include <Windows.h>
@@ -37,186 +38,215 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
 #include <sys/time.h>
 #endif
 
-Dataset dataset_= Emptyd;
-PhotoUnDistMode phoDistMode_ = Emptyp;
-std::string IntrinCalib = "";
-std::string Gamma = "";
-std::string Vignette = "";
-std::string Vocabulary = "";
-std::string Path = "";
-
-bool Reverse = false;
-bool Nogui = false;
-bool Prefetch = false;
-float PlaybackSpeed = 0;
-int Start = 0;
-int End = 9999999;
-int Mode = 0;
-int linc = 1;
-
-void parseargument(char * arg)
+namespace FSLAM
 {
-    int option;
-	float foption;
-	char buf[1000];
-    
-    if(1==sscanf(arg,"path=%s",buf))
-	{
-		Path = buf;
-		printf("loading data from %s!\n", Path.c_str());
-		return;
-	}
-    else if(1==sscanf(arg,"intrinsics=%s",buf))
-	{
-		IntrinCalib = buf;
-		printf("loading Intrinsics from %s!\n", IntrinCalib.c_str());
-		return;
-	}
-    else if(1==sscanf(arg,"gamma=%s",buf))
-	{
-		Gamma = buf;
-		printf("loading Gamma from %s!\n", Gamma.c_str());
-		return;
-	}
-    else if(1==sscanf(arg,"vignette=%s",buf))
-	{
-		Vignette = buf;
-		printf("loading Gamma from %s!\n", Vignette.c_str());
-		return;
-	}
-    else if(1==sscanf(arg,"vocabulary=%s",buf))
-	{
-		Vocabulary = buf;
-		printf("loading Vocabulary from %s!\n", Vocabulary.c_str());
-		return;
-	}
-    else if(1==sscanf(arg,"start=%d",&option))
-    {
-        Start = option;
-        printf("START AT %d!\n",Start);
-		return;
-    }
-    else if(1==sscanf(arg,"end=%d",&option))
-    {
-        End = option;
-        printf("End AT %d!\n",End);
-		return;
-    }
-    else if(1==sscanf(arg,"reverse=%d",&option))
-	{
-		if(option==1)
-		{
-			Reverse = true;
-            linc = -1;
-			printf("REVERSE!\n");
-		}
-		return;
-	}
-    else if(1==sscanf(arg,"nogui=%d",&option))
-	{
-		if(option==1)
-		{
-			Nogui = true;
-			printf("No GUI!\n");
-		}
-		return;
-	}
-    else if(1==sscanf(arg,"prefetch=%d",&option))
-	{
-		if(option==1)
-		{
-			Prefetch = true;
-			printf("Preload images!\n");
-		}
-		return;
-	}
-    else if(1==sscanf(arg,"playbackspeed=%f",&foption))
-	{
-		PlaybackSpeed = foption;
-		printf("playback speed %f!\n",PlaybackSpeed);
-		return;
-	}
-    else if (1==sscanf(arg,"dataset=%s",buf))
-    {
-        std::string data = buf;
-        if(data == "Euroc")
-            dataset_ = Euroc;
-        else if(data == "TumMono")
-            dataset_ = Tum_mono;
-        else if (data == "Kitti")
-            dataset_ = Kitti;
-    }
-    else if (1==sscanf(arg,"sensor=%s",buf))
-    {
-        std::string data = buf;
-        if(data == "Monocular")
-            Sensortype = Monocular;
-        else if (data == "Stereo")
-            Sensortype = Stereo;
-        else if (data == "RGBD")
-            Sensortype= RGBD;
-    }
-    else if (1==sscanf(arg,"photoCalibmodel=%s",buf))
-    {
-        std::string data = buf;
-        if(data == "HaveCalib")
-            phoDistMode_ = HaveCalib;
-        else if (data == "OnlineCalib")
-            phoDistMode_ = OnlineCalib;
-        else if (data == "NoCalib")
-            phoDistMode_= NoCalib;
-    }
-}
-
-void ValidateInput()
+class Input
 {
-    if(dataset_ == Emptyd)
+public:
+    Input(int argc, char** In_): 
+            dataset_(Emptyd), phoDistMode_(Emptyp), IntrinCalib(""), GammaL(""), GammaR(""), timestampsL(""),
+            VignetteL(""), VignetteR(""), Vocabulary(""), Path(""), Reverse(false), Nogui(false), 
+            Prefetch(false), PlaybackSpeed(0), Start(0), End(9999999), Mode(0), linc(1), needPhotoDistorterL(false), 
+            needPhotoDistorterR(false)
     {
-        printf("you did not specify a dataset\n");
-        exit(1);
+        for (int i = 1; i < argc; i++)
+            parseargument(In_[i]);
+        ValidateInput();
+
+        if(phoDistMode_== PhotoUnDistMode::NoCalib)
+        {
+            needPhotoDistorterL= false;
+            needPhotoDistorterR= false;
+        }
+        else
+        {
+            needPhotoDistorterL = true;
+            if(Sensortype == Stereo)
+                needPhotoDistorterR = true;
+        }
     }
-    if(Sensortype == Emptys)
+    Dataset dataset_;
+    PhotoUnDistMode phoDistMode_;
+    std::string IntrinCalib;
+    std::string GammaL;
+    std::string GammaR;
+    std::string timestampsL;
+    std::string VignetteL;
+    std::string VignetteR;
+    std::string Vocabulary;
+    std::string Path;
+    bool Reverse;
+    bool Nogui;
+    bool Prefetch;
+    float PlaybackSpeed;
+    int Start;
+    int End;
+    int Mode; //not used for now!
+    int linc;
+
+    bool needPhotoDistorterL;
+    bool needPhotoDistorterR;
+
+    inline void ValidateInput()
     {
-        printf("you did not specify a sensor type\n");
-        exit(1);
-    }
-    if(Path=="")
-    {
-        printf("you did not specify an image path\n");
-        exit(1);
-    }
-    if(IntrinCalib=="")
-    {
-        printf("you did not specify an Intrinsics calib path\n");
-        exit(1);
-    }
-    if(Vocabulary=="")
-    {
-        printf("you did not specify a Vocabulary path\n");
-        exit(1);
-    }
+    //Mandatory Input
+    if(dataset_ == Emptyd) {printf("you did not specify a dataset\n"); exit(1);}
+    if(Sensortype == Emptys) {printf("you did not specify a sensor type\n"); exit(1);}
     if(phoDistMode_== Emptyp)
+        {printf("you did not specify a photometric distortion mode\n"); exit(1);}
+    if(IntrinCalib=="") { printf("you did not specify an Intrinsics calib path\n"); exit(1);}
+    if(Vocabulary=="") {printf("you did not specify a Vocabulary path\n"); exit(1);}
+    if(Path=="") {printf("you did not specify an image path\n"); exit(1);}
+    if(phoDistMode_== PhotoUnDistMode::HaveCalib)
     {
-        printf("you did not specify a photometric distortion mode\n");
-        exit(1);
+        if(GammaL == "" || VignetteL =="")
+            {printf("photometric calibration for left image not provided!exit.\n");exit(1);}
+        if(Sensortype == Sensor::Stereo && (GammaR == "" || VignetteR ==""))
+            {printf("photometric calibration for right image is not provided!exit.\n");exit(1);}
     }
-    if(Gamma=="" || Vignette == "" && phoDistMode_ == HaveCalib )
-    {
-        phoDistMode_= NoCalib;
-        printf("Turning off photometric undistortion as the required data is not available\n");
+    if(dataset_ == Tum_mono && Sensortype != Monocular) {printf("Tum_mono is a monocular dataset only\n");exit(1);}
+    if(dataset_ == Euroc && Sensortype != Monocular && Sensortype != Stereo)
+        {printf("invalid sensor type for the dataset chosen!\n");exit(1);}   
+    if( (dataset_ == Kitti) && (Sensortype != Monocular) && (Sensortype != Stereo) )
+        {printf("invalid sensor type for the dataset chosen!\n");exit(1);}    
+    }
 
-    }
-    if(dataset_ == Tum_mono && Sensortype != Monocular)
+    void parseargument(char *arg)
     {
-        printf("Tum_mono is a monocular dataset only\n");
-        exit(1);
+        int option;
+        float foption;
+        char buf[1000];
+
+        if (1 == sscanf(arg, "path=%s", buf))
+        {
+            Path = buf;
+            printf("loading data from %s!\n", Path.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "intrinsics=%s", buf))
+        {
+            IntrinCalib = buf;
+            if (IntrinCalib.length() > 4 && IntrinCalib.substr(IntrinCalib.length() - 5) != ".yaml")
+            {
+                printf("Intrinsics have to be a .yaml file!\n");
+                exit(1);
+            }
+            printf("loading Intrinsics from %s!\n", IntrinCalib.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "timestampsL=%s", buf))
+        {
+            timestampsL = buf;
+            printf("loading left camera timestamps from %s!\n", timestampsL.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "gammaL=%s", buf))
+        {
+            GammaL = buf;
+            printf("loading Gamma Left from %s!\n", GammaL.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "gammaR=%s", buf))
+        {
+            GammaR = buf;
+            printf("loading Gamma Right from %s!\n", GammaR.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "vignetteL=%s", buf))
+        {
+            VignetteL = buf;
+            printf("loading vignette left from %s!\n", VignetteL.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "vignetteR=%s", buf))
+        {
+            VignetteR = buf;
+            printf("loading vignette right from %s!\n", VignetteR.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "vocabulary=%s", buf))
+        {
+            Vocabulary = buf;
+            printf("loading Vocabulary from %s!\n", Vocabulary.c_str());
+            return;
+        }
+        else if (1 == sscanf(arg, "start=%d", &option))
+        {
+            Start = option;
+            printf("START AT %d!\n", Start);
+            return;
+        }
+        else if (1 == sscanf(arg, "end=%d", &option))
+        {
+            End = option;
+            printf("End AT %d!\n", End);
+            return;
+        }
+        else if (1 == sscanf(arg, "reverse=%d", &option))
+        {
+            if (option == 1)
+            {
+                Reverse = true;
+                linc = -1;
+                printf("REVERSE!\n");
+            }
+            return;
+        }
+        else if (1 == sscanf(arg, "nogui=%d", &option))
+        {
+            if (option == 1)
+            {
+                Nogui = true;
+                printf("No GUI!\n");
+            }
+            return;
+        }
+        else if (1 == sscanf(arg, "prefetch=%d", &option))
+        {
+            if (option == 1)
+            {
+                Prefetch = true;
+                printf("Preload images!\n");
+            }
+            return;
+        }
+        else if (1 == sscanf(arg, "playbackspeed=%f", &foption))
+        {
+            PlaybackSpeed = foption;
+            printf("playback speed %f!\n", PlaybackSpeed);
+            return;
+        }
+        else if (1 == sscanf(arg, "dataset=%s", buf))
+        {
+            std::string data = buf;
+            if (data == "Euroc")
+                dataset_ = Euroc;
+            else if (data == "TumMono")
+                dataset_ = Tum_mono;
+            else if (data == "Kitti")
+                dataset_ = Kitti;
+        }
+        else if (1 == sscanf(arg, "sensor=%s", buf))
+        {
+            std::string data = buf;
+            if (data == "Monocular")
+                Sensortype = Monocular;
+            else if (data == "Stereo")
+                Sensortype = Stereo;
+            else if (data == "RGBD")
+                Sensortype = RGBD;
+        }
+        else if (1 == sscanf(arg, "photomCalibmodel=%s", buf))
+        {
+            std::string data = buf;
+            if (data == "HaveCalib")
+                phoDistMode_ = HaveCalib;
+            else if (data == "OnlineCalib")
+                phoDistMode_ = OnlineCalib;
+            else if (data == "NoCalib")
+                phoDistMode_ = NoCalib;
+        }
     }
-    if( (dataset_ == Tum_mono || dataset_ == Euroc || dataset_ == Kitti) && (Sensortype == RGBD))
-    {
-        printf("the dataset used does not contain RGBD data\n");
-        exit(1);
-    }    
+};
 }
-
-
 #endif

@@ -47,7 +47,7 @@ endif (MSVC)
 set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/System.cpp
   ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Undistorter.cpp
+  ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp
 
 )
 
@@ -66,7 +66,7 @@ include_directories(
 ) 
 
 # compile library.
-add_library(FSLAM ${fslam_SOURCE})
+add_library(FSLAMlib ${fslam_SOURCE})
 
 #if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 #    set(BOOST_THREAD_LIBRARY boost_thread-mt)
@@ -83,7 +83,7 @@ set(LIBS
   ${Pangolin_LIBRARIES}
   ${DBoW3_LIB_DIR}/libDBoW3.so
 ) #${BOOST_THREAD_LIBRARY} 
-add_executable(Dataset ${PROJECT_SOURCE_DIR}/Examples/Dataset.cpp )
-target_link_libraries(Dataset FSLAM cxsparse ${LIBS} ) #boost_system
+add_executable(FSLAM ${PROJECT_SOURCE_DIR}/Main.cpp )
+target_link_libraries(FSLAM FSLAMlib cxsparse ${LIBS} ) #boost_system
 
 
