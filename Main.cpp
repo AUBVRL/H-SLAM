@@ -49,7 +49,7 @@ int main(int argc, char **argv)
         for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
         {
             int i = idsToPlay[ii];
-            std::shared_ptr<ImageData> Img = std::make_shared<ImageData>();
+            std::shared_ptr<ImageData> Img = std::make_shared<ImageData>(GeomUndistorter->w, GeomUndistorter->h);
             DataReader->getImage(Img, i);
             Images.push_back(Img);
         }
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
         else
         {
             std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-            Img = std::make_shared<ImageData>();
+            Img = std::make_shared<ImageData>(GeomUndistorter->w, GeomUndistorter->h);
             DataReader->getImage(Img, i);
             std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
         }
@@ -102,14 +102,14 @@ int main(int argc, char **argv)
         if (Sensortype == Stereo)
         {
             if (Input_->dataset_ != Kitti)
-                cv::hconcat(Img->ImageL, Img->ImageR, Dest);
+                cv::hconcat(Img->cvImgL, Img->cvImgR, Dest);
             else
-                cv::vconcat(Img->ImageL, Img->ImageR, Dest);
+                cv::vconcat(Img->cvImgL, Img->cvImgR, Dest);
         }
         else if (Sensortype == RGBD)
-            cv::hconcat(Img->ImageL, Img->Depth, Dest);
+            cv::hconcat(Img->cvImgL, Img->cvImgR, Dest);
         else
-            Dest = Img->ImageL;
+            Dest = Img->cvImgL;
 
         cv::imshow("Img", Dest);
         cv::waitKey(1);

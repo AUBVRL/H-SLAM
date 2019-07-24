@@ -329,32 +329,19 @@ public:
         {
             if(Sensortype == Stereo)
             {
-                ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
-                ImgData->ImageR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
-                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
+                ImgData->cvImgR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
+                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri || ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
                     {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                if(GeomUndist->StereoState == "rectify")
-                {
-                    cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
-                    cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
-                    return;
-                }
-                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
-                cv::Mat outputR = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F);
-                GeomUndist->undistort(ImgData->ImageL, outputL);
-                GeomUndist->undistort(ImgData->ImageR, outputR);
-                outputL.convertTo(ImgData->ImageL, CV_8U);
-                outputR.convertTo(ImgData->ImageR, CV_8U);
+                
+                GeomUndist->undistort(ImgData);
             }
             else if(Sensortype == Monocular)
             {
-                ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
-                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
+                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
                     {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
-                GeomUndist->undistort(ImgData->ImageL, outputL);
-                outputL.convertTo(ImgData->ImageL, CV_8U);
-
+                GeomUndist->undistort(ImgData);
             }
         }
         else
@@ -363,33 +350,21 @@ public:
             if(Sensortype == Stereo)
             {
                 long readsize = ReadZipBuffer(filesL[id]);
-                ImgData->ImageL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
+                ImgData->cvImgL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
                 readsize = ReadZipBuffer(filesR[id]);
-                ImgData->ImageR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
-                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                ImgData->cvImgR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
+                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri || ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
                     {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                if(GeomUndist->StereoState == "rectify")
-                {
-                    cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
-                    cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
-                    return;
-                }
-                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
-                cv::Mat outputR = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F);
-                GeomUndist->undistort(ImgData->ImageL, outputL);
-                GeomUndist->undistort(ImgData->ImageR, outputR);
-                outputL.convertTo(ImgData->ImageL, CV_8U);
-                outputR.convertTo(ImgData->ImageR, CV_8U);
+
+                GeomUndist->undistort(ImgData);
             }
             else if(Sensortype == Monocular)
             {
                 long readsize = ReadZipBuffer(filesL[id]);
-                ImgData->ImageL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
-                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                ImgData->cvImgL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
+                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
                     {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
-                GeomUndist->undistort(ImgData->ImageL, outputL);
-                outputL.convertTo(ImgData->ImageL, CV_8U);
+                GeomUndist->undistort(ImgData);
             }
             #else
                 printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
@@ -397,6 +372,9 @@ public:
             #endif
         }
         return;
+        ImgData->timestamp = getTimestamp(id);
+        ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
+        ImgData->ExposureR = exposuresR.size() == 0 ? 1.0f : exposuresR[id];
     }
 
     inline long ReadZipBuffer(std::string In_)

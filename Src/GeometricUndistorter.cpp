@@ -442,16 +442,38 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
 
 }
 
-void GeometricUndistorter::undistort(cv::Mat &Input_, cv::Mat &Output)
+void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, bool isLeft)
 {
-    cv::Mat Temp;
-    Input_.convertTo(Temp,CV_32F);
-    if (!passthrough)
+    bool doRight = !ImgData->cvImgR.empty();
+    if (Sensortype == Stereo)
     {
-        float *out_data = (float*) Output.data;
+        if (StereoState == "rectify")
+        {
+            cv::remap(ImgData->cvImgL, ImgData->cvImgL, M1l, M2l, cv::INTER_LINEAR);
+            cv::remap(ImgData->cvImgR, ImgData->cvImgR, M1r, M2r, cv::INTER_LINEAR);
+            for (int i = 0; i < w * h; i++)
+            {
+                ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+                ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+            }
+            return;
+        }
+    }
+    if (!passthrough)
+    {   
+        for (int i = 0; i < WidthOri * HeightOri; i++)
+        {
+            in_data[i] = ImgData->cvImgL.data[i];
+            if(doRight)
+                in_data2[i] = ImgData->cvImgR.data[i];
+        }
+        
 
-        float *in_data = (float*) Temp.data;
-        size_t elem_step = Temp.step / sizeof(float);
+        float *out_data;
+        float *out_data2;
+        
+        out_data = ImgData->fImgL;
+        out_data2 = ImgData->fImgR;
 
         for (int idx = w * h - 1; idx >= 0; idx--)
         {
@@ -462,6 +484,8 @@ void GeometricUndistorter::undistort(cv::Mat &Input_, cv::Mat &Output)
             if (xx < 0)
             {
                 out_data[idx] = 0;
+                if(doRight)
+                    out_data2[idx] = 0;
             }
 
             int xxi = xx;
@@ -472,16 +496,34 @@ void GeometricUndistorter::undistort(cv::Mat &Input_, cv::Mat &Output)
 
             // get array base pointer
             const float *src = in_data + xxi + yyi * wOrg;
+            const float *src2;
+            if(doRight)
+                src2 = in_data2 + xxi + yyi * wOrg;
 
             // interpolate (bilinear)
             out_data[idx] = xxyy * src[1 + wOrg] + (yy - xxyy) * src[wOrg] + (xx - xxyy) * src[1] + (1 - xx - yy + xxyy) * src[0];
+            if(doRight)
+                out_data2[idx] = xxyy * src2[1 + wOrg] + (yy - xxyy) * src2[wOrg] + (xx - xxyy) * src2[1] + (1 - xx - yy + xxyy) * src2[0];
+        }
+
+        ImgData->cvImgL = cv::Mat(cv::Size(w, h), CV_32F, out_data);
+        ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
+
+        if(doRight)
+        {
+            ImgData->cvImgR = cv::Mat(cv::Size(w, h), CV_32F,out_data);
+            ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
         }
     }
     else
     {
-        memcpy((float*)Output.data, (float*)Temp.data, sizeof(float) * w * h);
+        for (int i = 0; i < WidthOri * HeightOri; i++)
+        {
+            ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+            if(doRight)
+                ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+        }
+
     }
 }
-
-
 }

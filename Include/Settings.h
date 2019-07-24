@@ -1,7 +1,7 @@
 #ifndef __Settings__
 #define __Settings__
-#include "GeometricUndistorter.h"
 #include <memory>
+#include <GlobalTypes.h>
 namespace FSLAM
 {
 

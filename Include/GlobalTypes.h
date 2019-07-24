@@ -23,23 +23,41 @@ enum PhotoUnDistMode {HaveCalib = 0, OnlineCalib, NoCalib, Emptyp};
 struct ImageData
 {
 public:
-    cv::Mat ImageL;
-    cv::Mat ImageR;
-    cv::Mat Depth;
+    cv::Mat cvImgL;
+    cv::Mat cvImgR;
     double timestamp;
-    float ExposureTimeL;
-    float ExposureTimeR;
+    float ExposureL;
+    float ExposureR;
 
+    float* fImgL;
+    float* fImgR;
 
     inline void deepCopy(ImageData & NewData)
     {
-        if(!ImageL.empty()) ImageL.copyTo(NewData.ImageL);
-        if(!ImageR.empty()) ImageR.copyTo(NewData.ImageR);
-        if(!Depth.empty()) Depth.copyTo(NewData.Depth);
-        NewData.timestamp =  timestamp;
-        NewData.ExposureTimeL = ExposureTimeL;
-        NewData.ExposureTimeR = ExposureTimeR;
+        if(!cvImgL.empty())
+        {
+            cvImgL.copyTo(NewData.cvImgL);
+            memcpy(NewData.fImgL,fImgL,cvImgL.cols*cvImgR.cols);
+        } 
 
+        if(!cvImgR.empty()) 
+        {
+            cvImgR.copyTo(NewData.cvImgR);
+            memcpy(NewData.fImgL,fImgL,cvImgL.cols*cvImgR.cols);
+        }
+        NewData.timestamp =  timestamp;
+        NewData.ExposureL = ExposureL;
+        NewData.ExposureR = ExposureR;
+    }
+    ImageData(int width, int height)
+    {
+        fImgL = new float [width*height];
+        fImgR = new float [width*height];
+    }
+    ~ImageData() 
+    {
+        if(fImgL) {delete fImgL; fImgL= NULL;}
+        if(fImgR) {delete fImgR; fImgR= NULL;}
     }
 };
 

@@ -14,7 +14,7 @@ Calib.process: "crop" #crop, none, useK
 Output.width: 640
 Output.height: 480
 
-# Left or monocular Camera calibration and distortion parameters
+# Left or monocular Camera calibration Input
 CameraL.K: !!opencv-matrix
    rows: 3
    cols: 3
@@ -24,7 +24,7 @@ CameraL.K: !!opencv-matrix
 #only used if calibration model is Atan (straight lines have to be straight)
 CameraL.dist: 0.897966326944875
 
-#only used if calib.process is useK
+#desired K, only used if calib.process is useK
 Calib.desiK: !!opencv-matrix
    rows: 1
    cols: 4
