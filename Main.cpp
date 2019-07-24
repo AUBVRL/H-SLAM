@@ -14,7 +14,7 @@ int main(int argc, char **argv)
      //Initialize undistorters
     std::shared_ptr<GeometricUndistorter> GeomUndistorter = std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
 
-    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_, GeomUndistorter);
+    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_->dataset_, Input_->Path, Input_->timestampsL, GeomUndistorter);
     
     if (Input_->Reverse)
     {
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
             Dest = Img->ImageL;
 
         cv::imshow("Img", Dest);
-        cv::waitKey(0);
+        cv::waitKey(1);
     }
 
     return 0;

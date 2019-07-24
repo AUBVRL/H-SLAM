@@ -442,5 +442,46 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
 
 }
 
+void GeometricUndistorter::undistort(cv::Mat &Input_, cv::Mat &Output)
+{
+    cv::Mat Temp;
+    Input_.convertTo(Temp,CV_32F);
+    if (!passthrough)
+    {
+        float *out_data = (float*) Output.data;
+
+        float *in_data = (float*) Temp.data;
+        size_t elem_step = Temp.step / sizeof(float);
+
+        for (int idx = w * h - 1; idx >= 0; idx--)
+        {
+            // get interp. values
+            float xx = remapX[idx];
+            float yy = remapY[idx];
+
+            if (xx < 0)
+            {
+                out_data[idx] = 0;
+            }
+
+            int xxi = xx;
+            int yyi = yy;
+            xx -= xxi;
+            yy -= yyi;
+            float xxyy = xx * yy;
+
+            // get array base pointer
+            const float *src = in_data + xxi + yyi * wOrg;
+
+            // interpolate (bilinear)
+            out_data[idx] = xxyy * src[1 + wOrg] + (yy - xxyy) * src[wOrg] + (xx - xxyy) * src[1] + (1 - xx - yy + xxyy) * src[0];
+        }
+    }
+    else
+    {
+        memcpy((float*)Output.data, (float*)Temp.data, sizeof(float) * w * h);
+    }
+}
+
 
 }

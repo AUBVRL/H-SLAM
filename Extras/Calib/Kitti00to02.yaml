@@ -1,0 +1,38 @@
+%YAML:1.0
+
+# Camera Parameters.
+#===================
+# If monocular, stereo or RGBD. If your input is unrectified distorted stereo, pinhole and radtan are not supported.
+Calibration.model: "Pinhole"  # RadTan, Atan, Pinhole, EquiDistant, KannalaBrandt
+
+Input.width: 1241
+Input.height: 376
+
+Calib.process: "crop" #crop, none, useK
+
+#only used if crop, useK or when stereo images are not rectified (Stereo.State = Rectify)
+Output.width: 1232
+Output.height: 368
+
+# Left or monocular Camera calibration and distortion parameters
+CameraL.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data:[7.18856e+02, 0.0, 6.071928e+02, 0.0, 7.18856e+02, 1.852157e+02, 0.0, 0.0, 1.0]
+
+#only used if calibration model is Atan (straight lines have to be straight)
+CameraL.dist: 0.0 
+
+#-------------------------------------------
+# this is enough information for monocular.
+#-------------------------------------------
+
+#If stereo:
+#==========
+
+# Stereo Images state. If previously rectified no need to rectify on the fly otherwise use rectify
+Stereo.State: "prerectified" #rectify or prerectified
+
+# stereo baseline times fx
+Stereo.bf: 386.1448

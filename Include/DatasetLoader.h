@@ -40,21 +40,21 @@ public:
     char *databuffer;
 #endif
 
-    DatasetReader(std::shared_ptr<Input> In_, std::shared_ptr<GeometricUndistorter> GeomUndistorter): dataset(In_->dataset_), GeomUndist(GeomUndistorter)
+    DatasetReader(Dataset dataset_, std::string ImPath, std::string timestampPath, std::shared_ptr<GeometricUndistorter> GeomUndistorter): dataset(dataset_), GeomUndist(GeomUndistorter)
     {
         #if HAS_ZIPLIB
         ziparchive = 0;
         databuffer = 0;
         #endif
-        isZipped = (In_->Path.length() > 4 && In_->Path.substr(In_->Path.length() - 4) == ".zip");
+        isZipped = (ImPath.length() > 4 && ImPath.substr(ImPath.length() - 4) == ".zip");
 
         if (isZipped)
         {
             #if HAS_ZIPLIB
             int ziperror = 0;
-            ziparchive = zip_open(In_->Path.c_str(), ZIP_RDONLY, &ziperror);
+            ziparchive = zip_open(ImPath.c_str(), ZIP_RDONLY, &ziperror);
             if (ziperror != 0)
-            {printf("ERROR %d reading archive %s!\n", ziperror, In_->Path.c_str()); exit(1);}
+            {printf("ERROR %d reading archive %s!\n", ziperror, ImPath.c_str()); exit(1);}
 
             filesL.clear();
             filesR.clear();
@@ -112,22 +112,22 @@ public:
         }
         else
         {
-            if (In_->Path.at(In_->Path.length() - 1) != '/')
-                In_->Path = In_->Path + "/";
+            if (ImPath.at(ImPath.length() - 1) != '/')
+                ImPath = ImPath + "/";
 
             if (dataset == Dataset::Tum_mono)
-                getdir(In_->Path, filesL);
+                getdir(ImPath, filesL);
             else if (dataset == Dataset::Euroc)
             {
-                getdir(In_->Path + "mav0/cam0/data/", filesL);
+                getdir(ImPath + "mav0/cam0/data/", filesL);
                 if(Sensortype == Stereo)
-                    getdir(In_->Path + "mav0/cam1/data/", filesR);
+                    getdir(ImPath + "mav0/cam1/data/", filesR);
             }
             else if (dataset == Dataset::Kitti)
             {
-                getdir(In_->Path + "image_0/", filesL);
+                getdir(ImPath + "image_0/", filesL);
                 if(Sensortype == Stereo)
-                    getdir(In_->Path + "image_1/", filesR);
+                    getdir(ImPath + "image_1/", filesR);
             }
         }
 
@@ -145,7 +145,7 @@ public:
                 printf("There is something wrong with the images - didn't load any!\n");
                 exit(-1);
             }
-        loadtimestamps(In_->timestampsL);
+        loadtimestamps(timestampPath);
     }
 
     ~DatasetReader() 
@@ -160,10 +160,8 @@ public:
     {
         if (dataset == Kitti)
         {
-            // if (path.at(path.length() - 1) != '/')
-            //     path = path + "/";
             std::ifstream fTimes;
-            std::string strPathTimeFile = path ;//+ "times.txt";
+            std::string strPathTimeFile = path ;
             fTimes.open(strPathTimeFile.c_str());
             if (!fTimes)
             {
@@ -187,10 +185,8 @@ public:
         }
         else if (dataset == Euroc)
         {
-            // if (path.at(path.length() - 1) != '/')
-            //     path = path + "/";
             std::ifstream fTimes;
-            std::string strPathTimeFile = path ;//+ "mav0/cam0/data.csv";
+            std::string strPathTimeFile = path ;
    
             fTimes.open(strPathTimeFile.c_str());
             if (!fTimes)
@@ -221,7 +217,6 @@ public:
         {
             std::ifstream tr;
             std::string timesFile = path;
-            // std::string timesFile = path.substr(0, path.find_last_of('/')) + "/times.txt";
             tr.open(timesFile.c_str());
 
             while (!tr.eof())
@@ -336,14 +331,31 @@ public:
             {
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
                 ImgData->ImageR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
+                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
                 if(GeomUndist->StereoState == "rectify")
                 {
                     cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
                     cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
+                    return;
                 }
+                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
+                cv::Mat outputR = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F);
+                GeomUndist->undistort(ImgData->ImageL, outputL);
+                GeomUndist->undistort(ImgData->ImageR, outputR);
+                outputL.convertTo(ImgData->ImageL, CV_8U);
+                outputR.convertTo(ImgData->ImageR, CV_8U);
             }
             else if(Sensortype == Monocular)
+            {
                 ImgData->ImageL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
+                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
+                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
+                GeomUndist->undistort(ImgData->ImageL, outputL);
+                outputL.convertTo(ImgData->ImageL, CV_8U);
+
+            }
         }
         else
         {
@@ -354,16 +366,30 @@ public:
                 ImgData->ImageL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
                 readsize = ReadZipBuffer(filesR[id]);
                 ImgData->ImageR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
+                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
                 if(GeomUndist->StereoState == "rectify")
                 {
                     cv::remap(ImgData->ImageL, ImgData->ImageL, GeomUndist->M1l, GeomUndist->M2l, cv::INTER_LINEAR);
                     cv::remap(ImgData->ImageR, ImgData->ImageR, GeomUndist->M1r, GeomUndist->M2r, cv::INTER_LINEAR);
+                    return;
                 }
+                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
+                cv::Mat outputR = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F);
+                GeomUndist->undistort(ImgData->ImageL, outputL);
+                GeomUndist->undistort(ImgData->ImageR, outputR);
+                outputL.convertTo(ImgData->ImageL, CV_8U);
+                outputR.convertTo(ImgData->ImageR, CV_8U);
             }
             else if(Sensortype == Monocular)
             {
                 long readsize = ReadZipBuffer(filesL[id]);
                 ImgData->ImageL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
+                if(ImgData->ImageL.size().width != WidthOri || ImgData->ImageL.size().height != HeightOri)
+                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
+                cv::Mat outputL = cv::Mat(GeomUndist->h,GeomUndist->w,CV_32F); 
+                GeomUndist->undistort(ImgData->ImageL, outputL);
+                outputL.convertTo(ImgData->ImageL, CV_8U);
             }
             #else
                 printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
