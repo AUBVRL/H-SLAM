@@ -8,7 +8,7 @@
             "args": [     
                 "sensor=Stereo", //Monocular, Stereo or RGBD
                 "dataset=Euroc", //Euroc, TumMono or Kitti
-                "photomCalibmodel=NoCalib", //OnlineCalib, HaveCalib, NoCalib
+                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
                 "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
                 // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
@@ -25,9 +25,9 @@
                 // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
 
                 "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
-                "gammaR=",
+                "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "vignetteL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-                "vignetteR=",
+                "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
 
                 "start=0",
                 "end=9999999",

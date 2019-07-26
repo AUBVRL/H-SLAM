@@ -30,7 +30,9 @@ public:
     void LoadGeometricCalibration(std::string GeomCalib);
     void makeOptimalK_crop();
     void distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n);
-    void undistort(std::shared_ptr<ImageData> ImgData, float* In_L, float* In_R);
+    void undistort(std::shared_ptr<ImageData> ImgData, float* In_L, float* In_R); //used when performing photometric calib first
+    void undistort(std::shared_ptr<ImageData>ImgData,  bool NoPhoCalib = false); //used when performing geometric calib first
+
 
     cv::Mat M1l, M2l, M1r, M2r; //rectification and remapping matrices for stereo rectification
     float ic[10];

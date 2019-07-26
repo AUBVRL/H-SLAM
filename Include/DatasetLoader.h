@@ -52,12 +52,13 @@ public:
         //Initialize undistorters
         GeomUndist= std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
 
-        PhoUndistL = std::make_shared<PhotometricUndistorter>(Input_->GammaL, Input_->VignetteL, GeomUndist->wOrg, GeomUndist->hOrg);
-        tPhoCalibL = new float[GeomUndist->wOrg * GeomUndist->hOrg];
-        if (Sensortype == Stereo)
+        PhoUndistL = std::make_shared<PhotometricUndistorter>(Input_->GammaL, Input_->VignetteL);
+        tPhoCalibL = new float[WidthOri * HeightOri];
+        if (Sensortype == Stereo || Sensortype == RGBD)
         {
-            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR, GeomUndist->wOrg, GeomUndist->hOrg);
-            tPhoCalibR = new float[GeomUndist->wOrg * GeomUndist->hOrg];
+            //For RGBD don't photometrically undistort the image, but pass it as is to the geometric distorter when HaveCalib.
+            tPhoCalibR = new float[WidthOri * HeightOri];
+            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR);
         }
 
         std::string ImPath = Input_->Path;
@@ -147,7 +148,7 @@ public:
             else if (dataset == Dataset::Kitti)
             {
                 getdir(ImPath + "image_0/", filesL);
-                if(Sensortype == Stereo)
+                if(Sensortype == Stereo )
                     getdir(ImPath + "image_1/", filesR);
             }
         }
@@ -350,8 +351,6 @@ public:
     {
         if (!isZipped)
         {
-            
-            
             ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
             if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
                 {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
@@ -420,11 +419,30 @@ public:
 
     inline void undistort(std::shared_ptr<ImageData> ImgData)
     {
-        PhoUndistL->undistort(ImgData->cvImgL, tPhoCalibL);
-        if (PhoUndistR)
-            PhoUndistR->undistort(ImgData->cvImgR, tPhoCalibR);
+        // If photometric calibration is known at startup we need to photometrically undistort first.
+        // Otherwise geometrically undistort first then photometrically!
+        if(PhoUndistMode == HaveCalib)
+        {
+            PhoUndistL->undistort(ImgData->cvImgL, tPhoCalibL);
+            if (PhoUndistR)
+                PhoUndistR->undistort(ImgData->cvImgR, tPhoCalibR, Sensortype == RGBD);
+            GeomUndist->undistort(ImgData, tPhoCalibL, tPhoCalibR);
+        }
+        else if(PhoUndistMode == OnlineCalib)
+        {
+            GeomUndist->undistort(ImgData);
+            PhoUndistL->undistort(ImgData->fImgL, ImgData->cvImgL, GeomUndist->w, GeomUndist->h);
+            if (PhoUndistR)
+                PhoUndistR->undistort(ImgData->fImgR, ImgData->cvImgR, GeomUndist->w, GeomUndist->h, Sensortype == RGBD);
+        }
+        else // If we don't want to perform photometric correction
+        {
+            GeomUndist->undistort(ImgData, true);
+        }
+        
+        
 
-        GeomUndist->undistort(ImgData, tPhoCalibL, tPhoCalibR);
+        
 
         return;
     }

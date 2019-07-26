@@ -9,11 +9,11 @@
 
 namespace FSLAM
 {
-PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, int w_, int h_)
+PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage)// int w_, int h_)
 {
     vignetteMapInv = 0;
-    w = w_;
-    h = h_;
+    // w = w_;
+    // h = h_;
     GammaValid = false;
     VignetteValid = false;
 
@@ -72,7 +72,7 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
     if (vignetteImage != "" && PhoUndistMode == HaveCalib)
     {
         cvVignette = cv::imread(vignetteImage, CV_LOAD_IMAGE_UNCHANGED);
-        if (cvVignette.size().width != w_ || cvVignette.size().height != h_)
+        if (cvVignette.size().width != WidthOri || cvVignette.size().height != HeightOri)
         {
             printf("something wrong with vignetting! turning it off! \n");
             cvVignette.release();
@@ -91,20 +91,19 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
             for(int i=0;i<dim;i++)
 			    vignetteMapInv[i] = maxV / temp[i];
             delete temp;
-             VignetteValid = true;
+            VignetteValid = true;
         }
     }
 }
 
-void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, float factor)
+void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, bool isRightRGBD, float factor)
 {
-    
     int dim = Image.size().width * Image.size().height;
 
-    if(Sensortype == RGBD)
+    if(isRightRGBD)
     {
         for(int i=0; i<dim;i++)
-            fImage[i] = Image.data[i]*factor;
+            fImage[i] = Image.data[i]*factor; //this is the RGBD magnitude factor
         return;
     }
 
@@ -119,8 +118,38 @@ void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, float fact
 		    fImage[i] = Image.data[i]*factor* vignetteMapInv[i];
     else
         for(int i=0; i<dim;i++)
-            fImage[i] = Image.data[i]*factor;       
-            
+            fImage[i] = Image.data[i]*factor;
+}
+
+void PhotometricUndistorter::undistort(float* fImg, cv::Mat& Img, int w, int h, bool isRightRGBD, float factor)
+{
+    int dim = w*h;
+
+    if(isRightRGBD)
+    {
+        for(int i=0; i<dim;i++)
+            fImg[i] = fImg[i]*factor; //this is the RGBD magnitude factor
+        Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
+        Img.convertTo(Img, CV_8U);
+        return;
+    }
+
+    if (GammaValid && VignetteValid)
+        for(int i=0; i<dim ;i++)
+		    fImg[i] = G[(int)round(fImg[i])]*factor* vignetteMapInv[i];
+    else if(GammaValid)
+        for(int i=0; i<dim;i++)
+            fImg[i] = G[(int)round(fImg[i])]*factor;
+    else if(VignetteValid)
+        for(int i=0; i<dim;i++)
+		    fImg[i] = fImg[i]*factor* vignetteMapInv[i];
+    else
+        for(int i=0; i<dim;i++)
+            fImg[i] = fImg[i]*factor;
+
+    Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
+    Img.convertTo(Img, CV_8U);
+    return;
 }
 
 }

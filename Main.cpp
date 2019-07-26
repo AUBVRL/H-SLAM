@@ -94,15 +94,13 @@ int main(int argc, char **argv)
                 continue;
 
         cv::Mat Dest;
-        if (Sensortype == Stereo)
+        if (Sensortype == Stereo || Sensortype == RGBD)
         {
             if (Input_->dataset_ != Kitti)
                 cv::hconcat(Img->cvImgL, Img->cvImgR, Dest);
             else
                 cv::vconcat(Img->cvImgL, Img->cvImgR, Dest);
         }
-        else if (Sensortype == RGBD)
-            cv::hconcat(Img->cvImgL, Img->cvImgR, Dest);
         else
             Dest = Img->cvImgL;
 

@@ -441,14 +441,13 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
 
 void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* In_L, float* In_R)
 {
-    bool doRight = !ImgData->cvImgR.empty();
+    bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
     if (Sensortype == Stereo)
     {
         if (StereoState == "rectify")
         {
-
-            ImgData->cvImgL = cv::Mat(cv::Size(w, h), CV_32F,  In_L);
-            ImgData->cvImgR = cv::Mat(cv::Size(w, h), CV_32F,  In_R);
+            ImgData->cvImgL = cv::Mat(cv::Size(ImgData->cvImgL.size().width, ImgData->cvImgL.size().height), CV_32F,  In_L);
+            ImgData->cvImgR = cv::Mat(cv::Size(ImgData->cvImgR.size().width, ImgData->cvImgR.size().height), CV_32F,  In_R);
             
             cv::remap(ImgData->cvImgL, ImgData->cvImgL, M1l, M2l, cv::INTER_LINEAR);
             cv::remap(ImgData->cvImgR, ImgData->cvImgR, M1r, M2r, cv::INTER_LINEAR);
@@ -465,8 +464,6 @@ void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* I
     }
     if (!passthrough)
     {
-        int dim = ImgData->cvImgL.size().width * ImgData->cvImgL.size().height;
-
         float * in_data = In_L;
         float * in_data2 = In_R ;
         float *out_data;
@@ -506,13 +503,12 @@ void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* I
                 out_data2[idx] = xxyy * src2[1 + wOrg] + (yy - xxyy) * src2[wOrg] + (xx - xxyy) * src2[1] + (1 - xx - yy + xxyy) * src2[0];
         }
 
-
             ImgData->cvImgL = cv::Mat(cv::Size(w, h), CV_32F, out_data);
             ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
 
-        if(doRight )
+        if(doRight)
         {
-            ImgData->cvImgR = cv::Mat(cv::Size(w, h), CV_32F,out_data);
+            ImgData->cvImgR = cv::Mat(cv::Size(w, h), CV_32F,out_data2);
             ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
         }
     }
@@ -526,4 +522,94 @@ void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* I
         }
     }
 }
+
+void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, bool NoPhoCalib)
+{
+    bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
+    if (Sensortype == Stereo && StereoState == "rectify")
+    {
+        cv::remap(ImgData->cvImgL, ImgData->cvImgL, M1l, M2l, cv::INTER_LINEAR);
+        cv::remap(ImgData->cvImgR, ImgData->cvImgR, M1r, M2r, cv::INTER_LINEAR);
+
+        for (int i = 0; i < w * h; i++)
+        {
+            ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+            ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+        }
+        if(NoPhoCalib)
+        {
+            ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
+            ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
+        }
+        
+        return;
+    }
+    if (!passthrough)
+    {
+         for (int i = 0; i < WidthOri * HeightOri; i++)
+        {
+            in_data[i] = ImgData->cvImgL.data[i];
+            if(doRight)
+                in_data2[i] = ImgData->cvImgR.data[i];
+        }
+
+        float *out_data = ImgData->fImgL ;
+        float *out_data2 = ImgData->fImgR;
+        
+
+        for (int idx = w * h - 1; idx >= 0; idx--)
+        {
+            // get interp. values
+            float xx = remapX[idx];
+            float yy = remapY[idx];
+
+            if (xx < 0)
+            {
+                out_data[idx] = 0;
+                if(doRight)
+                    out_data2[idx] = 0;
+            }
+
+            int xxi = xx;
+            int yyi = yy;
+            xx -= xxi;
+            yy -= yyi;
+            float xxyy = xx * yy;
+
+            // get array base pointer
+            const float *src = in_data + xxi + yyi * wOrg;
+            const float *src2;
+            if(doRight)
+                src2 = in_data2 + xxi + yyi * wOrg;
+
+            // interpolate (bilinear)
+            out_data[idx] = xxyy * src[1 + wOrg] + (yy - xxyy) * src[wOrg] + (xx - xxyy) * src[1] + (1 - xx - yy + xxyy) * src[0];
+            if(doRight)
+                out_data2[idx] = xxyy * src2[1 + wOrg] + (yy - xxyy) * src2[wOrg] + (xx - xxyy) * src2[1] + (1 - xx - yy + xxyy) * src2[0];
+        }
+        // Store back into cv::Mat
+        if(NoPhoCalib)
+        {
+            ImgData->cvImgL = cv::Mat(cv::Size(w, h), CV_32F, out_data);
+            ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
+
+            if (doRight)
+            {
+                ImgData->cvImgR = cv::Mat(cv::Size(w, h), CV_32F, out_data2);
+                ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < WidthOri * HeightOri; i++)
+        {
+            ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+            if(doRight)
+                ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+        }
+    }
+}
+
+
 }
