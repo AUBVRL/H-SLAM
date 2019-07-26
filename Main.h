@@ -44,29 +44,17 @@ class Input
 {
 public:
     Input(int argc, char** In_): 
-            dataset_(Emptyd), phoDistMode_(Emptyp), IntrinCalib(""), GammaL(""), GammaR(""), timestampsL(""),
+            dataset_(Emptyd), IntrinCalib(""), GammaL(""), GammaR(""), timestampsL(""),
             VignetteL(""), VignetteR(""), Vocabulary(""), Path(""), Reverse(false), Nogui(false), 
-            Prefetch(false), PlaybackSpeed(0), Start(0), End(9999999), Mode(0), linc(1), needPhotoDistorterL(false), 
-            needPhotoDistorterR(false)
+            Prefetch(false), PlaybackSpeed(0), Start(0), End(9999999), Mode(0), linc(1)
+           
     {
         for (int i = 1; i < argc; i++)
             parseargument(In_[i]);
         ValidateInput();
 
-        if(phoDistMode_== PhotoUnDistMode::NoCalib)
-        {
-            needPhotoDistorterL= false;
-            needPhotoDistorterR= false;
-        }
-        else
-        {
-            needPhotoDistorterL = true;
-            if(Sensortype == Stereo)
-                needPhotoDistorterR = true;
-        }
     }
     Dataset dataset_;
-    PhotoUnDistMode phoDistMode_;
     std::string IntrinCalib;
     std::string GammaL;
     std::string GammaR;
@@ -84,23 +72,20 @@ public:
     int Mode; //not used for now!
     int linc;
 
-    bool needPhotoDistorterL;
-    bool needPhotoDistorterR;
-
     inline void ValidateInput()
     {
     //Mandatory Input
     if(dataset_ == Emptyd) {printf("you did not specify a dataset\n"); exit(1);}
     if(Sensortype == Emptys) {printf("you did not specify a sensor type\n"); exit(1);}
-    if(phoDistMode_== Emptyp)
+    if(PhoUndistMode== Emptyp)
         {printf("you did not specify a photometric distortion mode\n"); exit(1);}
     if(IntrinCalib=="") { printf("you did not specify an Intrinsics calib path\n"); exit(1);}
     if(Vocabulary=="") {printf("you did not specify a Vocabulary path\n"); exit(1);}
     if(Path=="") {printf("you did not specify an image path\n"); exit(1);}
-    if(phoDistMode_== PhotoUnDistMode::HaveCalib)
+    if(PhoUndistMode== PhotoUnDistMode::HaveCalib)
     {
         if(GammaL == "" || VignetteL =="")
-            {printf("photometric calibration for left image not provided!exit.\n");exit(1);}
+            {printf("Gamma correction or vignette image for the left image not provided!exit.\n");exit(1);}
         if(Sensortype == Sensor::Stereo && (GammaR == "" || VignetteR ==""))
             {printf("photometric calibration for right image is not provided!exit.\n");exit(1);}
     }
@@ -240,11 +225,11 @@ public:
         {
             std::string data = buf;
             if (data == "HaveCalib")
-                phoDistMode_ = HaveCalib;
+                PhoUndistMode = HaveCalib;
             else if (data == "OnlineCalib")
-                phoDistMode_ = OnlineCalib;
+                PhoUndistMode = OnlineCalib;
             else if (data == "NoCalib")
-                phoDistMode_ = NoCalib;
+                PhoUndistMode = NoCalib;
         }
     }
 };

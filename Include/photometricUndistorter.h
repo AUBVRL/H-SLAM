@@ -7,14 +7,17 @@ class PhotometricUndistorter
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, int w_, int h_);
-    ~PhotometricUndistorter();
+    ~PhotometricUndistorter() 
+    {
+	    if(vignetteMapInv) delete[] vignetteMapInv;
+    }
 
 
-    void undistort(std::shared_ptr<ImageData> Img, float factor = 1);
+    void undistort(cv::Mat &Image, float* fImage, float factor = 1.0f);
 
     float *getG()
     {
-        if (!valid)
+        if (!GammaValid)
             return 0;
         else
             return G;
@@ -23,9 +26,10 @@ public:
 private:
     float G[256 * 256];
     int GDepth;
-    float *vignetteMap;
     float *vignetteMapInv;
     int w, h;
-    bool valid;
+    bool GammaValid;
+    bool VignetteValid;
+    cv::Mat cvVignette;
 };
 } // namespace FSLAM

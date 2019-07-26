@@ -7,6 +7,7 @@ namespace FSLAM
 
 
 //GLOBAL VARIABLES
+extern PhotoUnDistMode PhoUndistMode;
 extern Sensor Sensortype;
 
 

@@ -1,5 +1,4 @@
 #include <unistd.h>
-#include <memory>
 #include <chrono>
 
 #include "Main.h"
@@ -9,12 +8,8 @@ using namespace FSLAM;
 
 int main(int argc, char **argv)
 {
-    std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv);
-
-     //Initialize undistorters
-    std::shared_ptr<GeometricUndistorter> GeomUndistorter = std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
-
-    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_->dataset_, Input_->Path, Input_->timestampsL, GeomUndistorter);
+    std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv); //parse the arguments and set system settings
+    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_);
     
     if (Input_->Reverse)
     {
@@ -49,7 +44,7 @@ int main(int argc, char **argv)
         for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
         {
             int i = idsToPlay[ii];
-            std::shared_ptr<ImageData> Img = std::make_shared<ImageData>(GeomUndistorter->w, GeomUndistorter->h);
+            std::shared_ptr<ImageData> Img = std::make_shared<ImageData>(DataReader->GeomUndist->wOrg, DataReader->GeomUndist->hOrg);
             DataReader->getImage(Img, i);
             Images.push_back(Img);
         }
@@ -75,7 +70,7 @@ int main(int argc, char **argv)
         else
         {
             std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-            Img = std::make_shared<ImageData>(GeomUndistorter->w, GeomUndistorter->h);
+            Img = std::make_shared<ImageData>(DataReader->GeomUndist->wOrg, DataReader->GeomUndist->hOrg);
             DataReader->getImage(Img, i);
             std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
         }

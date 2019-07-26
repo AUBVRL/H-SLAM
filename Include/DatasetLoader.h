@@ -6,6 +6,8 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include "GeometricUndistorter.h"
+#include "photometricUndistorter.h"
+#include "Main.h"
 
 #if HAS_ZIPLIB
 #include "zip.h"
@@ -30,16 +32,38 @@ public:
 
     bool isZipped;
     Dataset dataset;
+
     std::shared_ptr<GeometricUndistorter> GeomUndist;
+    std::shared_ptr<PhotometricUndistorter> PhoUndistL;
+    std::shared_ptr<PhotometricUndistorter> PhoUndistR;
+
+    float *tPhoCalibL;
+    float *tPhoCalibR;
+
     
 #if HAS_ZIPLIB
     zip_t *ziparchive;
     char *databuffer;
 #endif
 
-    DatasetReader(Dataset dataset_, std::string ImPath, std::string timestampPath, std::shared_ptr<GeometricUndistorter> GeomUndistorter): dataset(dataset_), GeomUndist(GeomUndistorter)
+    DatasetReader(std::shared_ptr<Input> Input_): dataset(Input_->dataset_)
     {
-        #if HAS_ZIPLIB
+        tPhoCalibL = tPhoCalibR = NULL;
+        //Initialize undistorters
+        GeomUndist= std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
+
+        PhoUndistL = std::make_shared<PhotometricUndistorter>(Input_->GammaL, Input_->VignetteL, GeomUndist->wOrg, GeomUndist->hOrg);
+        tPhoCalibL = new float[GeomUndist->wOrg * GeomUndist->hOrg];
+        if (Sensortype == Stereo)
+        {
+            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR, GeomUndist->wOrg, GeomUndist->hOrg);
+            tPhoCalibR = new float[GeomUndist->wOrg * GeomUndist->hOrg];
+        }
+
+        std::string ImPath = Input_->Path;
+        std::string timestampPath = Input_->timestampsL;
+
+#if HAS_ZIPLIB
         ziparchive = 0;
         databuffer = 0;
         #endif
@@ -151,6 +175,8 @@ public:
             if (ziparchive != 0) zip_close(ziparchive);
             if (databuffer != 0) delete databuffer;
         #endif
+        if(tPhoCalibL) delete tPhoCalibL;
+        if(tPhoCalibR) delete tPhoCalibR;
     }
 
     inline void loadtimestamps(std::string path)
@@ -324,54 +350,49 @@ public:
     {
         if (!isZipped)
         {
-            if(Sensortype == Stereo)
+            
+            
+            ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
+            if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
+                {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
+            if(Sensortype == Stereo || Sensortype == RGBD)
             {
-                ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
                 ImgData->cvImgR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
-                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri || ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
-                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                
-                GeomUndist->undistort(ImgData);
+                if(ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
+                    {printf("Right and Left image resolutions are not equal! exit!\n"); exit(1);}
             }
-            else if(Sensortype == Monocular)
-            {
-                ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
-                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
-                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                GeomUndist->undistort(ImgData);
-            }
+                undistort(ImgData);
         }
         else
         {
             #if HAS_ZIPLIB
-            if(Sensortype == Stereo)
+
+            long readsize = ReadZipBuffer(filesL[id]);
+            ImgData->cvImgL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
+            if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
+                {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
+
+            if(Sensortype == Stereo || Sensortype == RGBD)
             {
-                long readsize = ReadZipBuffer(filesL[id]);
-                ImgData->cvImgL = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
                 readsize = ReadZipBuffer(filesR[id]);
                 ImgData->cvImgR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE);
-                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri || ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
-                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
+                if(ImgData->cvImgL.size()!=ImgData->cvImgR.size() )
+                    {printf("Right and Left image resolutions are not equal! exit!\n"); exit(1);}
+            }
 
-                GeomUndist->undistort(ImgData);
-            }
-            else if(Sensortype == Monocular)
-            {
-                long readsize = ReadZipBuffer(filesL[id]);
-                ImgData->cvImgL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
-                if(ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
-                    {printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n"); exit(1);}
-                GeomUndist->undistort(ImgData);
-            }
+            undistort(ImgData);
+        
             #else
                 printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
                 exit(1);
             #endif
         }
-        return;
+        
         ImgData->timestamp = getTimestamp(id);
         ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
         ImgData->ExposureR = exposuresR.size() == 0 ? 1.0f : exposuresR[id];
+
+        return;
     }
 
     inline long ReadZipBuffer(std::string In_)
@@ -395,6 +416,17 @@ public:
             }
             zip_fclose(fle);
             return readbytes;
+    }
+
+    inline void undistort(std::shared_ptr<ImageData> ImgData)
+    {
+        PhoUndistL->undistort(ImgData->cvImgL, tPhoCalibL);
+        if (PhoUndistR)
+            PhoUndistR->undistort(ImgData->cvImgR, tPhoCalibR);
+
+        GeomUndist->undistort(ImgData, tPhoCalibL, tPhoCalibR);
+
+        return;
     }
 };
 

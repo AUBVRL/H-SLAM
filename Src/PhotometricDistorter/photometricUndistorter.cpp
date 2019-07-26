@@ -1,33 +1,126 @@
 #include <fstream>
 #include <sstream>
+#include <iterator>
+#include <opencv2/highgui/highgui.hpp>
 
 #include "photometricUndistorter.h"
+#include "Settings.h"
 
 
 namespace FSLAM
 {
-    PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, int w_, int h_)
-    {
-       
+PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, int w_, int h_)
+{
+    vignetteMapInv = 0;
+    w = w_;
+    h = h_;
+    GammaValid = false;
+    VignetteValid = false;
 
-        //try to load class here, if it doesnt work initialize a parallel thread to estimate it if online calib until convergence (params don't change)
-    }
-
-    void PhotometricUndistorter::undistort(std::shared_ptr<ImageData> Img, float factor)
+    if (PhoUndistMode == NoCalib)
     {
-        if (valid)
+        printf("Photometric distortion is off!\n");
+        return;
+    } //vignette and gamma are not valid.
+
+    if (gamma_path != "" && PhoUndistMode == HaveCalib)
+    {
+        std::ifstream f(gamma_path.c_str());
+        printf("Reading Photometric Calibration from file %s\n", gamma_path.c_str());
+        if (!f.good())
         {
-            int dim = Img->cvImgL.size().width*Img->cvImgL.size().height ;
-            for (int i = 0; i < dim; i++)
-            {
-                Img->fImgL[i] = G[(int)std::round(Img->fImgL[i])]; 
-            }
+            printf("PhotometricUndistorter: Could not open file!\n");
+        }
+        else
+        {
+            std::string line;
+            std::getline(f, line);
+            std::istringstream l1i(line);
+            std::vector<float> Gvec = std::vector<float>(std::istream_iterator<float>(l1i), std::istream_iterator<float>());
 
-            // if (setting_photometricCalibration == 2)
-            // {
-            //     for (int i = 0; i < wh; i++)
-            //         data[i] *= vignetteMapInv[i];
-            // }
+            GDepth = Gvec.size();
+            if (GDepth < 256)
+            {
+                printf("PhotometricUndistorter: invalid format! got %d entries in first line, expected at least 256!\n", (int)Gvec.size());
+            }
+            else
+            {
+                for (int i = 0; i < GDepth; i++)
+                    G[i] = Gvec[i];
+                bool goodG = true;
+                for (int i = 0; i < GDepth - 1; i++)
+                {
+                    if (G[i + 1] <= G[i])
+                    {
+                        goodG = false;
+                        printf("PhotometricUndistorter: G invalid! it has to be strictly increasing, but it isnt!\n");
+                        break;
+                    }
+                }
+                if (goodG)
+                {
+                    float min = G[0];
+                    float max = G[GDepth - 1];
+                    for (int i = 0; i < GDepth; i++)
+                        G[i] = 255.0 * (G[i] - min) / (max - min); // make it to 0..255 => 0..255.
+                    GammaValid = true;
+                }
+            }
         }
     }
+
+    if (vignetteImage != "" && PhoUndistMode == HaveCalib)
+    {
+        cvVignette = cv::imread(vignetteImage, CV_LOAD_IMAGE_UNCHANGED);
+        if (cvVignette.size().width != w_ || cvVignette.size().height != h_)
+        {
+            printf("something wrong with vignetting! turning it off! \n");
+            cvVignette.release();
+        }
+        else
+        {
+            int dim = cvVignette.size().width * cvVignette.size().height;
+            vignetteMapInv = new float[dim];
+            unsigned short * temp  = new unsigned short [dim];
+            memcpy(temp, cvVignette.data, 2*dim);
+
+            float maxV=0;
+		    for(int i=0;i<dim;i++)
+			    if(temp[i] > maxV) maxV = temp[i];
+
+            for(int i=0;i<dim;i++)
+			    vignetteMapInv[i] = maxV / temp[i];
+            delete temp;
+             VignetteValid = true;
+        }
+    }
+}
+
+void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, float factor)
+{
+    
+    int dim = Image.size().width * Image.size().height;
+
+    if(Sensortype == RGBD)
+    {
+        for(int i=0; i<dim;i++)
+            fImage[i] = Image.data[i]*factor;
+        return;
+    }
+
+    if (GammaValid && VignetteValid)
+        for(int i=0; i<dim ;i++)
+		    fImage[i] = G[Image.data[i]]*factor* vignetteMapInv[i];
+    else if(GammaValid)
+        for(int i=0; i<dim;i++)
+            fImage[i] = G[Image.data[i]]*factor;
+    else if(VignetteValid)
+        for(int i=0; i<dim;i++)
+		    fImage[i] = Image.data[i]*factor* vignetteMapInv[i];
+    else
+        for(int i=0; i<dim;i++)
+            fImage[i] = Image.data[i]*factor;       
+            
+}
+
 }
