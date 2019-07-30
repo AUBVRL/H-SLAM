@@ -1,7 +1,7 @@
 SET(PROJECT_NAME FSLAM)
 
 PROJECT(${PROJECT_NAME})
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.2)
 
 set(BUILD_TYPE Release)
 #set(BUILD_TYPE RelWithDebInfo)
@@ -17,6 +17,16 @@ else()
   set(CMAKE_CXX_STANDARD 11)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
+# Configure CCache if available (requires cmake 3.4 or newer)
+if(${CMAKE_VERSION} VERSION_GREATER "3.2.0")
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+  endif()
 endif()
 
 # required libraries
@@ -47,6 +57,7 @@ endif (MSVC)
 set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/System.cpp
   ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
   ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/photometricUndistorter.cpp
 )

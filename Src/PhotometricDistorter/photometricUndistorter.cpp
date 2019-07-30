@@ -5,17 +5,21 @@
 
 #include "photometricUndistorter.h"
 #include "Settings.h"
+#include "Detector.h"
+#include <chrono>
 
 
 namespace FSLAM
 {
-PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage)// int w_, int h_)
+PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, bool isRight)// int w_, int h_)
 {
     vignetteMapInv = 0;
-    // w = w_;
-    // h = h_;
     GammaValid = false;
     VignetteValid = false;
+
+    if(isRight)
+    name = "Right";
+    else name = "Left";
 
     if (PhoUndistMode == NoCalib)
     {
@@ -94,6 +98,9 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
             VignetteValid = true;
         }
     }
+
+    if(PhoUndistMode == OnlineCalib)
+        Detector = std::make_shared<ORBDetector>();
 }
 
 void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, bool isRightRGBD, float factor)
@@ -149,6 +156,11 @@ void PhotometricUndistorter::undistort(float* fImg, cv::Mat& Img, int w, int h, 
 
     Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
     Img.convertTo(Img, CV_8U);
+
+    std::vector<cv::KeyPoint> mvKeys;
+    cv::Mat Descriptors;
+    int nOrb;
+    Detector->ExtractFeatures(Img, mvKeys, Descriptors, nOrb, name);
     return;
 }
 

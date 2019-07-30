@@ -1,7 +1,7 @@
 #!/bin/bash 
 # gy - 17/7/2019
 # Run this script once as it will clean up after itself. Everytime you run it will recompile packages (except opencv)
-BuildType="Debug"
+BuildType="Release"
 
 SCRIPTPATH=$(dirname $0)
 if [ $SCRIPTPATH = '.' ]
@@ -58,6 +58,6 @@ fi
 #build SLAM
 #==========
 cmake_prefix=$InstallDir/lib/cmake
-cd $SCRIPTPATH && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType && make -j
+cd $SCRIPTPATH && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType && make -j $(nproc)
 
 

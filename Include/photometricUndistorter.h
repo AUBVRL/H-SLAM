@@ -2,11 +2,12 @@
 
 namespace FSLAM
 {
+class ORBDetector;
 class PhotometricUndistorter
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    PhotometricUndistorter(std::string gamma_path, std::string vignetteImage); //, int w_, int h_);
+    PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, bool isRight = false); //, int w_, int h_);
     ~PhotometricUndistorter() 
     {
 	    if(vignetteMapInv) delete[] vignetteMapInv;
@@ -26,11 +27,14 @@ public:
     };
 
 private:
+    std::shared_ptr<ORBDetector> Detector;
     float G[256 * 256];
     int GDepth;
     float *vignetteMapInv;
     bool GammaValid;
     bool VignetteValid;
     cv::Mat cvVignette;
+
+    std::string name;
 };
 } // namespace FSLAM
