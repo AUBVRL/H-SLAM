@@ -14,7 +14,7 @@ InstallDir=$SCRIPTPATH/Thirdparty/CompiledLibs
 
 #install system wide dependencies
 #================================
-sudo apt install libgl1-mesa-dev libglew-dev libsuitesparse-dev libeigen3-dev libboost-all-dev cmake build-essential git libzip-dev freeglut3-dev
+sudo apt install libgl1-mesa-dev libglew-dev libsuitesparse-dev libeigen3-dev libboost-all-dev cmake build-essential git libzip-dev ccache freeglut3-dev
 
 #if you have OpenCV3.4 comment out the following and specify the directory later
 sudo apt install libjpeg8-dev libpng-dev libtiff5-dev libtiff-dev libavcodec-dev libavformat-dev libv4l-dev libgtk2.0-dev qt5-default v4l-utils
