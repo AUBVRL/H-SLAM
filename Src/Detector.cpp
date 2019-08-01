@@ -27,7 +27,7 @@ namespace FSLAM
 {
     
 
-void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, std::string name)
+void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb)
 {
     if (Image.empty())
         return;
@@ -39,9 +39,9 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
     int height = Image.size().height;
     int width = Image.size().width;
     float tolerance = 0.1;
-    int minThFAST = 5;
+    int minThFAST = 8;
 
-    bool DrawDetected = true;
+    bool DrawDetected = false;
     int maxCorners = 2000;
     bool DoSubPix = true;
 
@@ -53,8 +53,8 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
 
     cv::Mat DetectorBlur;
     cv::GaussianBlur(Image, DetectorBlur, cv::Size(9, 9), 0.7, 0.7, cv::BORDER_REFLECT_101);
-    // // cv::AGAST(DetectorBlur, vKp, minThFAST, true,cv::AgastFeatureDetector::OAST_9_16);    //OAST_9_16 AGAST_5_8 AGAST_7_12s
-    cv::FAST(DetectorBlur, vKpTemp, minThFAST, true);
+    cv::AGAST(DetectorBlur, vKpTemp, minThFAST, true,cv::AgastFeatureDetector::OAST_9_16);    //OAST_9_16 AGAST_5_8 AGAST_7_12s
+    // cv::FAST(DetectorBlur, vKpTemp, minThFAST, true);
     std::sort(vKpTemp.begin(), vKpTemp.end(), [](cv::KeyPoint &a, cv::KeyPoint &b) { return a.response > b.response; });
     maxScore = vKpTemp[0].response;
     vKp = Ssc(vKpTemp, maxCorners, tolerance, width, height);
@@ -63,7 +63,7 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
 
     for (int i = 0; i < vKp.size(); i++)
     {
-        if ((vKp[i].pt.y > height - this->HALF_PATCH_SIZE - 4) || (vKp[i].pt.y < this->HALF_PATCH_SIZE + 4) || (vKp[i].pt.x > width - this->HALF_PATCH_SIZE - 4) || (vKp[i].pt.x < this->HALF_PATCH_SIZE + 4))
+        if ((vKp[i].pt.y > height - this->HALF_PATCH_SIZE ) || (vKp[i].pt.y < this->HALF_PATCH_SIZE ) || (vKp[i].pt.x > width - this->HALF_PATCH_SIZE ) || (vKp[i].pt.x < this->HALF_PATCH_SIZE ))
             continue;
 
         if ((mvKeys.size() < maxCorners))
@@ -90,13 +90,13 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
 
     if (DrawDetected)
     {
-        cv::namedWindow("CornerDetector"+name, cv::WINDOW_KEEPRATIO | cv::WINDOW_GUI_NORMAL);
+        cv::namedWindow("CornerDetector", cv::WINDOW_KEEPRATIO | cv::WINDOW_GUI_NORMAL);
         cv::Mat ImageDisp;
         cv::cvtColor(Image, ImageDisp, cv::COLOR_GRAY2BGR);
         for (int i = 0; i < nOrb; i++)
             cv::rectangle(ImageDisp, cv::Point2i(mvKeys[i].pt.x - 3, mvKeys[i].pt.y - 3), cv::Point2i(mvKeys[i].pt.x + 3, mvKeys[i].pt.y + 3), cv::Scalar(0.0, 255.0, 0.0), 1, 8, 0);
 
-        cv::imshow("CornerDetector"+name, ImageDisp);
+        cv::imshow("CornerDetector", ImageDisp);
     }
     return;
 }
@@ -123,7 +123,6 @@ void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, 
            cvRound(ppattern[idx].x * a - ppattern[idx].y * b)]
         for (size_t i = 0; i < 32; ++i, ppattern += 16)
         {
-
             int t0, t1, val;
             t0 = GET_VALUE(0); t1 = GET_VALUE(1);
             val = t0 < t1;

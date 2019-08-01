@@ -5,21 +5,17 @@
 
 #include "photometricUndistorter.h"
 #include "Settings.h"
-#include "Detector.h"
-#include <chrono>
 
+#include "OnlineCalibrator.h"
 
 namespace FSLAM
 {
-PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage, bool isRight)// int w_, int h_)
+PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::string vignetteImage)
 {
     vignetteMapInv = 0;
     GammaValid = false;
     VignetteValid = false;
 
-    if(isRight)
-    name = "Right";
-    else name = "Left";
 
     if (PhoUndistMode == NoCalib)
     {
@@ -99,8 +95,6 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
         }
     }
 
-    if(PhoUndistMode == OnlineCalib)
-        Detector = std::make_shared<ORBDetector>();
 }
 
 void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, bool isRightRGBD, float factor)
@@ -157,10 +151,11 @@ void PhotometricUndistorter::undistort(float* fImg, cv::Mat& Img, int w, int h, 
     Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
     Img.convertTo(Img, CV_8U);
 
-    std::vector<cv::KeyPoint> mvKeys;
-    cv::Mat Descriptors;
-    int nOrb;
-    Detector->ExtractFeatures(Img, mvKeys, Descriptors, nOrb, name);
+    std::shared_ptr<OnlineCalibrator>Oc; 
+    if(PhoUndistMode == OnlineCalib)
+        Oc = std::make_shared<OnlineCalibrator>();    
+    Oc->AddFrame(Img);
+
     return;
 }
 

@@ -11,22 +11,22 @@
             "program": "${workspaceFolder}/build/bin/FSLAM",
             "args": [
                 //VIP machine
-                "sensor=Stereo", //Monocular, Stereo or RGBD
-                "dataset=Euroc", //Euroc, TumMono or Kitti
+                "sensor=Monocular", //Monocular, Stereo or RGBD
+                "dataset=TumMono", //Euroc, TumMono or Kitti
                 "photomCalibmodel=OnlineCalib", //OnlineCalib, HaveCalib, NoCalib
 
-                "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
+                // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
+                "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
                 // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
 
                 "vocabulary=pathtovocab",
 
-                "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
-                // "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
+                // "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
+                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
                 // "path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/", //Kitti      
 
-                "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                // "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
+                // "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
+                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
                 // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
 
                 "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",

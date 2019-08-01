@@ -58,7 +58,7 @@ public:
         {
             //For RGBD don't photometrically undistort the image, but pass it as is to the geometric distorter when HaveCalib.
             tPhoCalibR = new float[WidthOri * HeightOri];
-            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR, true);
+            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR);
         }
 
         std::string ImPath = Input_->Path;

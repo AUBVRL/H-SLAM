@@ -105,7 +105,7 @@ int main(int argc, char **argv)
             Dest = Img->cvImgL;
 
         cv::imshow("Img", Dest);
-        cv::waitKey(1);
+        cv::waitKey(0);
     }
 
     return 0;

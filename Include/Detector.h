@@ -22,7 +22,7 @@ public:
     }
 
     ~ORBDetector(){}
-    void ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, std::string name = "");
+    void ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb);
 
 
 private:
