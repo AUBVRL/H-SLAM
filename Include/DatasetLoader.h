@@ -349,6 +349,10 @@ public:
 
     inline void getImage(std::shared_ptr<ImageData> ImgData, int id )
     {
+        ImgData->timestamp = getTimestamp(id);
+        ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
+        ImgData->ExposureR = exposuresR.size() == 0 ? 1.0f : exposuresR[id];
+
         if (!isZipped)
         {
             ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
@@ -387,9 +391,6 @@ public:
             #endif
         }
         
-        ImgData->timestamp = getTimestamp(id);
-        ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
-        ImgData->ExposureR = exposuresR.size() == 0 ? 1.0f : exposuresR[id];
 
         return;
     }

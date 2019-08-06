@@ -8,13 +8,13 @@ namespace FSLAM
 System::System()
 {
     //Setup Online Photometric Calibrators
-    OnlinePhCalibL = OnlinePhCalibL = NULL;
-    if (PhoUndistMode == OnlineCalib)
-    {
-        OnlinePhCalibL = std::make_shared<OnlineCalibrator>();
-        if (Sensortype == Stereo)
-            OnlinePhCalibR = std::make_shared<OnlineCalibrator>();
-    }
+    // OnlinePhCalibL = OnlinePhCalibL = NULL;
+    // if (PhoUndistMode == OnlineCalib)
+    // {
+    //     OnlinePhCalibL = std::make_shared<OnlineCalibrator>();
+    //     if (Sensortype == Stereo)
+    //         OnlinePhCalibR = std::make_shared<OnlineCalibrator>();
+    // }
 }
 
 System::~System()
@@ -25,10 +25,10 @@ void System::ProcessNewFrame(ImageData &Frame)
 {
 
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
-    if(OnlinePhCalibL) 
-        OnlinePhCalibL->AddFrame(Frame.cvImgL);
-    if(OnlinePhCalibR)
-        OnlinePhCalibL->AddFrame(Frame.cvImgR);
+    // if(OnlinePhCalibL) 
+    //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);
+    // if(OnlinePhCalibR)
+    //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
 
 
 
