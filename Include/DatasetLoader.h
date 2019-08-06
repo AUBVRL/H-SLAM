@@ -3,7 +3,7 @@
 
 #include <fstream>
 #include <dirent.h>
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"

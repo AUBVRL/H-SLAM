@@ -10,6 +10,7 @@ namespace FSLAM
 extern PhotoUnDistMode PhoUndistMode;
 extern Sensor Sensortype;
 
+// extern int NumProcessors;
 
 extern int WidthOri;
 extern int HeightOri;

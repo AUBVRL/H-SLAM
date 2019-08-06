@@ -6,7 +6,6 @@
 #include "photometricUndistorter.h"
 #include "Settings.h"
 
-#include "OnlineCalibrator.h"
 
 namespace FSLAM
 {
@@ -150,11 +149,6 @@ void PhotometricUndistorter::undistort(float* fImg, cv::Mat& Img, int w, int h, 
 
     Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
     Img.convertTo(Img, CV_8U);
-
-    std::shared_ptr<OnlineCalibrator>Oc; 
-    if(PhoUndistMode == OnlineCalib)
-        Oc = std::make_shared<OnlineCalibrator>();    
-    Oc->AddFrame(Img);
 
     return;
 }

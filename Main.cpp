@@ -1,8 +1,11 @@
 #include <unistd.h>
-#include <chrono>
+#include <opencv2/highgui.hpp>
 
 #include "Main.h"
 #include "DatasetLoader.h"
+#include "System.h"
+
+#include <chrono>
 
 using namespace FSLAM;
 
@@ -54,6 +57,7 @@ int main(int argc, char **argv)
     clock_t started = clock();
     double sInitializerOffset = 0;
 
+    std::shared_ptr<System> slam = std::make_shared<System>();
 
     for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
     {
@@ -72,7 +76,10 @@ int main(int argc, char **argv)
             std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
             Img = std::make_shared<ImageData>(DataReader->GeomUndist->wOrg, DataReader->GeomUndist->hOrg);
             DataReader->getImage(Img, i);
-            std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+            std::cout << "reading image: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+            slam->ProcessNewFrame(*Img);
+            std::cout << "feature extract time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
         }
 
         bool skipFrame = false;
@@ -105,7 +112,7 @@ int main(int argc, char **argv)
             Dest = Img->cvImgL;
 
         cv::imshow("Img", Dest);
-        cv::waitKey(0);
+        cv::waitKey(1);
     }
 
     return 0;
