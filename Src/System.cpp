@@ -1,5 +1,6 @@
 #include "System.h"
 #include "OnlineCalibrator.h"
+#include "Detector.h"
 #include "Settings.h"
 
 namespace FSLAM
@@ -7,6 +8,7 @@ namespace FSLAM
 
 System::System()
 {
+    Detector = std::make_shared<ORBDetector>();
     //Setup Online Photometric Calibrators
     // OnlinePhCalibL = OnlinePhCalibL = NULL;
     // if (PhoUndistMode == OnlineCalib)
@@ -21,9 +23,8 @@ System::~System()
 {
 }
 
-void System::ProcessNewFrame(ImageData &Frame)
+void System::ProcessNewFrame(std::shared_ptr<ImageData> &Frame)
 {
-
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);

@@ -46,7 +46,7 @@ public:
     char *databuffer;
 #endif
 
-    DatasetReader(std::shared_ptr<Input> Input_): dataset(Input_->dataset_)
+    DatasetReader(std::shared_ptr<Input>& Input_): dataset(Input_->dataset_)
     {
         tPhoCalibL = tPhoCalibR = NULL;
         //Initialize undistorters
@@ -347,7 +347,7 @@ public:
         return files.size();
     }
 
-    inline void getImage(std::shared_ptr<ImageData> ImgData, int id )
+    inline void getImage(std::shared_ptr<ImageData>& ImgData, int id )
     {
         ImgData->timestamp = getTimestamp(id);
         ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
@@ -418,7 +418,7 @@ public:
             return readbytes;
     }
 
-    inline void undistort(std::shared_ptr<ImageData> ImgData)
+    inline void undistort(std::shared_ptr<ImageData>& ImgData)
     {
         // If photometric calibration is known at startup we need to photometrically undistort first.
         // Otherwise geometrically undistort first then photometrically!

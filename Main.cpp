@@ -78,7 +78,7 @@ int main(int argc, char **argv)
             DataReader->getImage(Img, i);
             std::cout << "reading image: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
             start = std::chrono::high_resolution_clock::now();
-            slam->ProcessNewFrame(*Img);
+            slam->ProcessNewFrame(Img);
             std::cout << "feature extract time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
         }
 

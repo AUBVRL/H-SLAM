@@ -60,6 +60,7 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
   ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/photometricUndistorter.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/OnlineCalibrator.cpp
 
 )

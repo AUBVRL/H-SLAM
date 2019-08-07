@@ -7,6 +7,21 @@
 namespace FSLAM
 {
 
+GeometricUndistorter::GeometricUndistorter(std::string GeomCalib_)
+{
+    LoadGeometricCalibration(GeomCalib_);
+    in_data = new float[WidthOri * HeightOri];
+    in_data2 = new float[WidthOri * HeightOri];
+}
+
+GeometricUndistorter::~GeometricUndistorter()
+{
+    if (remapX != 0)    delete[] remapX;
+    if (remapY != 0)    delete[] remapY;
+    if (in_data != 0)   delete[] in_data;
+    if (in_data2 != 0)  delete[] in_data2;
+}
+
 void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 {
     passthrough=false;
@@ -439,7 +454,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
 
 }
 
-void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* In_L, float* In_R)
+void GeometricUndistorter::undistort(std::shared_ptr<ImageData> &ImgData, float* In_L, float* In_R)
 {
     bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
     if (Sensortype == Stereo)
@@ -523,7 +538,7 @@ void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, float* I
     }
 }
 
-void GeometricUndistorter::undistort(std::shared_ptr<ImageData>ImgData, bool NoPhoCalib)
+void GeometricUndistorter::undistort(std::shared_ptr<ImageData> &ImgData, bool NoPhoCalib)
 {
     bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
     if (Sensortype == Stereo && StereoState == "rectify")

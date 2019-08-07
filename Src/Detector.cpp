@@ -25,7 +25,18 @@
 
 namespace FSLAM
 {
-    
+ORBDetector::ORBDetector()
+{
+    HALF_PATCH_SIZE = 15;
+    PATCH_SIZE = 31;
+    EDGE_THRESHOLD = 19;
+    umax = InitUmax();
+    pattern = InitPattern();
+}
+
+ORBDetector::~ORBDetector()
+{
+}
 
 void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb)
 {
@@ -36,15 +47,16 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
 
     nOrb = 0;
 
-    int height = Image.size().height;
-    int width = Image.size().width;
-    float tolerance = 0.1;
-    int minThFAST = 8;
-    int gridsize = 3;
+    static int height = Image.size().height;
+    static int width = Image.size().width;
 
-    bool DrawDetected = false;
-    int maxCorners = 2500;
-    bool DoSubPix = true;
+    tolerance = 0.1;
+    minThFAST = 8;
+    gridsize = 3;
+
+    DrawDetected = false;
+    maxCorners = 2500;
+    DoSubPix = true;
 
     float maxScore = 0.0f;
 
