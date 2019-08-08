@@ -36,13 +36,13 @@ public:
         if(!cvImgL.empty())
         {
             cvImgL.copyTo(NewData.cvImgL);
-            memcpy(NewData.fImgL,fImgL,cvImgL.cols*cvImgR.cols);
+            memcpy(NewData.fImgL,fImgL,cvImgL.cols*cvImgL.rows * sizeof(float));
         } 
 
         if(!cvImgR.empty()) 
         {
             cvImgR.copyTo(NewData.cvImgR);
-            memcpy(NewData.fImgL,fImgL,cvImgL.cols*cvImgR.cols);
+            memcpy(NewData.fImgL,fImgL,cvImgR.rows*cvImgR.cols * sizeof(float));
         }
         NewData.timestamp =  timestamp;
         NewData.ExposureL = ExposureL;
