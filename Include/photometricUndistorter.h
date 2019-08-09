@@ -14,8 +14,7 @@ public:
     }
 
 
-    void undistort(cv::Mat &Image, float* fImage, bool isRightRGBD = false, float factor = 1.0f);
-    void undistort(float* fImg, cv::Mat& Img, int w, int h, bool isRightRGBD = false, float factor = 1.0f);
+    void undistort(cv::Mat &Image, bool isRightRGBD = false, float factor = 1.0f);
 
 
     float *getG()

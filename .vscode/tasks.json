@@ -25,9 +25,9 @@
                 // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
 
                 "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
-                // "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "vignetteL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-                // "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
 
                 "start=0",
                 "end=9999999",

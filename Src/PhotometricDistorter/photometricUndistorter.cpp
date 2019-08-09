@@ -96,61 +96,29 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
 
 }
 
-void PhotometricUndistorter::undistort(cv::Mat &Image, float* fImage, bool isRightRGBD, float factor)
+void PhotometricUndistorter::undistort(cv::Mat &Image, bool isRightRGBD, float factor)
 {
     int dim = Image.size().width * Image.size().height;
+    float *ptr = Image.ptr<float>();
 
-    if(isRightRGBD)
+    if (isRightRGBD)
     {
-        for(int i=0; i<dim;i++)
-            fImage[i] = Image.data[i]*factor; //this is the RGBD magnitude factor
-        return;
+        Image *= factor;
     }
-
-    if (GammaValid && VignetteValid)
-        for(int i=0; i<dim ;i++)
-		    fImage[i] = G[Image.data[i]]*factor* vignetteMapInv[i];
-    else if(GammaValid)
-        for(int i=0; i<dim;i++)
-            fImage[i] = G[Image.data[i]]*factor;
-    else if(VignetteValid)
-        for(int i=0; i<dim;i++)
-		    fImage[i] = Image.data[i]*factor* vignetteMapInv[i];
-    else
-        for(int i=0; i<dim;i++)
-            fImage[i] = Image.data[i]*factor;
-}
-
-void PhotometricUndistorter::undistort(float* fImg, cv::Mat& Img, int w, int h, bool isRightRGBD, float factor)
-{
-    int dim = w*h;
-
-    if(isRightRGBD)
+    else if (GammaValid && VignetteValid)
     {
-        for(int i=0; i<dim;i++)
-            fImg[i] = fImg[i]*factor; //this is the RGBD magnitude factor
-        Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
-        Img.convertTo(Img, CV_8U);
-        return;
+        for (int i = 0; i < dim; i++)
+            ptr[i] = G[cv::saturate_cast<uchar>(ptr[i])] * factor * vignetteMapInv[i];
     }
-
-    if (GammaValid && VignetteValid)
-        for(int i=0; i<dim ;i++)
-		    fImg[i] = G[(int)round(fImg[i])]*factor* vignetteMapInv[i];
-    else if(GammaValid)
-        for(int i=0; i<dim;i++)
-            fImg[i] = G[(int)round(fImg[i])]*factor;
-    else if(VignetteValid)
-        for(int i=0; i<dim;i++)
-		    fImg[i] = fImg[i]*factor* vignetteMapInv[i];
+    else if (GammaValid)
+    {
+        for (int i = 0; i < dim; i++)
+            ptr[i] = G[cv::saturate_cast<uchar>(ptr[i])] * factor;
+    }
+    else if (VignetteValid)
+        for (int i = 0; i < dim; i++)
+            ptr[i] = ptr[i] * factor * vignetteMapInv[i];
     else
-        for(int i=0; i<dim;i++)
-            fImg[i] = fImg[i]*factor;
-
-    Img = cv::Mat(cv::Size(w, h), CV_32F, fImg);
-    Img.convertTo(Img, CV_8U);
-
-    return;
+        Image *= factor;
 }
-
 }

@@ -420,31 +420,43 @@ public:
 
     inline void undistort(std::shared_ptr<ImageData>& ImgData)
     {
-        // If photometric calibration is known at startup we need to photometrically undistort first.
-        // Otherwise geometrically undistort first then photometrically!
+        //operating with uchar is a lot faster but leads to discretization issues
+        ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_32F);
+        if (PhoUndistR)
+            ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_32F);
+
         if(PhoUndistMode == HaveCalib)
         {
-            PhoUndistL->undistort(ImgData->cvImgL, tPhoCalibL);
+            PhoUndistL->undistort(ImgData->cvImgL);
             if (PhoUndistR)
-                PhoUndistR->undistort(ImgData->cvImgR, tPhoCalibR, Sensortype == RGBD);
-            GeomUndist->undistort(ImgData, tPhoCalibL, tPhoCalibR);
+                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD);
+            GeomUndist->undistort(ImgData->cvImgL,ImgData->cvImgR);
+
         }
         else if(PhoUndistMode == OnlineCalib)
         {
-            GeomUndist->undistort(ImgData);
-            PhoUndistL->undistort(ImgData->fImgL, ImgData->cvImgL, GeomUndist->w, GeomUndist->h);
+            GeomUndist->undistort(ImgData->cvImgL,ImgData->cvImgR);
+            PhoUndistL->undistort(ImgData->cvImgL);
             if (PhoUndistR)
-                PhoUndistR->undistort(ImgData->fImgR, ImgData->cvImgR, GeomUndist->w, GeomUndist->h, Sensortype == RGBD);
+                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD);
         }
         else // If we don't want to perform photometric correction
         {
-            GeomUndist->undistort(ImgData, true);
+            GeomUndist->undistort(ImgData->cvImgL,ImgData->cvImgR);
         }
-        
-        
 
-        
+        int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
+        for (int i = 0; i < dim; i++)
+        {
+            ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+            if (PhoUndistR)
+                ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+        }
 
+        ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
+        if (PhoUndistR)
+            ImgData->cvImgL.convertTo(ImgData->cvImgR, CV_8U);
+        
         return;
     }
 };
