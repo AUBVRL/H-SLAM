@@ -11,9 +11,11 @@ using namespace FSLAM;
 
 int main(int argc, char **argv)
 {
+    //Get input data and initialize dataset reader
     std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv); //parse the arguments and set system settings
     std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_);
     
+    //Configure image playback data
     if (Input_->Reverse)
     {
         int temp = Input_->Start;
@@ -22,16 +24,13 @@ int main(int argc, char **argv)
             Input_->Start = DataReader->nImgL - 1;
         Input_->End = temp;
     }
-
     std::vector<int> idsToPlay;
     std::vector<double> timesToPlayAt;
     for (int i = Input_->Start; i >= 0 && i < DataReader->nImgL && Input_->linc * i < Input_->linc * Input_->End; i += Input_->linc)
     {
         idsToPlay.push_back(i);
         if (timesToPlayAt.size() == 0)
-        {
             timesToPlayAt.push_back((double)0);
-        }
         else
         {
             double tsThis = DataReader->getTimestamp(idsToPlay[idsToPlay.size()-1]);
@@ -40,6 +39,7 @@ int main(int argc, char **argv)
         }
     }
 
+    //Preload images if neccessary (reading from drive throttles!)
     std::vector<std::shared_ptr<ImageData>> Images;
     if (Input_->Prefetch && Images.empty())
     {
@@ -52,11 +52,14 @@ int main(int argc, char **argv)
             Images.push_back(Img);
         }
     }
+
+    //Initialize time
     struct timeval tv_start;
     gettimeofday(&tv_start, NULL);
     clock_t started = clock();
     double sInitializerOffset = 0;
 
+    //Create a SLAM system instance
     std::shared_ptr<System> slam = std::make_shared<System>();
 
     for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
@@ -67,38 +70,38 @@ int main(int argc, char **argv)
         //     started = clock();
         //     sInitializerOffset = timesToPlayAt[ii];
         // }
+
         int i = idsToPlay[ii];
         std::shared_ptr<ImageData> Img;
-        if (Input_->Prefetch)
+        if (!Images.empty())
             Img = Images[ii];
         else
         {
-            std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
             Img = std::make_shared<ImageData>(DataReader->GeomUndist->wOrg, DataReader->GeomUndist->hOrg);
-            DataReader->getImage(Img, i);
-            std::cout << "reading image: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-            slam->ProcessNewFrame(Img);
-            std::cout << "feature extract time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+            DataReader->getImage(Img, i); 
         }
 
         bool skipFrame = false;
-            if (Input_->PlaybackSpeed != 0) {
-                struct timeval tv_now;
-                gettimeofday(&tv_now, NULL);
-                double sSinceStart = sInitializerOffset + ((tv_now.tv_sec - tv_start.tv_sec) +
-                                                           (tv_now.tv_usec - tv_start.tv_usec) / (1000.0f * 1000.0f));
-                
-                if (sSinceStart < timesToPlayAt[ii]) {
-                    usleep((int) ((timesToPlayAt[ii] - sSinceStart) * 1000 * 1000));
-                }
-                if (sSinceStart > timesToPlayAt[ii] + 0.5 + 0.1 * (ii % 2)) {
-                    printf("SKIPFRAME %d (play at %f, now it is %f)!\n", ii, timesToPlayAt[ii], sSinceStart);
-                    skipFrame = true;
-                }
+        if (Input_->PlaybackSpeed != 0)
+        {
+            struct timeval tv_now;
+            gettimeofday(&tv_now, NULL);
+            double sSinceStart = sInitializerOffset + ((tv_now.tv_sec - tv_start.tv_sec) + (tv_now.tv_usec - tv_start.tv_usec) / (1000.0f * 1000.0f));
+            if (sSinceStart < timesToPlayAt[ii])
+            { usleep((int)((timesToPlayAt[ii] - sSinceStart) * 1000 * 1000)); }
+            if (sSinceStart > timesToPlayAt[ii] + 0.5 + 0.1 * (ii % 2))
+            {
+                printf("SKIPFRAME %d (play at %f, now it is %f)!\n", ii, timesToPlayAt[ii], sSinceStart);
+                skipFrame = true;
             }
-            if (skipFrame)
-                continue;
+        }
+        if (skipFrame)
+            continue;
+
+        slam->ProcessNewFrame(Img);
+
+
+
 
         cv::Mat Dest;
         if (Sensortype == Stereo || Sensortype == RGBD)
