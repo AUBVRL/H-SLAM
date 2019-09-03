@@ -55,7 +55,7 @@
 
                 "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",//Euroc 
                 // "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
-                // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti      
+                // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti 
 
                 "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono

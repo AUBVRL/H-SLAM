@@ -7,6 +7,7 @@ class ImageData;
 class OnlineCalibrator;
 class ORBDetector;
 class Frame;
+class CalibData;
 
 class System
 {
@@ -17,6 +18,7 @@ public:
     void ProcessNewFrame(std::shared_ptr<ImageData> &DataIn);
 
 private:
+    std::shared_ptr<CalibData> Calib;
     std::shared_ptr<OnlineCalibrator> OnlinePhCalibL;
     std::shared_ptr<OnlineCalibrator> OnlinePhCalibR;
 

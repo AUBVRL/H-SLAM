@@ -55,7 +55,17 @@
         "bitset": "cpp",
         "thread": "cpp",
         "typeindex": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "csignal": "cpp",
+        "strstream": "cpp",
+        "condition_variable": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "memory_resource": "cpp",
+        "random": "cpp",
+        "set": "cpp",
+        "*.ipp": "cpp"
     },
-    "zenMode.hideTabs": false
+    "zenMode.hideTabs": false,
+    "cmake.buildBeforeRun": false
 }

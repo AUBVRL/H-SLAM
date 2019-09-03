@@ -420,6 +420,11 @@ public:
 
     inline void undistort(std::shared_ptr<ImageData>& ImgData)
     {
+        //The final result of ImgData->cvImgL and cvImgR are CV_8U which are discretized
+        //representations of their CV_32F undistorted images! whereas ImgData->fImgL is a float
+        //vector and hence more accurate but slower ! unfortunately most opencv functions only uses
+        // CV_8U so keep track of both versions but use fImgL whenever possible!
+        
         //operating with uchar is a lot faster but leads to discretization issues
         ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_32F);
         if (PhoUndistR)
@@ -446,11 +451,15 @@ public:
         }
 
         int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
+
+        float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
+        float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
+
         for (int i = 0; i < dim; i++)
         {
-            ImgData->fImgL[i] = ImgData->cvImgL.data[i];
+            ImgData->fImgL[i] = CvPtrL[i];
             if (PhoUndistR)
-                ImgData->fImgR[i] = ImgData->cvImgR.data[i];
+                ImgData->fImgR[i] = CvPtrR[i];
         }
 
         ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);

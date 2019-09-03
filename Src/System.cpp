@@ -3,6 +3,7 @@
 #include "Detector.h"
 #include "Settings.h"
 #include "Frame.h"
+#include "CalibData.h"
 
 namespace FSLAM
 {
@@ -10,6 +11,7 @@ namespace FSLAM
 System::System()
 {
     Detector = std::make_shared<ORBDetector>();
+    // Calib = std::make_shared<CalibData>(GWidth, GHeight, GK, GbinvL, GbinvR, ScaleFactor);
     //Setup Online Photometric Calibrators
     // OnlinePhCalibL = OnlinePhCalibL = NULL;
     // if (PhoUndistMode == OnlineCalib)
