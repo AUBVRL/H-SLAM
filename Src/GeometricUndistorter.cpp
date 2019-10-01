@@ -150,10 +150,10 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     }
 
     if(Sensortype == Stereo)
-        baseline*=K(0,0); //for vertical baseline this should be K(1,1)
+        baseline*=K(0,0); //for vertical baseline this should be K(1,1) this is new_bf
 
-    for(int y=0;y<h;y++)
-	    for(int x=0;x<w;x++)
+    for(int y=0;y<h;++y)
+	    for(int x=0;x<w;++x)
 		{
 			remapX[x+y*w] = x;
 			remapY[x+y*w] = y;
@@ -161,8 +161,8 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
 	distortCoordinates(remapX, remapY, remapX, remapY, h*w);
 
-	for(int y=0;y<h;y++)
-		for(int x=0;x<w;x++)
+	for(int y=0;y<h;++y)
+		for(int x=0;x<w;++x)
 		{
 			// make rounding resistant.
 			float ix = remapX[x+y*w];
@@ -187,7 +187,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     remapX_ = cv::Mat(cv::Size(w, h), CV_32F,  remapX);
     remapY_ = cv::Mat(cv::Size(w, h), CV_32F,  remapY);
 
-    std::cout << K << "\n\n";
+    std::cout << K << std::endl;
 }
 
 void GeometricUndistorter::makeOptimalK_crop()
@@ -203,10 +203,10 @@ void GeometricUndistorter::makeOptimalK_crop()
 	float minY = 0;
 	float maxY = 0;
 
-	for(int x=0; x<100000;x++)
+	for(int x=0; x<100000;++x)
 	{tgX[x] = (x-50000.0f) / 10000.0f; tgY[x] = 0;}
 	distortCoordinates(tgX, tgY,tgX, tgY,100000);
-	for(int x=0; x<100000;x++)
+	for(int x=0; x<100000;++x)
 	{
 		if(tgX[x] > 0 && tgX[x] < wOrg-1)
 		{
@@ -214,10 +214,10 @@ void GeometricUndistorter::makeOptimalK_crop()
 			maxX = (x-50000.0f) / 10000.0f;
 		}
 	}
-	for(int y=0; y<100000;y++)
+	for(int y=0; y<100000;++y)
 	{tgY[y] = (y-50000.0f) / 10000.0f; tgX[y] = 0;}
 	distortCoordinates(tgX, tgY,tgX, tgY,100000);
-	for(int y=0; y<100000;y++)
+	for(int y=0; y<100000;++y)
 	{
 		if(tgY[y] > 0 && tgY[y] < hOrg-1)
 		{
@@ -242,14 +242,14 @@ void GeometricUndistorter::makeOptimalK_crop()
 	while(oobLeft || oobRight || oobTop || oobBottom)
 	{
 		oobLeft=oobRight=oobTop=oobBottom=false;
-		for(int y=0;y<h;y++)
+		for(int y=0;y<h;++y)
 		{
 			remapX[y*2] = minX;
 			remapX[y*2+1] = maxX;
 			remapY[y*2] = remapY[y*2+1] = minY + (maxY-minY) * (float)y / ((float)h-1.0f);
 		}
 		distortCoordinates(remapX, remapY,remapX, remapY,2*h);
-		for(int y=0;y<h;y++)
+		for(int y=0;y<h;++y)
 		{
 			if(!(remapX[2*y] > 0 && remapX[2*y] < wOrg-1))
 				oobLeft = true;
@@ -257,7 +257,7 @@ void GeometricUndistorter::makeOptimalK_crop()
 				oobRight = true;
 		}
 
-		for(int x=0;x<w;x++)
+		for(int x=0;x<w;++x)
 		{
 			remapY[x*2] = minY;
 			remapY[x*2+1] = maxY;
@@ -266,7 +266,7 @@ void GeometricUndistorter::makeOptimalK_crop()
 		distortCoordinates(remapX, remapY,remapX, remapY,2*w);
 
 
-		for(int x=0;x<w;x++)
+		for(int x=0;x<w;++x)
 		{
 			if(!(remapY[2*x] > 0 && remapY[2*x] < hOrg-1))
 				oobTop = true;
@@ -319,7 +319,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
 
     if (Cameramodel == CamModel::Pinhole)
     {
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; ++i)
         {
             float x = in_x[i];
             float y = in_y[i];
@@ -335,7 +335,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
     {
         float dist = ic[4];
         float d2t = 2.0f * tan(dist / 2.0f);
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; ++i)
         {
             float x = in_x[i];
             float y = in_y[i];
@@ -359,7 +359,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
         float r1 = ic[6];
         float r2 = ic[7];
 
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; ++i)
         {
             float x = in_x[i];
             float y = in_y[i];
@@ -387,7 +387,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
         float k2 = ic[5];
         float k3 = ic[6];
         float k4 = ic[7];
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; ++i)
         {
             float x = in_x[i];
             float y = in_y[i];
@@ -416,7 +416,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
         const float k1 = ic[5];
         const float k2 = ic[6];
         const float k3 = ic[7];
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; ++i)
         {
             float x = in_x[i];
             float y = in_y[i];

@@ -31,7 +31,7 @@ namespace FSLAM
 // {
 // public:
 // 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-//     Frame(cv::Mat Image, std::shared_ptr<ORBDetector>& Detector_);
+//     Frame(cv::Mat Image, std::shared_ptr<ORBDetector> Detector_);
 //     ~Frame() {}
 //     void InterpolateFeaturePatches(int keyInd);
 

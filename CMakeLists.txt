@@ -47,7 +47,7 @@ else()
 endif()
 
 add_definitions("-DENABLE_SSE")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O3 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations ") #-fno-omit-frame-pointer"
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O0 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations ") #-fno-omit-frame-pointer"
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")

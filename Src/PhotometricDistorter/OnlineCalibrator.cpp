@@ -51,7 +51,7 @@ namespace FSLAM
 
 
 // /* Frame class */
-// Frame::Frame(cv::Mat Image, std::shared_ptr<ORBDetector>& Detector_): image(Image), Detector(Detector_)
+// Frame::Frame(cv::Mat Image, std::shared_ptr<ORBDetector> Detector_): image(Image), Detector(Detector_)
 // {
 //     Detector->ExtractFeatures(image, mvKeys, Descriptors, nOrb);
 //     for (int i = 0; i < nOrb; i ++)

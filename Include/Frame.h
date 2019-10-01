@@ -14,9 +14,9 @@ class Frame
 public:
 	// EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    Frame(std::shared_ptr<ImageData>&Img, std::shared_ptr<ORBDetector>&_Detector);
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector);
     ~Frame();
-    // void CreatePyrsAndExtractFeats(std::shared_ptr<ImageData>& Img);
+    void CreatePyrs(std::shared_ptr<ImageData> Img);
 
     std::shared_ptr<ORBDetector> Detector;
 

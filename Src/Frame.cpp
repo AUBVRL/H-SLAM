@@ -7,10 +7,9 @@
 namespace FSLAM
 {
 
-Frame::Frame(std::shared_ptr<ImageData>& Img, std::shared_ptr<ORBDetector>& _Detector): Detector(_Detector)
+Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector): Detector(_Detector)
 {
-
-//    CreatePyrsAndExtractFeats(Img);
+   CreatePyrs(Img);
 
     // Detector->ExtractFeatures(Img->cvImgL,mvKeysL,DescriptorsL,nFeaturesL);
 
@@ -24,7 +23,12 @@ Frame::Frame(std::shared_ptr<ImageData>& Img, std::shared_ptr<ORBDetector>& _Det
 
 }
 
-// void Frame::CreatePyrsAndExtractFeats(std::shared_ptr<ImageData>& Img)
+void Frame::CreatePyrs(std::shared_ptr<ImageData> Img)
+{
+
+}
+
+// void Frame::CreatePyrsAndExtractFeats(std::shared_ptr<ImageData> Img)
 // {
     // vfImgL.resize(PyrSize);
     // vfImgR.resize(PyrSize);

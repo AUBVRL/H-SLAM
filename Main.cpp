@@ -13,7 +13,9 @@ int main(int argc, char **argv)
 {
     //Get input data and initialize dataset reader
     std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv); //parse the arguments and set system settings
-    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_);
+    std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_->IntrinCalib, 
+    Input_->GammaL, Input_->GammaR, Input_->VignetteL, Input_->VignetteR, Input_->Path, Input_->timestampsL,
+    Input_->dataset_);
     
     //Configure image playback data
     if (Input_->Reverse)
@@ -33,18 +35,21 @@ int main(int argc, char **argv)
             timesToPlayAt.push_back((double)0);
         else
         {
-            double tsThis = DataReader->getTimestamp(idsToPlay[idsToPlay.size()-1]);
-            double tsPrev = DataReader->getTimestamp(idsToPlay[idsToPlay.size()-2]);
+            const int idsToPlayCount = idsToPlay.size();
+            double tsThis = DataReader->getTimestamp(idsToPlay[idsToPlayCount-1]);
+            double tsPrev = DataReader->getTimestamp(idsToPlay[idsToPlayCount-2]);
             timesToPlayAt.push_back(timesToPlayAt.back() +  fabs(tsThis-tsPrev)/Input_->PlaybackSpeed);
         }
     }
 
-    //Preload images if neccessary (reading from drive throttles!)
+    //Preload images if neccessary (reading from drive sometimes throttles!)
     std::vector<std::shared_ptr<ImageData>> Images;
+    const int idsToPlayCount = idsToPlay.size();
+
     if (Input_->Prefetch && Images.empty())
     {
         printf("LOADING ALL IMAGES!\n");
-        for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
+        for (int ii = 0; ii < idsToPlayCount; ++ii)
         {
             int i = idsToPlay[ii];
             std::shared_ptr<ImageData> Img = std::make_shared<ImageData>(DataReader->GeomUndist->wOrg, DataReader->GeomUndist->hOrg);
@@ -60,9 +65,9 @@ int main(int argc, char **argv)
     double sInitializerOffset = 0;
 
     //Create a SLAM system instance
-    std::shared_ptr<System> slam = std::make_shared<System>();
+    std::shared_ptr<System> slam = std::make_shared<System>(DataReader->GeomUndist, DataReader->PhoUndistL, DataReader->PhoUndistR);
 
-    for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
+    for (int ii = 0; ii < idsToPlayCount; ++ii)
     {
         // if (!fullSystem->initialized) // if not initialized: reset start time.
         // {
@@ -99,9 +104,6 @@ int main(int argc, char **argv)
             continue;
 
         slam->ProcessNewFrame(Img);
-
-
-
 
         cv::Mat Dest;
         if (Sensortype == Stereo || Sensortype == RGBD)

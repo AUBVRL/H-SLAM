@@ -8,14 +8,11 @@ namespace FSLAM
     PhotoUnDistMode PhoUndistMode = Emptyp;
 
     int WidthOri; 
-    int HeightOri; 
+    int HeightOri;
 
-    //Frame params
-    // int PyrSize = 8;
-    // float ScaleFactor = 1.2;
-    // int GWidth;
-    // int GHeight;
-    // Mat33f GK;
-    // float* GbinvL;
-    // float* GbinvR;
+    //Detector params
+    int PyrLevels = 8;
+    float PyrScaleFactor = 1.2;
+    int numFeatures = 1500;
+
 }

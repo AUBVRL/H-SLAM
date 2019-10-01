@@ -7,7 +7,6 @@
 
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
-#include "Main.h"
 
 #if HAS_ZIPLIB
 #include "zip.h"
@@ -37,32 +36,22 @@ public:
     std::shared_ptr<PhotometricUndistorter> PhoUndistL;
     std::shared_ptr<PhotometricUndistorter> PhoUndistR;
 
-    float *tPhoCalibL;
-    float *tPhoCalibR;
-
-    
 #if HAS_ZIPLIB
     zip_t *ziparchive;
     char *databuffer;
 #endif
 
-    DatasetReader(std::shared_ptr<Input>& Input_): dataset(Input_->dataset_)
+    DatasetReader(std::string IntrCalib, std::string GammaL, std::string GammaR, std::string VignetteL, std::string VignetteR, std::string imPath, std::string stimestamp, Dataset data)
     {
-        tPhoCalibL = tPhoCalibR = NULL;
         //Initialize undistorters
-        GeomUndist= std::make_shared<GeometricUndistorter>(Input_->IntrinCalib);
+        GeomUndist= std::make_shared<GeometricUndistorter>(IntrCalib);
 
-        PhoUndistL = std::make_shared<PhotometricUndistorter>(Input_->GammaL, Input_->VignetteL);
-        tPhoCalibL = new float[WidthOri * HeightOri];
-        if (Sensortype == Stereo || Sensortype == RGBD)
-        {
-            //For RGBD don't photometrically undistort the image, but pass it as is to the geometric distorter when HaveCalib.
-            tPhoCalibR = new float[WidthOri * HeightOri];
-            PhoUndistR = std::make_shared<PhotometricUndistorter>(Input_->GammaR, Input_->VignetteR);
-        }
+        PhoUndistL = std::make_shared<PhotometricUndistorter>(GammaL, VignetteL);
+        PhoUndistR = std::make_shared<PhotometricUndistorter>(GammaR, VignetteR);
 
-        std::string ImPath = Input_->Path;
-        std::string timestampPath = Input_->timestampsL;
+        std::string ImPath = imPath;
+        std::string timestampPath = stimestamp;
+        dataset = data;
 
 #if HAS_ZIPLIB
         ziparchive = 0;
@@ -85,7 +74,7 @@ public:
             if (dataset == Dataset::Tum_mono)
             {
                 numEntries = zip_get_num_entries(ziparchive, 0);
-                for (int k = 0; k < numEntries; k++)
+                for (int k = 0; k < numEntries; ++k)
                 {
                     const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
                     std::string nstr = std::string(name);
@@ -100,7 +89,7 @@ public:
                 numEntries = zip_get_num_entries(ziparchive, 0);
                 std::string LeftDir = "mav0/cam0/data/";
                 std::string RightDir = "mav0/cam1/data/";
-                for (int k = 0; k < numEntries; k++)
+                for (int k = 0; k < numEntries; ++k)
                 {
                     const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
                     std::string nstr = std::string(name);
@@ -176,8 +165,6 @@ public:
             if (ziparchive != 0) zip_close(ziparchive);
             if (databuffer != 0) delete databuffer;
         #endif
-        if(tPhoCalibL) delete tPhoCalibL;
-        if(tPhoCalibR) delete tPhoCalibR;
     }
 
     inline void loadtimestamps(std::string path)
@@ -338,7 +325,8 @@ public:
         std::sort(files.begin(), files.end());
         if (dir.at(dir.length() - 1) != '/')
             dir = dir + "/";
-        for (unsigned int i = 0; i < files.size(); i++)
+        const unsigned int filescount = files.size();
+        for (unsigned int i = 0; i < filescount; ++i)
         {
             if (files[i].at(0) != '/')
                 files[i] = dir + files[i];
@@ -347,7 +335,7 @@ public:
         return files.size();
     }
 
-    inline void getImage(std::shared_ptr<ImageData>& ImgData, int id )
+    inline void getImage(std::shared_ptr<ImageData> ImgData, int id )
     {
         ImgData->timestamp = getTimestamp(id);
         ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
@@ -418,7 +406,7 @@ public:
             return readbytes;
     }
 
-    inline void undistort(std::shared_ptr<ImageData>& ImgData)
+    inline void undistort(std::shared_ptr<ImageData> ImgData)
     {
         //The final result of ImgData->cvImgL and cvImgR are CV_8U which are discretized
         //representations of their CV_32F undistorted images! whereas ImgData->fImgL is a float
@@ -427,23 +415,23 @@ public:
         
         //operating with uchar is a lot faster but leads to discretization issues
         ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_32F);
-        if (PhoUndistR)
+        if (Sensortype == Stereo || Sensortype == RGBD)
             ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_32F);
 
         if(PhoUndistMode == HaveCalib)
         {
-            PhoUndistL->undistort(ImgData->cvImgL);
-            if (PhoUndistR)
-                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD);
+            PhoUndistL->undistort(ImgData->cvImgL,false,1.0f);
+            if (Sensortype == Stereo || Sensortype == RGBD)
+                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD, 1.0f);
             GeomUndist->undistort(ImgData->cvImgL,ImgData->cvImgR);
 
         }
         else if(PhoUndistMode == OnlineCalib)
         {
             GeomUndist->undistort(ImgData->cvImgL,ImgData->cvImgR);
-            PhoUndistL->undistort(ImgData->cvImgL);
-            if (PhoUndistR)
-                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD);
+            PhoUndistL->undistort(ImgData->cvImgL,false, 1.0f);
+            if (Sensortype == Stereo || Sensortype == RGBD)
+                PhoUndistR->undistort(ImgData->cvImgR, Sensortype == RGBD, 1.0f);
         }
         else // If we don't want to perform photometric correction
         {
@@ -455,15 +443,15 @@ public:
         float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
         float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
 
-        for (int i = 0; i < dim; i++)
+        for (int i = 0; i < dim; ++i)
         {
             ImgData->fImgL[i] = CvPtrL[i];
-            if (PhoUndistR)
+            if (Sensortype == Stereo || Sensortype == RGBD)
                 ImgData->fImgR[i] = CvPtrR[i];
         }
 
         ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
-        if (PhoUndistR)
+        if (Sensortype == Stereo || Sensortype == RGBD)
             ImgData->cvImgL.convertTo(ImgData->cvImgR, CV_8U);
         
         return;

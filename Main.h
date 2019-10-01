@@ -210,6 +210,7 @@ public:
                 dataset_ = Tum_mono;
             else if (data == "Kitti")
                 dataset_ = Kitti;
+            return;
         }
         else if (1 == sscanf(arg, "sensor=%s", buf))
         {
@@ -220,6 +221,7 @@ public:
                 Sensortype = Stereo;
             else if (data == "RGBD")
                 Sensortype = RGBD;
+            return;
         }
         else if (1 == sscanf(arg, "photomCalibmodel=%s", buf))
         {
@@ -230,6 +232,43 @@ public:
                 PhoUndistMode = OnlineCalib;
             else if (data == "NoCalib")
                 PhoUndistMode = NoCalib;
+            return;
+        }
+        else if (1 == sscanf(arg, "PyrLevels=%i", &option))
+        {
+            if(option >= 1 && option <= 10)
+            {
+                PyrLevels = option;
+                printf("Using %i pyramid levels\n", PyrLevels);
+            }
+            else
+                printf("PyrLevel chosen is invalid, using default %i levels\n", PyrLevels);
+
+            return;
+        }
+        else if (1 == sscanf(arg, "PyrScaleFactor=%f", &foption))
+        {
+            if (foption >= 1.0f && foption <= 4.0f)
+            {
+                PyrScaleFactor = foption;
+                printf("Using %f as a scale factor\n", PyrScaleFactor);
+            }
+            else
+                printf("Scale factor chosen is invalid, using default %f\n", PyrScaleFactor);
+
+            return;
+        }
+        else if (1 == sscanf(arg, "numFeatures=%i", &option))
+        {
+            if (option >= 500 && option <= 5000)
+            {
+                numFeatures = option;
+                printf("Extracting %i features\n", numFeatures);
+            }
+            else
+                printf("Number of features chosen is invalid, using default %i features\n", numFeatures);
+
+            return;
         }
     }
 };

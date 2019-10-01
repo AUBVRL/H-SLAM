@@ -39,13 +39,16 @@
                 // "reverse=0",
                 // "nogui=0",
                 // "prefetch=0",
-                // "playbackspeed=0"
+                // "playbackspeed=0",
+                // "PyrLevels=8",
+                // "PyrScaleFactor=1.2",
+                // "numFeatures=1500"
 
 
                 //Alienware
-                "sensor=Stereo", //Monocular, Stereo or RGBD
+                "sensor=Monocular", //Monocular, Stereo or RGBD
                 "dataset=Euroc", //Euroc, TumMono or Kitti
-                "photomCalibmodel=NoCalib", //OnlineCalib, HaveCalib, NoCalib
+                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
                 "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
                 // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
@@ -61,9 +64,9 @@
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
 
-                "gammaL=",
+                "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "gammaR=",
-                "vignetteL=",
+                "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
                 "vignetteR=",
 
                 "start=0",
@@ -71,7 +74,11 @@
                 "reverse=0",
                 "nogui=0",
                 "prefetch=0",
-                "playbackspeed=0"
+                "playbackspeed=0",
+                "PyrLevels=8",
+                "PyrScaleFactor=1.2",
+                "numFeatures=1500"
+                
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

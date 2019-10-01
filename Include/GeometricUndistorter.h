@@ -21,13 +21,14 @@ public:
     enum CamModel {RadTan = 0, Pinhole, Atan, KannalaBrandt, EquiDistant} Cameramodel;
     cv::Mat M1l, M2l, M1r, M2r; //rectification and remapping matrices for stereo rectification
     std::string StereoState;
-    int w, h, wOrg, hOrg;
+    int w, h, wOrg, hOrg; //w, h is the largest resolution SLAM will operate at. wOrg, hOrg is the input res.
     float baseline;
     float ic[10];
+    Mat33f K;
+
 
 protected:
     
-    Mat33 K;
     bool passthrough;
     cv::Mat remapX_;
     cv::Mat remapY_;

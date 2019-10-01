@@ -64,7 +64,15 @@
         "memory_resource": "cpp",
         "random": "cpp",
         "set": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "codecvt": "cpp",
+        "unordered_set": "cpp",
+        "future": "cpp",
+        "cfenv": "cpp",
+        "valarray": "cpp",
+        "variant": "cpp"
     },
     "zenMode.hideTabs": false,
     "cmake.buildBeforeRun": false
