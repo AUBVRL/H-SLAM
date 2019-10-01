@@ -50,7 +50,7 @@
             "args": [ 
                 "sensor=Stereo", //Monocular, Stereo or RGBD
                 "dataset=Euroc", //Euroc, TumMono or Kitti
-                "photomCalibmodel=NoCalib", //OnlineCalib, HaveCalib, NoCalib
+                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
                 "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
                 // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34

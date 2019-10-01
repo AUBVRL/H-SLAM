@@ -451,24 +451,24 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
     { printf("something went horribly wrong!\n"); exit(1);}
 
 }
-void GeometricUndistorter::undistort(cv::Mat &ImgL, cv::Mat &ImgR)
+
+void GeometricUndistorter::undistort(cv::Mat &Img, bool isRight)
 {
-    bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
-    if (Sensortype == Stereo)
+    // bool doRight = (Sensortype == Stereo || Sensortype == RGBD);
+    if (Sensortype == Stereo && StereoState == "rectify")
     {
-        if (StereoState == "rectify")
-        {
-            cv::remap(ImgL, ImgL, M1l, M2l, cv::INTER_LINEAR);
-            cv::remap(ImgR, ImgR, M1r, M2r, cv::INTER_LINEAR);
-            return;
-        }
+        if (isRight)
+            cv::remap(Img, Img, M1r, M2r, cv::INTER_LINEAR);
+        else
+            cv::remap(Img, Img, M1l, M2l, cv::INTER_LINEAR);
+        return;
     }
+
     if (!passthrough)
     {
-        cv::remap(ImgL, ImgL, remapX_, remapY_, cv::INTER_LINEAR);
-        if (doRight)
-            cv::remap(ImgR, ImgR, remapX_, remapY_, cv::INTER_LINEAR);
+            cv::remap(Img, Img, remapX_, remapY_, cv::INTER_LINEAR);
     }
+    return;
 }
 
 }
