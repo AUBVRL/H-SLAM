@@ -25,7 +25,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
     cv::FileStorage CalibIn(GeomCalibPath, cv::FileStorage::READ);
     if(!CalibIn.isOpened())
-    {printf("could not read Geometric calibration data from %s \n", GeomCalibPath.c_str()); exit(1); }
+        throw std::runtime_error("could not read Geometric calibration data from %s \n"+ GeomCalibPath);
     
     wOrg = CalibIn["Input.width"]; hOrg = CalibIn["Input.height"];
     w = CalibIn["Output.width"]; h = CalibIn["Output.height"];
@@ -46,11 +46,13 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     { Cameramodel = CamModel::EquiDistant; CalibIn["CameraL.distM"] >> distM; }
     else if (Calibmodel == "KannalaBrandt")
     { Cameramodel = CamModel::KannalaBrandt; CalibIn["CameraL.distM"] >> distM; }
-    else {printf("Camera calibration model not specified! exit,\n"); exit(1);}
+    else throw std::runtime_error("Camera calibration model not specified! exit,\n");
     
-    if(K_l.empty() || wOrg <=0 || hOrg <= 0 || w <=0 || h<= 0) {printf("Reading camera calibration failed! exit.\n"); exit(1);}
+    if(K_l.empty() || wOrg <=0 || hOrg <= 0 || w <=0 || h<= 0)
+        throw std::runtime_error("Reading camera calibration failed! exit.\n");
+
     if( (Cameramodel == CamModel::EquiDistant || Cameramodel == CamModel::RadTan || Cameramodel== CamModel::KannalaBrandt) && distM.empty())
-    {printf("Error reading camera distortion! exit.\n"); exit(1);}
+        throw std::runtime_error("Error reading camera distortion! exit.\n");
 
     if(Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
         ic[4] = atanDist;
@@ -81,7 +83,8 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     {
         baseline = CalibIn["Stereo.bf"];
         Cameramodel = CamModel::Pinhole;
-        if(baseline<=0){printf("failed to read stereo baseline!\n"); exit(1);} 
+        if(baseline<=0)
+            throw std::runtime_error("failed to read stereo baseline!\n");
         baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
     }
 
@@ -97,7 +100,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
         else if (CalibProcess == "none")
         {
             if (w != wOrg || h != hOrg)
-            {printf("ERROR: rectification mode none requires input and output dimenstions to match!\n\n"); exit(1); }
+                throw std::runtime_error("ERROR: rectification mode none requires input and output dimenstions to match!\n");
             K.setIdentity();
             ic[0] = K(0, 0) = K_l.at<float>(0, 0);
             ic[1] = K(1, 1) = K_l.at<float>(1, 1);
@@ -110,7 +113,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
             cv::Mat DesiredK;
             CalibIn["Calib.desiK"] >> DesiredK;
             if (DesiredK.empty() || DesiredK.at<float>(0,2) > 1 || DesiredK.at<float>(0,3) > 1)
-            {printf("Error reading desired camera calibration! it should be fx fy cx cy relative to the width and height exit.\n"); exit(1);}
+                throw std::runtime_error("Error reading desired camera calibration! it should be fx fy cx cy relative to the width and height exit.\n");
 
             K.setIdentity();
             ic[0] = K(0, 0) = DesiredK.at<float>(0, 0) * w;
@@ -122,7 +125,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     else //rquire stereo rectification
     {
         if(Cameramodel == CamModel::Atan || Cameramodel == CamModel::Pinhole)
-            {printf("Distortion parameters provided are not supported with unrectified images! \n"); exit(1);}
+            throw std::runtime_error("Distortion parameters provided are not supported with unrectified images! \n");
 
         Cameramodel = CamModel::Pinhole;
         CalibProcess = "none";
@@ -133,8 +136,10 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
         CalibIn["CameraR.DistM"] >> DistR;
         CalibIn["CameraR.R"] >> R_R;
         CalibIn["New.Intrin"] >> NewInt;
+
         if(R_L.empty() || IntR.empty()|| DistR.empty() || R_R.empty() || NewInt.empty())
-        {printf("failed to read required calibration for stereo rectification! exiting.\n");exit(1);}
+            throw std::runtime_error("failed to read required calibration for stereo rectification! exiting.\n");
+
         hOrg = h; wOrg=w;
         K.setIdentity();
         ic[0] = K(0, 0) = NewInt.at<float>(0,0);
@@ -143,7 +148,8 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
         ic[3] = K(1, 2) = NewInt.at<float>(1,2);
 
         baseline = CalibIn["Stereo.bf"];
-        if(baseline<=0){printf("failed to read stereo baseline!\n"); exit(1);} 
+        if(baseline<=0)
+            throw std::runtime_error("failed to read stereo baseline!\n");
         baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
         cv::initUndistortRectifyMap(K_l, distM, R_L, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1l, M2l);
         cv::initUndistortRectifyMap(IntR, DistR, R_R, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1r, M2r);
@@ -291,10 +297,7 @@ void GeometricUndistorter::makeOptimalK_crop()
 
 		// printf("iteration %05d: range: x: %.4f - %.4f; y: %.4f - %.4f!\n", iteration,  minX, maxX, minY, maxY);
 		if(iteration > 500)
-		{
-			printf("FAILED TO COMPUTE GOOD CAMERA MATRIX - SOMETHING IS SERIOUSLY WRONG. ABORTING \n");
-			exit(1);
-		}
+			throw std::runtime_error("FAILED TO COMPUTE GOOD CAMERA MATRIX - SOMETHING IS SERIOUSLY WRONG. ABORTING \n");
 	}
 
 	K(0,0) = ((float)w-1.0f)/(maxX-minX);
@@ -448,7 +451,7 @@ void GeometricUndistorter::distortCoordinates(float* in_x, float* in_y, float* o
         }
     }
     else
-    { printf("something went horribly wrong!\n"); exit(1);}
+        throw std::runtime_error("something went horribly wrong!\n");
 
 }
 

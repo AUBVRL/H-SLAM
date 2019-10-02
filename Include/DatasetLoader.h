@@ -38,11 +38,13 @@ public:
     std::shared_ptr<PhotometricUndistorter> PhoUndistR;
 
     std::thread t2;
+    std::mutex mReadBuf;
 
 #if HAS_ZIPLIB
     zip_t *ziparchive;
-    char *databuffer;
-    char *databufferR;
+    std::vector<char> databuffer;
+    std::vector<char> databufferR;
+
 #endif
 
     DatasetReader(std::string IntrCalib, std::string GammaL, std::string GammaR, std::string VignetteL, std::string VignetteR, std::string imPath, std::string stimestamp, Dataset data)
@@ -57,74 +59,64 @@ public:
         std::string timestampPath = stimestamp;
         dataset = data;
 
-#if HAS_ZIPLIB
-        ziparchive = 0;
-        databuffer = 0;
-        databufferR =0;
+        #if HAS_ZIPLIB
+            ziparchive = 0;
         #endif
         isZipped = (ImPath.length() > 4 && ImPath.substr(ImPath.length() - 4) == ".zip");
 
         if (isZipped)
         {
             #if HAS_ZIPLIB
-            int ziperror = 0;
-            ziparchive = zip_open(ImPath.c_str(), ZIP_RDONLY, &ziperror);
-            if (ziperror != 0)
-            {printf("ERROR %d reading archive %s!\n", ziperror, ImPath.c_str()); exit(1);}
+                int ziperror = 0;
+                ziparchive = zip_open(ImPath.c_str(), ZIP_RDONLY, &ziperror);
+                if (ziperror != 0)
+                    throw std::runtime_error("ERROR " + std::to_string(ziperror) + " reading archive " + ImPath.c_str() + " ! exit\n." );
 
-            filesL.clear();
-            filesR.clear();
-            filesD.clear();
-            int numEntries;
-            if (dataset == Dataset::Tum_mono)
-            {
-                numEntries = zip_get_num_entries(ziparchive, 0);
-                for (int k = 0; k < numEntries; ++k)
+                filesL.clear();
+                filesR.clear();
+                filesD.clear();
+                int numEntries;
+                if (dataset == Dataset::Tum_mono)
                 {
-                    const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
-                    std::string nstr = std::string(name);
-                    if (nstr == "." || nstr == "..")
-                        continue;
-                    filesL.push_back(name);
+                    numEntries = zip_get_num_entries(ziparchive, 0);
+                    for (int k = 0; k < numEntries; ++k)
+                    {
+                        const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
+                        std::string nstr = std::string(name);
+                        if (nstr == "." || nstr == "..")
+                            continue;
+                        filesL.push_back(name);
+                    }
+                    std::sort(filesL.begin(), filesL.end());
                 }
-                std::sort(filesL.begin(), filesL.end());
-            }
-            else if (dataset == Dataset::Euroc)
-            {
-                numEntries = zip_get_num_entries(ziparchive, 0);
-                std::string LeftDir = "mav0/cam0/data/";
-                std::string RightDir = "mav0/cam1/data/";
-                for (int k = 0; k < numEntries; ++k)
+                else if (dataset == Dataset::Euroc)
                 {
-                    const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
-                    std::string nstr = std::string(name);
-                    if (nstr == "." || nstr == ".." || nstr == LeftDir || nstr == RightDir)
-                        continue;
+                    numEntries = zip_get_num_entries(ziparchive, 0);
+                    std::string LeftDir = "mav0/cam0/data/";
+                    std::string RightDir = "mav0/cam1/data/";
+                    for (int k = 0; k < numEntries; ++k)
+                    {
+                        const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
+                        std::string nstr = std::string(name);
+                        if (nstr == "." || nstr == ".." || nstr == LeftDir || nstr == RightDir)
+                            continue;
 
-                    if (LeftDir.compare(0, 15, nstr, 0, 15) == 0)
-                        filesL.push_back(nstr);
-                    else if (RightDir.compare(0, 15, nstr, 0, 15) == 0)
-                        filesR.push_back(nstr);
-                }
-                if ((filesL.size() != filesR.size()) && Sensortype == Stereo )
-                {
-                    printf("number of left images not equal number of right images!");
-                    exit(-1);
-                }
-                std::sort(filesL.begin(), filesL.end());
-                std::sort(filesR.begin(), filesR.end());
-            }
-            else
-            {
-                printf("Zip for the current dataset is not supported\n");
-                exit(-1);
-            }
+                        if (LeftDir.compare(0, 15, nstr, 0, 15) == 0)
+                            filesL.push_back(nstr);
+                        else if (RightDir.compare(0, 15, nstr, 0, 15) == 0)
+                            filesR.push_back(nstr);
+                    }
+                    if ((filesL.size() != filesR.size()) && Sensortype == Stereo )
+                        throw std::runtime_error("number of left images not equal number of right images!" );
 
+                    std::sort(filesL.begin(), filesL.end());
+                    std::sort(filesR.begin(), filesR.end());
+                }
+                else
+                    throw std::runtime_error("Zip for the current dataset is not supported\n" );
             #else 
-                printf("ERROR: cannot read .zip archive without ziplib!\n");
-                exit(-1);
+                throw std::runtime_error("ERROR: cannot read .zip archive without ziplib!\n");
             #endif
-                
         }
         else
         {
@@ -151,16 +143,11 @@ public:
 
         if (Sensortype == Stereo)
             if (nImgL == 0 || nImgR == 0 || nImgL != nImgR)
-            {
-                printf("There is something wrong with the loaded stereo data: didn't load any or Left and Right images does not match!\n");
-                exit(-1);
-            }
+                throw std::runtime_error("There is something wrong with the loaded stereo data: didn't load any or Left and Right images does not match!\n");
+        
         if (Sensortype == Monocular)
             if (filesL.size() == 0)
-            {
-                printf("There is something wrong with the images - didn't load any!\n");
-                exit(-1);
-            }
+                throw std::runtime_error("There is something wrong with the images - didn't load any!\n");
         loadtimestamps(timestampPath);
     }
 
@@ -168,9 +155,6 @@ public:
     {
         #if HAS_ZIPLIB
             if (ziparchive != 0) zip_close(ziparchive);
-            if (databuffer != 0) delete databuffer;
-            if (databufferR != 0) delete databufferR;
-
         #endif
     }
 
@@ -229,7 +213,11 @@ public:
             }
             fTimes.close();
             if(timestamps.size() != nImgL)
-            { printf("timestamps don't match number of images. disabling timestamps!\n"); timestamps.clear(); return;}
+            { 
+                printf("timestamps don't match number of images. disabling timestamps!\n"); 
+                timestamps.clear(); 
+                return;
+            } 
         }
         else if (dataset == Tum_mono)
         {
@@ -317,10 +305,7 @@ public:
         DIR *dp;
         struct dirent *dirp;
         if ((dp = opendir(dir.c_str())) == NULL)
-        {
-            printf("FAILED to open path %s",dir.c_str());
-            exit(-1);
-        }
+            throw std::runtime_error("FAILED to open path " + dir);
 
         while ((dirp = readdir(dp)) != NULL)
         {
@@ -348,20 +333,14 @@ public:
         {
             ImgData->cvImgR = cv::imread(filesR[id], cv::IMREAD_GRAYSCALE);
             if (ImgData->cvImgR.size().width != WidthOri || ImgData->cvImgR.size().height != HeightOri)
-            {
-                printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
-                exit(1);
-            }
+                throw std::runtime_error("Right Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
             undistort(ImgData, true);
         }
         else
         {
             ImgData->cvImgL = cv::imread(filesL[id], cv::IMREAD_GRAYSCALE);
             if (ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
-            {
-                printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
-                exit(1);
-            }
+                throw std::runtime_error("Left Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
             undistort(ImgData, false);
         }
     }
@@ -370,45 +349,39 @@ public:
     {
         if(isRight)
         {
-            long readsize = ReadZipBuffer(filesR[id],databufferR);
-            ImgData->cvImgR = cv::imdecode(cv::Mat(readsize,1,CV_8U, databufferR), cv::IMREAD_GRAYSCALE);
+            long readsize = ReadZipBuffer(filesR[id], databufferR);
+            ImgData->cvImgR = cv::imdecode(cv::Mat(readsize,1,CV_8U, &databufferR[0]), cv::IMREAD_GRAYSCALE);
             if (ImgData->cvImgR.size().width != WidthOri || ImgData->cvImgR.size().height != HeightOri)
-            {
-                printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
-                exit(1);
-            }
-            undistort(ImgData, true);
+                throw std::runtime_error("Right Input resolution does not correspond to image read! something might be wrong in your intrinsics file! exit.\n");
+            undistort(ImgData, isRight);
         }
         else
         {
-            long readsize = ReadZipBuffer(filesL[id],databuffer);
-            ImgData->cvImgL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, databuffer), cv::IMREAD_GRAYSCALE); 
+            long readsize = ReadZipBuffer(filesL[id], databuffer);
+            ImgData->cvImgL =  cv::imdecode(cv::Mat(readsize,1,CV_8U, &databuffer[0]), cv::IMREAD_GRAYSCALE); 
             if (ImgData->cvImgL.size().width != WidthOri || ImgData->cvImgL.size().height != HeightOri)
-            {
-                printf("Input resolution does not correspond to image read! something might be wrong in your intrinsics file!\n");
-                exit(1);
-            }
-            undistort(ImgData, false);
+                throw std::runtime_error("Left Input resolution does not correspond to image read! something might be wrong in your intrinsics file! exit.\n");
+            undistort(ImgData, isRight);
         }
     }
+
     inline void getImage(std::shared_ptr<ImageData> ImgData, int id )
     {
         ImgData->timestamp = getTimestamp(id);
         ImgData->ExposureL =  exposuresL.size() == 0 ? 1.0f : exposuresL[id];
         ImgData->ExposureR = exposuresR.size() == 0 ? 1.0f : exposuresR[id];
-
+        bool isRight = (Sensortype == Stereo || Sensortype == RGBD);
         //Read right image
-        if (Sensortype == Stereo || Sensortype == RGBD)
+        if (isRight)
         {
             if (!isZipped)
-                t2 = std::thread(&DatasetReader::readNonZippedImage, this, ImgData, id, true);
+                t2 = std::thread(&DatasetReader::readNonZippedImage, this, ImgData, id, isRight);
             else
             {
                 #if HAS_ZIPLIB
-                    t2 = std::thread(&DatasetReader::readZippedImage, this, ImgData, id, true);
+                    t2 = std::thread(&DatasetReader::readZippedImage, this, ImgData, id, isRight);
                 #else
-                    printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
-                    exit(1);
+                    throw std::runtime_error("ERROR: cannot read .zip archive, as compile without ziplib!\n");
                 #endif
             }
         }
@@ -421,44 +394,43 @@ public:
             #if HAS_ZIPLIB
                 readZippedImage(ImgData, id, false);
             #else
-                printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
-                exit(1);
+                throw std::runtime_error("ERROR: cannot read .zip archive, as compile without ziplib!\n");
             #endif
         }
 
-        if (Sensortype == Stereo || Sensortype == RGBD)
+        if (isRight)
         {
             t2.join();
             if (ImgData->cvImgL.size() != ImgData->cvImgR.size())
-            {
-                printf("Right and Left image resolutions are not equal! exit!\n");
-                exit(1);
-            }
+                throw std::runtime_error("Right and Left image resolutions are not equal! exit!\n");
         }
 
         return;
     }
 
-    inline long ReadZipBuffer(std::string In_, char* &_databuffer)
+    inline long ReadZipBuffer(std::string In_, std::vector<char>& _databuffer)
     {
-        if (_databuffer == 0) _databuffer = new char[WidthOri * HeightOri * 6 + 10000];
+        std::unique_lock<std::mutex> lock (mReadBuf); //Libzip does not support parallel thread access to the same zip file. prevent access!
+        static long int imageSizeBuf = WidthOri * HeightOri * 6 + 1000;
+        if (_databuffer.empty()) _databuffer.resize(imageSizeBuf); //; = new char[WidthOri * HeightOri * 6 + 10000];
             zip_file_t *fle = zip_fopen(ziparchive, In_.c_str(), 0);
-            long readbytes = zip_fread(fle, _databuffer, (long) WidthOri * HeightOri * 6 + 10000);
-            if (readbytes > (long) WidthOri * HeightOri * 6) {
-                printf("read %ld/%ld bytes for file %s. increase buffer!!\n", readbytes,
-                       (long) WidthOri * HeightOri * 6 + 10000, In_.c_str());
-                delete[] _databuffer;
-                _databuffer = new char[(long) WidthOri * HeightOri * 30];
+            if (!fle)
+                throw std::runtime_error("Dataset file could not be read");
+            long readbytes = zip_fread(fle, &_databuffer[0], _databuffer.size());
+            if (readbytes > imageSizeBuf) 
+            {
+                printf("read %ld/%ld bytes for file %s. increase buffer!!\n", readbytes, imageSizeBuf, In_.c_str());
+                imageSizeBuf = (long) WidthOri * HeightOri * 30 + 10000;
+                _databuffer.resize(imageSizeBuf);
                 fle = zip_fopen(ziparchive, In_.c_str(), 0);
-                readbytes = zip_fread(fle, _databuffer, (long) WidthOri * HeightOri * 30 + 10000);
+                readbytes = zip_fread(fle, &_databuffer[0], imageSizeBuf);
                
-                if (readbytes > (long) WidthOri * HeightOri * 30) {
-                    printf("buffer still to small (read %ld/%ld). abort.\n", readbytes,
-                           (long) WidthOri * HeightOri * 30 + 10000);
-                    exit(1);
-                }
+                if (readbytes > (imageSizeBuf-10000))
+                    throw std::runtime_error("buffer still to small (read" + std::to_string(readbytes) + " in " + std::to_string(imageSizeBuf-10000) + "abort.\n");
             }
             zip_fclose(fle);
+            if(readbytes == -1)
+                throw std::runtime_error("zip_fread failed to read dataset file");
             return readbytes;
     }
 
@@ -486,12 +458,11 @@ public:
                 GeomUndist->undistort(ImgData->cvImgR, true);
             }
 
-            int dim = ImgData->cvImgR.cols * ImgData->cvImgR.rows;
-            float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
+            // int dim = ImgData->cvImgR.cols * ImgData->cvImgR.rows;
+            // float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
+            // for (int i = 0; i < dim; ++i)
+            //     ImgData->fImgR[i] = CvPtrR[i];
 
-            for (int i = 0; i < dim; ++i)
-                ImgData->fImgR[i] = CvPtrR[i];
-            
             ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
         }
         else
@@ -514,15 +485,13 @@ public:
             {
                 GeomUndist->undistort(ImgData->cvImgL, false);
             }
-            int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
 
-            float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
-
-            for (int i = 0; i < dim; ++i)
-                ImgData->fImgL[i] = CvPtrL[i];
+            // int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
+            // float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
+            // for (int i = 0; i < dim; ++i)
+            //     ImgData->fImgL[i] = CvPtrL[i];
 
             ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
-            
         }
 
         return;

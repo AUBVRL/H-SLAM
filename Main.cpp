@@ -9,7 +9,7 @@
 
 using namespace FSLAM;
 
-int main(int argc, char **argv)
+int main(int argc, char **argv) try
 {
     //Get input data and initialize dataset reader
     std::shared_ptr<Input> Input_ = std::make_shared<Input>(argc, argv); //parse the arguments and set system settings
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
             gettimeofday(&tv_now, NULL);
             double sSinceStart = sInitializerOffset + ((tv_now.tv_sec - tv_start.tv_sec) + (tv_now.tv_usec - tv_start.tv_usec) / (1000.0f * 1000.0f));
             if (sSinceStart < timesToPlayAt[ii])
-            { usleep((int)((timesToPlayAt[ii] - sSinceStart) * 1000 * 1000)); }
+                usleep((int)((timesToPlayAt[ii] - sSinceStart) * 1000 * 1000)); 
             if (sSinceStart > timesToPlayAt[ii] + 0.5 + 0.1 * (ii % 2))
             {
                 printf("SKIPFRAME %d (play at %f, now it is %f)!\n", ii, timesToPlayAt[ii], sSinceStart);
@@ -121,4 +121,12 @@ int main(int argc, char **argv)
     }
 
     return 0;
+}
+catch(std::exception & e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    return 1;
+}
+catch(...) {
+    std::cerr << "Unknown exception" << std::endl;
+    return 2;
 }

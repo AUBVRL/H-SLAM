@@ -46,7 +46,7 @@
 
 
                 //Alienware
-                "sensor=Monocular", //Monocular, Stereo or RGBD
+                "sensor=Stereo", //Monocular, Stereo or RGBD
                 "dataset=Euroc", //Euroc, TumMono or Kitti
                 "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
@@ -56,7 +56,7 @@
 
                 "vocabulary=pathtovocab",
 
-                "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",//Euroc 
+                "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
                 // "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
                 // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti 
 
@@ -65,9 +65,9 @@
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
 
                 "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
-                "gammaR=",
+                "gammaR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-                "vignetteR=",
+                "vignetteR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
 
                 "start=0",
                 "end=9999999",

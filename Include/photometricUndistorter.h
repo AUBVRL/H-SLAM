@@ -23,7 +23,7 @@ public:
 
     EIGEN_STRONG_INLINE float getBGradOnly(float color)
     {
-        std::unique_lock<std::mutex>(mlock);
+        std::unique_lock<std::mutex> lock (mlock);
         int c = color + 0.5f;
         if (c < 5) c = 5;
         if (c > 250) c = 250;
@@ -32,7 +32,7 @@ public:
 
     EIGEN_STRONG_INLINE float getBInvGradOnly(float color)
     {
-        std::unique_lock<std::mutex>(mlock);
+        std::unique_lock<std::mutex> lock (mlock);
         int c = color + 0.5f;
         if (c < 5) c = 5;
         if (c > 250) c = 250;

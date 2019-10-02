@@ -75,25 +75,24 @@ public:
     inline void ValidateInput()
     {
     //Mandatory Input
-    if(dataset_ == Emptyd) {printf("you did not specify a dataset\n"); exit(1);}
-    if(Sensortype == Emptys) {printf("you did not specify a sensor type\n"); exit(1);}
-    if(PhoUndistMode== Emptyp)
-        {printf("you did not specify a photometric distortion mode\n"); exit(1);}
-    if(IntrinCalib=="") { printf("you did not specify an Intrinsics calib path\n"); exit(1);}
-    if(Vocabulary=="") {printf("you did not specify a Vocabulary path\n"); exit(1);}
-    if(Path=="") {printf("you did not specify an image path\n"); exit(1);}
+    if(dataset_ == Emptyd) throw std::runtime_error("you did not specify a dataset\n");
+    if(Sensortype == Emptys) throw std::runtime_error("you did not specify a sensor type\n");
+    if(PhoUndistMode== Emptyp) throw std::runtime_error("you did not specify a photometric distortion mode\n");
+    if(IntrinCalib=="") throw std::runtime_error("you did not specify an Intrinsics calib path\n");
+    if(Vocabulary=="") throw std::runtime_error("you did not specify a Vocabulary path\n");
+    if(Path=="") throw std::runtime_error("you did not specify an image path\n");
     if(PhoUndistMode== PhotoUnDistMode::HaveCalib)
     {
         if(GammaL == "" || VignetteL =="")
-            {printf("Gamma correction or vignette image for the left image not provided!exit.\n");exit(1);}
+            throw std::runtime_error("Gamma correction or vignette image for the left image not provided!exit.\n");
         if(Sensortype == Sensor::Stereo && (GammaR == "" || VignetteR ==""))
-            {printf("photometric calibration for right image is not provided!exit.\n");exit(1);}
+            throw std::runtime_error("photometric calibration for right image is not provided!exit.\n");
     }
-    if(dataset_ == Tum_mono && Sensortype != Monocular) {printf("Tum_mono is a monocular dataset only\n");exit(1);}
+    if(dataset_ == Tum_mono && Sensortype != Monocular) throw std::runtime_error("Tum_mono is a monocular dataset only\n");
     if(dataset_ == Euroc && Sensortype != Monocular && Sensortype != Stereo)
-        {printf("invalid sensor type for the dataset chosen!\n");exit(1);}   
+        throw std::runtime_error("invalid sensor type for the dataset chosen!\n");
     if( (dataset_ == Kitti) && (Sensortype != Monocular) && (Sensortype != Stereo) )
-        {printf("invalid sensor type for the dataset chosen!\n");exit(1);}    
+        throw std::runtime_error("invalid sensor type for the dataset chosen!\n");
     }
 
     void parseargument(char *arg)
@@ -112,10 +111,7 @@ public:
         {
             IntrinCalib = buf;
             if (IntrinCalib.length() > 4 && IntrinCalib.substr(IntrinCalib.length() - 5) != ".yaml")
-            {
-                printf("Intrinsics have to be a .yaml file!\n");
-                exit(1);
-            }
+                throw std::runtime_error("Intrinsics have to be a .yaml file!\n");
             printf("loading Intrinsics from %s!\n", IntrinCalib.c_str());
             return;
         }
