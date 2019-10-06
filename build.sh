@@ -16,6 +16,9 @@ InstallDir=$SCRIPTPATH/Thirdparty/CompiledLibs
 #================================
 sudo apt install libgl1-mesa-dev libglew-dev libsuitesparse-dev libeigen3-dev libboost-all-dev cmake build-essential git libzip-dev ccache freeglut3-dev
 
+#optional libs to record pangolin gui
+sudo apt install ffmpeg libavcodec-dev libavutil-dev libavformat-dev libswscale-dev libavdevice-dev
+
 #if you have OpenCV3.4 comment out the following and specify the directory later
 sudo apt install libjpeg8-dev libpng-dev libtiff5-dev libtiff-dev libavcodec-dev libavformat-dev libv4l-dev libgtk2.0-dev qt5-default v4l-utils
 cvVersion=3.4.6

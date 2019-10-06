@@ -36,3 +36,5 @@ Thirdparty/CompiledLibs/
 Thirdparty/opencv-*
 
 build/
+
+*.avi

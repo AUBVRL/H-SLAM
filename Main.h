@@ -45,7 +45,7 @@ class Input
 public:
     Input(int argc, char** In_): 
             dataset_(Emptyd), IntrinCalib(""), GammaL(""), GammaR(""), timestampsL(""),
-            VignetteL(""), VignetteR(""), Vocabulary(""), Path(""), Reverse(false), Nogui(false), 
+            VignetteL(""), VignetteR(""), Vocabulary(""), Path(""), Reverse(false), 
             Prefetch(false), PlaybackSpeed(0), Start(0), End(9999999), Mode(0), linc(1)
            
     {
@@ -64,7 +64,6 @@ public:
     std::string Vocabulary;
     std::string Path;
     bool Reverse;
-    bool Nogui;
     bool Prefetch;
     float PlaybackSpeed;
     int Start;
@@ -177,7 +176,7 @@ public:
         {
             if (option == 1)
             {
-                Nogui = true;
+                DisplayOn = false;
                 printf("No GUI!\n");
             }
             return;

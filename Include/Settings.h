@@ -20,6 +20,9 @@ extern int PyrLevels;
 extern float PyrScaleFactor;
 extern int numFeatures;
 
+//Display options
+extern bool DisplayOn;
+
 }
 
 #endif

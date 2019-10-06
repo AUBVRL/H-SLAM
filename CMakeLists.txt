@@ -56,6 +56,7 @@ endif (MSVC)
 # Sources files
 set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/System.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Display.cpp
   ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
   ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
   ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp

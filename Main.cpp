@@ -4,6 +4,7 @@
 #include "Main.h"
 #include "DatasetLoader.h"
 #include "System.h"
+#include "Display.h"
 
 #include <chrono>
 
@@ -16,7 +17,12 @@ int main(int argc, char **argv) try
     std::shared_ptr<DatasetReader> DataReader = std::make_shared<DatasetReader>(Input_->IntrinCalib, 
     Input_->GammaL, Input_->GammaR, Input_->VignetteL, Input_->VignetteR, Input_->Path, Input_->timestampsL,
     Input_->dataset_);
-    
+
+    //Start gui
+    std::shared_ptr<Display> DisplayHandler;
+    if(DisplayOn)
+        DisplayHandler = std::make_shared<Display>();
+
     //Configure image playback data
     if (Input_->Reverse)
     {
@@ -118,6 +124,10 @@ int main(int argc, char **argv) try
 
         cv::imshow("Img", Dest);
         cv::waitKey(1);
+        
+        if(DisplayHandler)
+            if(DisplayHandler->isDead)
+                break;
     }
 
     return 0;

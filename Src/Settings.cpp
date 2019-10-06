@@ -15,4 +15,8 @@ namespace FSLAM
     float PyrScaleFactor = 1.2;
     int numFeatures = 1500;
 
+    //Display options
+    bool DisplayOn = true;
+
+
 }
