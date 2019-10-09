@@ -1,5 +1,5 @@
 #include "GlobalTypes.h"
-#include "mutex"
+#include "boost/thread/mutex.hpp"
 
 namespace FSLAM
 {
@@ -23,7 +23,7 @@ public:
 
     EIGEN_STRONG_INLINE float getBGradOnly(float color)
     {
-        std::unique_lock<std::mutex> lock (mlock);
+        boost::unique_lock<boost::mutex> lock (mlock);
         int c = color + 0.5f;
         if (c < 5) c = 5;
         if (c > 250) c = 250;
@@ -32,7 +32,7 @@ public:
 
     EIGEN_STRONG_INLINE float getBInvGradOnly(float color)
     {
-        std::unique_lock<std::mutex> lock (mlock);
+        boost::unique_lock<boost::mutex> lock (mlock);
         int c = color + 0.5f;
         if (c < 5) c = 5;
         if (c > 250) c = 250;
@@ -52,7 +52,7 @@ private:
     float Binv[256];
     float* vignetteMapInv;
     
-    std::mutex mlock;
+    boost::mutex mlock;
 
 
 };

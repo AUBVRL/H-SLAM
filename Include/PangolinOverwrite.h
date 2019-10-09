@@ -4,7 +4,7 @@
 #include "pangolin/display/widgets/widgets.h"
 #include "pangolin/gl/gldraw.h"
 #include <pangolin/display/display_internal.h>
-#include <mutex>
+#include <boost/thread/mutex.hpp>
 
 namespace pangolin
 {
@@ -24,7 +24,7 @@ void GuiVarChanged(Var<T> &var)
     }
 }
 
-std::mutex new_display_mutex;
+boost::mutex new_display_mutex;
 GLfloat Transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f}; //fully transparent color
 GLfloat GreenTransparent[4] = {0.0f, 1.0f, 0.0f, 0.5f};
 GLfloat Black[4] = {0.0f, 0.0f, 0.0f, 1.0f};

@@ -2,13 +2,11 @@
 #define __FRAME__
 
 #include "Settings.h"
-
 namespace FSLAM
 {
 
 class ORBDetector;
 class ImageData;
-
 class Frame
 {
 public:
@@ -16,12 +14,13 @@ public:
 
     Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector);
     ~Frame();
-    void CreatePyrs(std::shared_ptr<ImageData> Img);
+    void CreatePyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);
 
     std::shared_ptr<ORBDetector> Detector;
-
-    // std::vector<float*> vfImgL;
-    // std::vector<float*> vfImgR;
+    
+    
+    std::vector<cv::Mat> LeftPyr;
+    std::vector<cv::Mat> RightPyr;
 
     // Vec6f* Image; //[0]I, [1]Ix, [2]Iy, [3]Ixy, [4]Ixx, [5]Iyy
 

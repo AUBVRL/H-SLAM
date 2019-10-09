@@ -12,12 +12,13 @@ namespace FSLAM
 {
 
 
-System::System(std::shared_ptr<GeometricUndistorter> GeomUndist, std::shared_ptr<PhotometricUndistorter> PhoUndistL, std::shared_ptr<PhotometricUndistorter> PhoUndistR)
+System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_ptr<PhotometricUndistorter> _PhoUndistL, std::shared_ptr<PhotometricUndistorter> _PhoUndistR)
 {
     Detector = std::make_shared<ORBDetector>();
-    GeomCalibIn = GeomUndist;
-    PhotoR = PhoUndistR;
-    PhotoL = PhoUndistL;
+    
+    GeomUndist = _GeomUndist;
+    PhoUndistR = _PhoUndistR;
+    PhoUndistL = _PhoUndistL;
     Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR));
     //Setup Online Photometric Calibrators
     // OnlinePhCalibL = OnlinePhCalibL = NULL;

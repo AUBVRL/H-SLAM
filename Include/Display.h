@@ -2,7 +2,7 @@
 #define __DISPLAY__
 
 #include <pangolin/pangolin.h>
-#include <thread>
+#include <boost/thread.hpp>
 
 static const std::string main_window_name = "FSLAM";
 
@@ -32,7 +32,7 @@ public:
     void setup();
     void run();
     void UploadFrameImage(unsigned char* In_, int width, int height);
-    std::thread render_loop;
+    boost::thread render_loop;
     bool isDead = false;
 
 private:
@@ -56,7 +56,7 @@ private:
     // pangolin::Var<int> a_int; //("ui.An_Int",2,0,5);
     std::unique_ptr<pangolin::View> FramesPanel;
 
-    std::mutex mSLAMThread;
+    boost::mutex mSLAMThread;
     std::unique_ptr<InternalImage> FrameImage; 
 
 };

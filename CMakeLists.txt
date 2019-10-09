@@ -32,7 +32,7 @@ endif()
 # required libraries
 find_package(SuiteParse REQUIRED)
 find_package(Eigen3 REQUIRED)
-#find_package(Boost COMPONENTS system thread) 
+find_package(Boost COMPONENTS system thread) 
 find_package(OpenCV 3.4.6 REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/share/OpenCV)
 find_package(Pangolin REQUIRED PATHS ${PROJECT_SOURCE_DIR}/Thirdparty/CompiledLibs/lib/cmake/Pangolin)
 find_package(G2O REQUIRED)
@@ -47,6 +47,11 @@ else()
 endif()
 
 add_definitions("-DENABLE_SSE")
+
+include(ProcessorCount)
+ProcessorCount(NUMTHREADS)
+add_definitions("-DThreadCount=${NUMTHREADS}")
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O0 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations ") #-fno-omit-frame-pointer"
 
 if (MSVC)
@@ -83,11 +88,11 @@ include_directories(
 # compile library.
 add_library(FSLAMlib ${fslam_SOURCE})
 
-#if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-#    set(BOOST_THREAD_LIBRARY boost_thread-mt)
-#else()
-#    set(BOOST_THREAD_LIBRARY boost_thread)
-#endif()
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+   set(BOOST_THREAD_LIBRARY boost_thread-mt)
+else()
+   set(BOOST_THREAD_LIBRARY boost_thread)
+endif()
 
 # build executables
 set(LIBS
@@ -97,8 +102,9 @@ set(LIBS
   ${LIBZIP_LIBRARY} 
   ${Pangolin_LIBRARIES}
   ${DBoW3_LIB_DIR}/libDBoW3.so
-) #${BOOST_THREAD_LIBRARY} 
+  ${BOOST_THREAD_LIBRARY} 
+) 
 add_executable(FSLAM ${PROJECT_SOURCE_DIR}/Main.cpp )
-target_link_libraries(FSLAM FSLAMlib cxsparse ${LIBS} ) #boost_system
+target_link_libraries(FSLAM FSLAMlib cxsparse ${LIBS} boost_system ) 
 
 

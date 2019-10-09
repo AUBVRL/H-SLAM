@@ -1,15 +1,21 @@
 #include "Frame.h"
 #include "Detector.h"
-// #include <opencv2/imgproc.hpp>
+#include <opencv2/imgproc.hpp>
 
-// #include <opencv2/highgui.hpp>
+#include <opencv2/highgui.hpp>
+#include <chrono>
 
 namespace FSLAM
 {
 
 Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector): Detector(_Detector)
 {
-   CreatePyrs(Img);
+    // boost::thread Par(&Frame::CreatePyrs, this, boost::ref(Img->cvImgR), boost::ref(RightPyr));
+    // Thr.reduce(boost::bind(&Frame::CreatePyrs, this, Img->cvImgR, RightPyr), 0, 1, 1);
+    if(Sensortype == Stereo || Sensortype == RGBD)
+        CreatePyrs(Img->cvImgR, RightPyr); //This is faster than parallelizing it!!
+    CreatePyrs(Img->cvImgL, LeftPyr);
+    // Par.join();
 
     // Detector->ExtractFeatures(Img->cvImgL,mvKeysL,DescriptorsL,nFeaturesL);
 
@@ -23,9 +29,16 @@ Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detec
 
 }
 
-void Frame::CreatePyrs(std::shared_ptr<ImageData> Img)
+void Frame::CreatePyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 {
-
+    Pyr.resize(PyrLevels);
+    cv::GaussianBlur( Img, Pyr[0], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    for (size_t i = 1; i < PyrLevels; ++i)
+    {      
+        cv::Size sz(cvRound((float)Pyr[i-1].cols/PyrScaleFactor), cvRound((float)Pyr[i-1].rows/PyrScaleFactor));
+        cv::resize(Pyr[i-1],Pyr[i],sz,0,0,CV_INTER_LINEAR);
+        cv::GaussianBlur( Pyr[i], Pyr[i], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    }
 }
 
 // void Frame::CreatePyrsAndExtractFeats(std::shared_ptr<ImageData> Img)

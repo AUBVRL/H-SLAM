@@ -9,7 +9,7 @@ using namespace pangolin;
 GUI::GUI()
 {
     setup();
-    render_loop = std::thread(&GUI::run, this);
+    render_loop = boost::thread(&GUI::run, this);
     render_loop.detach();
 }
 
@@ -60,9 +60,7 @@ void GUI::run()
         
         pangolin::FinishFrame();
     }
-
     isDead = true;
-    pangolin::GetBoundWindow()->RemoveCurrent();
 }
 
 void GUI::ProcessInput()
@@ -85,8 +83,7 @@ void GUI::UploadFrameImage(unsigned char* _In, int width, int height)
 {
     if (ShowFeatureFrames->Get())
     {
-        std::unique_lock<std::mutex> lock(mSLAMThread);
-
+        boost::unique_lock<boost::mutex> lock(mSLAMThread);
         if(FrameImage->Image.empty())
         {
             FrameImage->Width = width;
@@ -115,7 +112,7 @@ void GUI::RenderInputFrameImage(std::unique_ptr<InternalImage> &ImageToRender, s
 
     if (ImageToRender->IsTextureGood)
     {
-        std::unique_lock<std::mutex> lock(mSLAMThread);
+        boost::unique_lock<boost::mutex> lock(mSLAMThread);
         if (ImageToRender->HaveNewImage)
             ImageToRender->FeatureFrameTexture.Upload(&ImageToRender->Image[0], GL_BGR, GL_UNSIGNED_BYTE);
         CanvasFrame->Activate();

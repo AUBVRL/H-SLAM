@@ -7,7 +7,7 @@
 
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
-#include <thread>
+#include <boost/thread.hpp>
 
 #if HAS_ZIPLIB
 #include "zip.h"
@@ -37,8 +37,8 @@ public:
     std::shared_ptr<PhotometricUndistorter> PhoUndistL;
     std::shared_ptr<PhotometricUndistorter> PhoUndistR;
 
-    std::thread t2;
-    std::mutex mReadBuf;
+    boost::thread t2;
+    boost::mutex mReadBuf;
 
 #if HAS_ZIPLIB
     zip_t *ziparchive;
@@ -375,11 +375,11 @@ public:
         if (isRight)
         {
             if (!isZipped)
-                t2 = std::thread(&DatasetReader::readNonZippedImage, this, ImgData, id, isRight);
+                t2 = boost::thread(&DatasetReader::readNonZippedImage, this, ImgData, id, isRight);
             else
             {
                 #if HAS_ZIPLIB
-                    t2 = std::thread(&DatasetReader::readZippedImage, this, ImgData, id, isRight);
+                    t2 = boost::thread(&DatasetReader::readZippedImage, this, ImgData, id, isRight);
                 #else
                     throw std::runtime_error("ERROR: cannot read .zip archive, as compile without ziplib!\n");
                 #endif
@@ -410,7 +410,7 @@ public:
 
     inline long ReadZipBuffer(std::string In_, std::vector<char>& _databuffer)
     {
-        std::unique_lock<std::mutex> lock (mReadBuf); //Libzip does not support parallel thread access to the same zip file. prevent access!
+        boost::unique_lock<boost::mutex> lock (mReadBuf); //Libzip does not support parallel thread access to the same zip file. prevent access!
         static long int imageSizeBuf = WidthOri * HeightOri * 6 + 1000;
         if (_databuffer.empty()) _databuffer.resize(imageSizeBuf); //; = new char[WidthOri * HeightOri * 6 + 10000];
             zip_file_t *fle = zip_fopen(ziparchive, In_.c_str(), 0);
@@ -458,10 +458,10 @@ public:
                 GeomUndist->undistort(ImgData->cvImgR, true);
             }
 
-            // int dim = ImgData->cvImgR.cols * ImgData->cvImgR.rows;
-            // float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
-            // for (int i = 0; i < dim; ++i)
-            //     ImgData->fImgR[i] = CvPtrR[i];
+            int dim = ImgData->cvImgR.cols * ImgData->cvImgR.rows;
+            float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
+            for (int i = 0; i < dim; ++i)
+                ImgData->fImgR[i] = CvPtrR[i];
 
             ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
         }
@@ -486,10 +486,10 @@ public:
                 GeomUndist->undistort(ImgData->cvImgL, false);
             }
 
-            // int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
-            // float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
-            // for (int i = 0; i < dim; ++i)
-            //     ImgData->fImgL[i] = CvPtrL[i];
+            int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
+            float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
+            for (int i = 0; i < dim; ++i)
+                ImgData->fImgL[i] = CvPtrL[i];
 
             ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
         }

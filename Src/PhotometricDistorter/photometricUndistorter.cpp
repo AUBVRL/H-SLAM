@@ -120,7 +120,7 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
 
 void PhotometricUndistorter::undistort(cv::Mat &Image, bool isRightRGBD, float factor)
 {
-    std::unique_lock<std::mutex> lock (mlock);
+    boost::unique_lock<boost::mutex> lock (mlock);
     int dim = Image.size().width * Image.size().height;
     float *ptr = Image.ptr<float>();
 
@@ -147,7 +147,7 @@ void PhotometricUndistorter::undistort(cv::Mat &Image, bool isRightRGBD, float f
 
 void PhotometricUndistorter::ResetVignette() //when system is reset, call this to reset vignette estimates
 {
-    std::unique_lock<std::mutex> lock (mlock);
+    boost::unique_lock<boost::mutex> lock (mlock);
     if(vignetteMapInv != 0)
         delete vignetteMapInv;
 
@@ -179,7 +179,7 @@ void PhotometricUndistorter::UpdateGamma(float *_BInv)
         printf("you tried updating gamma with nothing!!"); 
         return;
     }
-    std::unique_lock<std::mutex> lock (mlock);
+    boost::unique_lock<boost::mutex> lock (mlock);
 
     memcpy(Binv, _BInv, sizeof(float) * 256);
     // invert binv to get B
@@ -201,7 +201,7 @@ void PhotometricUndistorter::UpdateGamma(float *_BInv)
 
 void PhotometricUndistorter::ResetGamma() //when system is reset, call this to reset gamma estimates
 {
-    std::unique_lock<std::mutex> lock (mlock);
+    boost::unique_lock<boost::mutex> lock (mlock);
 
     if(PhoUndistMode == HaveCalib && GammaValid)
     {
