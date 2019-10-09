@@ -9,9 +9,6 @@
 namespace pangolin
 {
 
-PANGOLIN_EXPORT
-View &CreateNewPanel(const std::string &name);
-
 template <typename T>
 void GuiVarChanged(Var<T> &var)
 {
@@ -49,6 +46,27 @@ void glRect(Viewport v)
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+struct PANGOLIN_EXPORT HandlerResize : Handler
+{
+    
+    void Mouse(View& In_, MouseButton button, int x, int y, bool pressed, int button_state)
+    {
+        float TopBound = In_.top.p;
+    
+        if (button == MouseWheelDown ) //MouseButtonRight
+            TopBound = std::max(0.1, TopBound - 0.01);
+    
+        if (button == MouseWheelUp ) //MouseButtonLeft
+            TopBound = std::min(1.0, TopBound + 0.01);
+
+        In_.SetBounds(In_.bottom, TopBound, In_.left, In_.right);
+    }
+
+    void MouseMotion(View&, int x, int y, int button_state)
+    {
+    }
+};
+
 struct NewCheckBox : public Checkbox
 {
     NewCheckBox(std::string title, VarValueGeneric &tv) : Checkbox(title, tv) {}
@@ -69,7 +87,9 @@ struct NewCheckBox : public Checkbox
 };
 
 struct NewButton : public Button
-{
+{   //KNOWN BUG: this button was created for the recorder URI, when the window is resized the recorder stops working.
+    //Since there is no feedback from the recorder the button assumes is still on. Tried detecting window resizing 
+    //but did not work!
     bool IsOn = false;
     GlText textIfOn;
     GlText textIfOff;
@@ -156,8 +176,6 @@ struct NewPanel : public Panel
 
         ViewMap::iterator pnl = GetCurrentContext()->named_managed_views.find(name);
 
-        // Only add if a widget by the same name doesn't
-        // already exist
         if (pnl == GetCurrentContext()->named_managed_views.end())
         {
             View *nv = NULL;
@@ -193,12 +211,12 @@ struct NewPanel : public Panel
 
     NewPanel(const std::string &auto_register_var_prefix) : Panel()
     {
-        RegisterNewVarCallback(&AddNewVariable, (void *)this, auto_register_var_prefix);
-        ProcessHistoricCallbacks(&AddNewVariable, (void *)this, auto_register_var_prefix);
+        pangolin::RegisterNewVarCallback(&AddNewVariable, (void *)this, auto_register_var_prefix);
+        pangolin::ProcessHistoricCallbacks(&AddNewVariable, (void *)this, auto_register_var_prefix);
     }
 };
 
-View &CreateNewPanel(const std::string &name)
+PANGOLIN_EXPORT View &CreateNewPanel(const std::string &name)
 {
     if (GetCurrentContext()->named_managed_views.find(name) != GetCurrentContext()->named_managed_views.end())
     {

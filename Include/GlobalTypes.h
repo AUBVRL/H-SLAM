@@ -49,7 +49,7 @@ public:
     float* fImgL;
     float* fImgR;
 
-    inline void deepCopy(ImageData & NewData)
+    inline void deepCopy(ImageData & NewData) //deep copy was never tested!! 
     {
         if(!cvImgL.empty())
         {

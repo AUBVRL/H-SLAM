@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 #include "Main.h"
 #include "DatasetLoader.h"
@@ -19,10 +20,10 @@ int main(int argc, char **argv) try
     Input_->dataset_);
 
     //Start gui
-    std::shared_ptr<Display> DisplayHandler;
+    std::shared_ptr<GUI> DisplayHandler;
     if(DisplayOn)
-        DisplayHandler = std::make_shared<Display>();
-
+        DisplayHandler = std::make_shared<GUI>();
+    
     //Configure image playback data
     if (Input_->Reverse)
     {
@@ -64,14 +65,12 @@ int main(int argc, char **argv) try
         }
     }
 
-    //Initialize time
-    struct timeval tv_start;
-    gettimeofday(&tv_start, NULL);
-    clock_t started = clock();
-    double sInitializerOffset = 0;
-
     //Create a SLAM system instance
     std::shared_ptr<System> slam = std::make_shared<System>(DataReader->GeomUndist, DataReader->PhoUndistL, DataReader->PhoUndistR);
+
+
+   //Initialize time
+    struct timeval tv_start; gettimeofday(&tv_start, NULL); clock_t started = clock(); double sInitializerOffset = 0;
 
     for (int ii = 0; ii < idsToPlayCount; ++ii)
     {
@@ -122,14 +121,12 @@ int main(int argc, char **argv) try
         else
             Dest = Img->cvImgL;
 
-        cv::imshow("Img", Dest);
-        cv::waitKey(1);
-        
-        if(DisplayHandler)
-            if(DisplayHandler->isDead)
-                break;
-    }
+        cv::cvtColor(Dest,Dest, CV_GRAY2BGR);
+        DisplayHandler->UploadFrameImage(Dest.data,Dest.size().width, Dest.size().height);
 
+        if (DisplayHandler) if (DisplayHandler->isDead) break;
+    }
+    if (DisplayHandler) while (!DisplayHandler->isDead) usleep(50000);
     return 0;
 }
 catch(std::exception & e) {
