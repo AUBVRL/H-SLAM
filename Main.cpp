@@ -1,13 +1,8 @@
 #include <unistd.h>
-#include <opencv2/highgui.hpp>
-#include <opencv2/opencv.hpp>
-
 #include "Main.h"
 #include "DatasetLoader.h"
 #include "System.h"
 #include "Display.h"
-
-#include <chrono>
 
 using namespace FSLAM;
 
@@ -66,7 +61,7 @@ int main(int argc, char **argv) try
     }
 
     //Create a SLAM system instance
-    std::shared_ptr<System> slam = std::make_shared<System>(DataReader->GeomUndist, DataReader->PhoUndistL, DataReader->PhoUndistR);
+    std::shared_ptr<System> slam = std::make_shared<System>(DataReader->GeomUndist, DataReader->PhoUndistL, DataReader->PhoUndistR, DisplayHandler);
 
 
    //Initialize time
@@ -74,6 +69,8 @@ int main(int argc, char **argv) try
 
     for (int ii = 0; ii < idsToPlayCount; ++ii)
     {
+        while(Pause)
+            usleep(5000);
         // if (!fullSystem->initialized) // if not initialized: reset start time.
         // {
         //     gettimeofday(&tv_start, NULL);
@@ -109,20 +106,6 @@ int main(int argc, char **argv) try
             continue;
 
         slam->ProcessNewFrame(Img);
-
-        cv::Mat Dest;
-        if (Sensortype == Stereo || Sensortype == RGBD)
-        {
-            if (Input_->dataset_ != Kitti)
-                cv::hconcat(Img->cvImgL, Img->cvImgR, Dest);
-            else
-                cv::vconcat(Img->cvImgL, Img->cvImgR, Dest);
-        }
-        else
-            Dest = Img->cvImgL;
-
-        cv::cvtColor(Dest,Dest, CV_GRAY2BGR);
-        DisplayHandler->UploadFrameImage(Dest.data,Dest.size().width, Dest.size().height);
 
         if (DisplayHandler) if (DisplayHandler->isDead) break;
     }

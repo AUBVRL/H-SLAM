@@ -6,16 +6,23 @@
 #include "CalibData.h"
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
+#include "Display.h"
 
+#include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 namespace FSLAM
 {
 
 
-System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_ptr<PhotometricUndistorter> _PhoUndistL, std::shared_ptr<PhotometricUndistorter> _PhoUndistR)
+System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_ptr<PhotometricUndistorter> _PhoUndistL, 
+            std::shared_ptr<PhotometricUndistorter> _PhoUndistR,    std::shared_ptr<GUI> _DisplayHandler): DisplayHandler(_DisplayHandler)
 {
+    FrontEndThreadPoolLeft = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
+    FrontEndThreadPoolRight = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
+    BackEndThreadPool = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
+
     Detector = std::make_shared<ORBDetector>();
-    
     GeomUndist = _GeomUndist;
     PhoUndistR = _PhoUndistR;
     PhoUndistL = _PhoUndistL;
@@ -36,7 +43,7 @@ System::~System()
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {
-    CurrentFrame = std::make_shared<Frame>(DataIn, Detector);
+    CurrentFrame = std::make_shared<Frame>(DataIn, Detector, FrontEndThreadPoolLeft, FrontEndThreadPoolRight);
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);
@@ -45,6 +52,32 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 
 
 
-
+    DrawImages();
 }
+
+void System::DrawImages()
+{
+      cv::Mat Dest;
+        if (Sensortype == Stereo || Sensortype == RGBD)
+            cv::hconcat(CurrentFrame->LeftPyr[0], CurrentFrame->RightPyr[0], Dest);
+        else
+            Dest = CurrentFrame->LeftPyr[0];
+
+        cv::cvtColor(Dest, Dest, CV_GRAY2BGR);
+        
+        if (DrawDetected)
+        {
+
+            for (size_t i = 0; i < CurrentFrame->mvKeysL.size(); ++i)
+                cv::circle(Dest, CurrentFrame->mvKeysL[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
+            if (Sensortype == Stereo)
+            {
+                cv::Point2f Shift(CurrentFrame->LeftPyr[0].size().width, 0.0f);
+                for (size_t i = 0; i < CurrentFrame->mvKeysR.size(); ++i)
+                    cv::circle(Dest, CurrentFrame->mvKeysR[i].pt + Shift, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
+            }
+        }
+        DisplayHandler->UploadFrameImage(Dest.data,Dest.size().width, Dest.size().height);
+}
+
 } // namespace FSLAM

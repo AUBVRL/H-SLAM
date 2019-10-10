@@ -1,24 +1,31 @@
 #include "Frame.h"
 #include "Detector.h"
 #include <opencv2/imgproc.hpp>
-
-#include <opencv2/highgui.hpp>
-#include <chrono>
+#include "IndexThreadReduce.h"
 
 namespace FSLAM
 {
 
-Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector): Detector(_Detector)
-{
-    // boost::thread Par(&Frame::CreatePyrs, this, boost::ref(Img->cvImgR), boost::ref(RightPyr));
-    // Thr.reduce(boost::bind(&Frame::CreatePyrs, this, Img->cvImgR, RightPyr), 0, 1, 1);
-    if(Sensortype == Stereo || Sensortype == RGBD)
-        CreatePyrs(Img->cvImgR, RightPyr); //This is faster than parallelizing it!!
+Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector,
+        std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight): 
+        Detector(_Detector), EDGE_THRESHOLD(19)//, FrontEndThreadPool(_FrontEndThreadPool)
+{   
+    boost::thread RightImageThread;
+    if(Sensortype == Stereo)
+        RightImageThread = boost::thread(&Frame::RightThread, this, boost::ref(Img->cvImgR), boost::ref(RightPyr), boost::ref(mvKeysR) ,boost::ref(DescriptorsR), boost::ref(nFeaturesR), boost::ref(FrontEndThreadPoolRight));
+    // if(Sensortype == Stereo)
+    // {
+    //     CreatePyrs(Img->cvImgR, RightPyr); //This is faster than parallelizing it!!   
+    //     Detector->ExtractFeatures(Img->cvImgR,mvKeysR,DescriptorsR,nFeaturesR, FrontEndThreadPoolRight);
+    // }
+    
     CreatePyrs(Img->cvImgL, LeftPyr);
-    // Par.join();
+    Detector->ExtractFeatures(Img->cvImgL,mvKeysL,DescriptorsL,nFeaturesL, FrontEndThreadPoolLeft);
 
-    // Detector->ExtractFeatures(Img->cvImgL,mvKeysL,DescriptorsL,nFeaturesL);
-
+    if(Sensortype == Stereo)
+        if(RightImageThread.joinable())
+            RightImageThread.join();
+    
     // if(Sensortype == Stereo || Sensortype == RGBD)
     // {
     //     memcpy(vfImgR[0],Img->fImgR,Img->cvImgR.cols*Img->cvImgR.rows*sizeof(float));
@@ -26,19 +33,51 @@ Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detec
     //     // if(Sensortype == Stereo)
     //     //     Detector->ExtractFeatures(Img->cvImgR,mvKeysR,DescriptorsR,nFeaturesR);
     // }
+}
 
+void Frame::RightThread(cv::Mat& Img, std::vector<cv::Mat>& Pyr, std::vector<cv::KeyPoint>& mvKeysR,cv::Mat& DescriptorsR, int& nFeaturesR, std::shared_ptr<IndexThreadReduce<Vec10>>& FrontEndThreadPoolRight)
+{
+    CreatePyrs(Img, Pyr);
+    Detector->ExtractFeatures(Pyr[0],mvKeysR,DescriptorsR, nFeaturesR, FrontEndThreadPoolRight);
 }
 
 void Frame::CreatePyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 {
     Pyr.resize(PyrLevels);
-    cv::GaussianBlur( Img, Pyr[0], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
-    for (size_t i = 1; i < PyrLevels; ++i)
-    {      
-        cv::Size sz(cvRound((float)Pyr[i-1].cols/PyrScaleFactor), cvRound((float)Pyr[i-1].rows/PyrScaleFactor));
-        cv::resize(Pyr[i-1],Pyr[i],sz,0,0,CV_INTER_LINEAR);
-        cv::GaussianBlur( Pyr[i], Pyr[i], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    for (int i = 0; i < PyrLevels; ++i)
+    {
+        if (i == 0)
+        {
+            cv::Size sz = cv::Size(Img.cols, Img.rows);
+            cv::Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
+            cv::Mat temp(wholeSize, Img.type());
+            Pyr[i] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+            copyMakeBorder(Img, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+                           cv::BORDER_REFLECT_101);
+        }
+        else
+        {
+            cv::Size sz = cv::Size(cvRound((float)Pyr[i - 1].cols / PyrScaleFactor), cvRound((float)Pyr[i - 1].rows / PyrScaleFactor));
+            cv::Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
+            cv::Mat temp(wholeSize, Img.type());
+            Pyr[i] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+            cv::resize(Pyr[i - 1], Pyr[i], sz, 0, 0, cv::INTER_LINEAR);
+            copyMakeBorder(Pyr[i], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+                           cv::BORDER_REFLECT_101 + cv::BORDER_ISOLATED);
+        }
+        // cv::GaussianBlur( Pyr[i], Pyr[i], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+
+ 
     }
+    // Pyr.resize(PyrLevels);
+    // Img.copyTo(Pyr[0]);
+    // // cv::GaussianBlur( Img, Pyr[0], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    // for (size_t i = 1; i < PyrLevels; ++i)
+    // {      
+    //     cv::Size sz(cvRound((float)Pyr[i-1].cols/PyrScaleFactor), cvRound((float)Pyr[i-1].rows/PyrScaleFactor));
+    //     cv::resize(Pyr[i-1],Pyr[i],sz,0,0,CV_INTER_LINEAR);
+    //     // cv::GaussianBlur( Pyr[i], Pyr[i], cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    // }
 }
 
 // void Frame::CreatePyrsAndExtractFeats(std::shared_ptr<ImageData> Img)

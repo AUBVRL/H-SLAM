@@ -49,9 +49,11 @@ private:
     std::unique_ptr<pangolin::Var<bool>> ShowPanel;
     std::unique_ptr<pangolin::Var<bool>> HidePanel;
     std::unique_ptr<pangolin::View> FeatureFrame;
+    std::unique_ptr<pangolin::Var<bool>> ShowDetectedFeatures;
     std::unique_ptr<pangolin::Var<bool>> ShowFeatureFrames;
     std::unique_ptr<pangolin::Var<bool>> Show3D;
     std::unique_ptr<pangolin::Var<bool>> RecordScreen;
+    std::unique_ptr<pangolin::Var<bool>> _Pause;
     // pangolin::Var<double> a_double;//("ui.A_Double",3,0,5);
     // pangolin::Var<int> a_int; //("ui.An_Int",2,0,5);
     std::unique_ptr<pangolin::View> FramesPanel;

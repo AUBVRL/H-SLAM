@@ -27,7 +27,6 @@
 #include "boost/thread.hpp"
 #include <stdio.h>
 #include <iostream>
-#include <Settings.h>
 
 
 namespace FSLAM
@@ -66,10 +65,6 @@ public:
 
 		for(int i=0;i<NUM_THREADS;i++)
 			workerThreads[i].join();
-
-
-		printf("destroyed ThreadReduce\n");
-
 	}
 
 	inline void reduce(boost::function<void(int,int,Running*,int)> callPerIndex, int first, int end, int stepSize = 0)

@@ -1,5 +1,6 @@
 #include "Display.h"
 #include "PangolinOverwrite.h"
+#include "Settings.h"
 
 namespace FSLAM
 {
@@ -27,10 +28,13 @@ void GUI::setup()
     Nopanel = std::unique_ptr<View>(&CreateNewPanel("noui").SetBounds(1.0, Attach::ReversePix(35), 0.0, Attach::Pix(MenuWidth)));
     ShowPanel = std::unique_ptr<Var<bool>>(new Var<bool>("noui.Show Settings", false, false));
     HidePanel = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Hide Settings", false, false));
-    ShowFeatureFrames = std::unique_ptr<Var<bool>>(new Var<bool>("ui.ShowFrames", true, true));
+    ShowFeatureFrames = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Show Frames", true, true));
+    ShowDetectedFeatures = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Show Features", DrawDetected, true));
     Show3D = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Show3D", true, true));
     RecordScreen = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Record Screen!Stop Recording", false, false));
     FeatureFrame = std::unique_ptr<View>(&Display("FeatureFrame"));
+
+    _Pause = std::unique_ptr<Var<bool>>(new Var<bool>("ui.Pause!Resume", Pause, false));
     FramesPanel = std::unique_ptr<View>(&CreateDisplay().SetBounds(0.0, 0.2, 0.0, 1.0).SetLayout(LayoutEqual).AddDisplay(*FeatureFrame.get()));
     FramesPanel->SetHandler(new HandlerResize());
     panel->Show(false); Nopanel->Show(true);
@@ -60,6 +64,8 @@ void GUI::run()
         
         pangolin::FinishFrame();
     }
+
+    Pause = false;
     isDead = true;
 }
 
@@ -72,9 +78,14 @@ void GUI::ProcessInput()
     } else if (FramesPanel->IsShown()) 
         FramesPanel->Show(false);
 
+    if(ShowDetectedFeatures->Get())
+        DrawDetected = true;
+    else
+        DrawDetected = false;
+
+    if (Pushed(*_Pause.get())) {Pause = !Pause;}
     if (Pushed(*ShowPanel.get())) {Nopanel->Show(false); panel->Show(true);}
     if (Pushed(*HidePanel.get())) {Nopanel->Show(true); panel->Show(false); }
-
     if (Pushed(*RecordScreen.get()))
         DisplayBase().RecordOnRender("ffmpeg:[fps=30,bps=8388608,flip=true,unique_filename]//screencap.avi");
 }

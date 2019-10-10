@@ -1,9 +1,10 @@
 #include "Detector.h"
+#include "Settings.h"
 #include <opencv2/highgui.hpp>
 #include "opencv2/xfeatures2d.hpp"
 #include "opencv2/imgproc.hpp"
 #include <nmmintrin.h>
-
+#include <IndexThreadReduce.h>
 // Check windows
 #if _WIN32 || _WIN64
 #if _WIN64
@@ -29,7 +30,6 @@ ORBDetector::ORBDetector()
 {
     HALF_PATCH_SIZE = 15;
     PATCH_SIZE = 31;
-    EDGE_THRESHOLD = 19;
     umax = InitUmax();
     pattern = InitPattern();
 }
@@ -38,69 +38,30 @@ ORBDetector::~ORBDetector()
 {
 }
 
-void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb)
+void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, std::shared_ptr<IndexThreadReduce<Vec10>>thPool )
 {
     if (Image.empty())
         return;
 
     mvKeys.clear();
-
     nOrb = 0;
+    int height = Image.size().height;
+    int width = Image.size().width;
 
-    static int height = Image.size().height;
-    static int width = Image.size().width;
-
-    tolerance = 0.1;
-    minThFAST = 8;
-    gridsize = 3;
-
-    DrawDetected = false;
-    maxCorners = 2500;
-    DoSubPix = true;
-
-    float maxScore = 0.0f;
-
-    std::vector<cv::KeyPoint> vKp;
     std::vector<cv::KeyPoint> vKpTemp;
-    std::vector<cv::Point2f> vPTemp;
-
-    vKp.clear();
-    cv::Mat Occupancy = cv::Mat::zeros(width, height,CV_8UC1);
-    // cv::Mat DetectorBlur;
-    // cv::GaussianBlur(Image, DetectorBlur, cv::Size(9, 9), 0.7, 0.7, cv::BORDER_REFLECT_101);
-    // cv::AGAST(Image, vKp, minThFAST, true,cv::AgastFeatureDetector::OAST_9_16);    //OAST_9_16 AGAST_5_8 AGAST_7_12s
-    cv::FAST(Image, vKp, minThFAST, true);
-    std::sort(vKp.begin(), vKp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
-    maxScore = vKp[0].response;
-    // vKp = Ssc(vKpTemp, maxCorners, tolerance, width, height);
-    // if (vKp.size() > 2200)
-    //     vKp.resize(2200);
-
-    for (int i = 0; i < vKp.size(); i++)
-    {
-        if(mvKeys.size() > maxCorners)
-            break;
-
-        if ((vKp[i].pt.y > height - this->HALF_PATCH_SIZE - 4 ) || (vKp[i].pt.y < this->HALF_PATCH_SIZE + 4) || (vKp[i].pt.x > width - this->HALF_PATCH_SIZE - 4) || (vKp[i].pt.x < this->HALF_PATCH_SIZE + 4 ))
-            continue;
-
-        if ( Occupancy.at<uchar>(vKp[i].pt.y, vKp[i].pt.x) == 0 )
-        {
-            mvKeys.push_back(vKp[i]);
-            for (int k = -gridsize; k <= gridsize; k++)
-                for (int l = -gridsize; l <= gridsize; l++)
-                {
-                    Occupancy.at<uchar>(vKp[i].pt.y + k, vKp[i].pt.x + l) = 255;
-                    // Occupancy.data[ (int)((vKp[i].pt.x + k)*Occupancy.step + (vKp[i].pt.y + l)) ] = 255;
-                }
-
-        }
-    }
     
+    cv::FAST(Image, vKpTemp, minThFAST, true);
+    std::sort(vKpTemp.begin(), vKpTemp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
+    mvKeys = Ssc(vKpTemp, numFeatures, tolerance, width, height);
+    if (vKpTemp.size() > 2200)
+        vKpTemp.resize(2200);
+    nOrb = mvKeys.size();
 
     cv::Mat ImageBlurred;
     cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
-    computeOrbDescriptor(Image, ImageBlurred, mvKeys, Descriptors);
+
+    Descriptors = cv::Mat::zeros((int)mvKeys.size(), 32, CV_8UC1);
+    thPool->reduce(boost::bind(&ORBDetector::computeOrbDescriptor, this, Image, ImageBlurred, mvKeys, Descriptors,_1,_2),0,mvKeys.size(), std::ceil(mvKeys.size()/NUM_THREADS));
     
      if (DoSubPix)
     {
@@ -113,27 +74,12 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
             mvKeys[i].pt = TempPt[i];
     }
 
-    nOrb = mvKeys.size();
-
-    if (DrawDetected)
-    {
-        cv::namedWindow("CornerDetector", cv::WINDOW_KEEPRATIO | cv::WINDOW_GUI_NORMAL);
-        cv::Mat ImageDisp;
-        cv::cvtColor(Image, ImageDisp, cv::COLOR_GRAY2BGR);
-        for (int i = 0; i < nOrb; i++)
-            cv::rectangle(ImageDisp, cv::Point2i(mvKeys[i].pt.x - 2, mvKeys[i].pt.y - 2), cv::Point2i(mvKeys[i].pt.x + 2, mvKeys[i].pt.y + 2), cv::Scalar(0.0, 255.0, 0.0), 1, 8, 0);
-
-        cv::imshow("CornerDetector", ImageDisp);
-    }
     return;
 }
 
-void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_)
+void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
 {
-
-    Descriptors_ = cv::Mat::zeros((int)Keys.size(), 32, CV_8UC1);
-// #pragma omp parallel for num_threads(NumProcessors) schedule(static)
-    for (int j = 0; j < Keys.size(); j++)
+    for (int j = min; j < max; j++)
     {
         cv::Point *ppattern = &pattern[0];
         Keys[j].angle = IC_Angle(Orig, Keys[j].pt, umax);
@@ -266,81 +212,86 @@ std::vector<int> ORBDetector::InitUmax()
     return umax;
 }
 
-// std::vector<cv::KeyPoint> ORBDetector::Ssc(std::vector<cv::KeyPoint> keyPoints, int numRetPoints,float tolerance, int cols, int rows)
-// {
-//     // several temp expression variables to simplify solution equation
-//     int exp1 = rows + cols + 2*numRetPoints;
-//     long long exp2 = ((long long) 4*cols + (long long)4*numRetPoints + (long long)4*rows*numRetPoints + (long long)rows*rows + (long long) cols*cols - (long long)2*rows*cols + (long long)4*rows*cols*numRetPoints);
-//     double exp3 = sqrt(exp2);
-//     double exp4 = (2*(numRetPoints - 1));
+std::vector<cv::KeyPoint> ORBDetector::Ssc(std::vector<cv::KeyPoint> keyPoints, int numRetPoints,float tolerance, int cols, int rows)
+{
+    // several temp expression variables to simplify solution equation
+    int exp1 = rows + cols + 2*numRetPoints;
+    long long exp2 = ((long long) 4*cols + (long long)4*numRetPoints + (long long)4*rows*numRetPoints + (long long)rows*rows + (long long) cols*cols - (long long)2*rows*cols + (long long)4*rows*cols*numRetPoints);
+    double exp3 = sqrt(exp2);
+    double exp4 = (2*(numRetPoints - 1));
 
-//     double sol1 = -round((exp1+exp3)/exp4); // first solution
-//     double sol2 = -round((exp1-exp3)/exp4); // second solution
+    double sol1 = -round((exp1+exp3)/exp4); // first solution
+    double sol2 = -round((exp1-exp3)/exp4); // second solution
 
-//     int high = (sol1>sol2)? sol1 : sol2; //binary search range initialization with positive solution
-//     int low = floor(sqrt((double)keyPoints.size()/numRetPoints));
+    int high = (sol1>sol2)? sol1 : sol2; //binary search range initialization with positive solution
+    int low = floor(sqrt((double)keyPoints.size()/numRetPoints));
 
-//     int width;
-//     int prevWidth = -1;
+    int width;
+    int prevWidth = -1;
 
-//     std::vector<int> ResultVec;
-//     bool complete = false;
-//     unsigned int K = numRetPoints; unsigned int Kmin = round(K-(K*tolerance)); unsigned int Kmax = round(K+(K*tolerance));
+    std::vector<int> ResultVec;
+    bool complete = false;
+    unsigned int K = numRetPoints; unsigned int Kmin = round(K-(K*tolerance)); unsigned int Kmax = round(K+(K*tolerance));
 
-//     std::vector<int> result; result.reserve(keyPoints.size());
-//     while(!complete){
-//         width = low+(high-low)/2;
-//         if (width == prevWidth || low>high) { //needed to reassure the same radius is not repeated again
-//             ResultVec = result; //return the keypoints from the previous iteration
-//             break;
-//         }
-//         double c = width/2; //initializing Grid
-//         if (width!=0 && c!=0)
-//         {
+    std::vector<int> result; result.reserve(keyPoints.size());
+    while(!complete){
+        width = low+(high-low)/2;
+        if (width == prevWidth || low>high) { //needed to reassure the same radius is not repeated again
+            ResultVec = result; //return the keypoints from the previous iteration
+            break;
+        }
+        double c = width/2; //initializing Grid
+        if (width!=0 && c!=0)
+        {
 
-//         int numCellCols = floor(cols/c);
-//         int numCellRows = floor(rows/c);
-//         result.clear();
-//         std::vector<std::vector<bool> > coveredVec(numCellRows+1,std::vector<bool>(numCellCols+1,false));
+        int numCellCols = floor(cols/c);
+        int numCellRows = floor(rows/c);
+        result.clear();
+        std::vector<std::vector<bool> > coveredVec(numCellRows+1,std::vector<bool>(numCellCols+1,false));
 
-//         for (unsigned int i=0;i<keyPoints.size();++i){
-//             int row = floor(keyPoints[i].pt.y/c); //get position of the cell current point is located at
-//             int col = floor(keyPoints[i].pt.x/c);
-//             if (coveredVec[row][col]==false){ // if the cell is not covered
-//                 result.push_back(i);
-//                 int rowMin = ((row-floor(width/c))>=0)? (row-floor(width/c)) : 0; //get range which current radius is covering
-//                 int rowMax = ((row+floor(width/c))<=numCellRows)? (row+floor(width/c)) : numCellRows;
-//                 int colMin = ((col-floor(width/c))>=0)? (col-floor(width/c)) : 0;
-//                 int colMax = ((col+floor(width/c))<=numCellCols)? (col+floor(width/c)) : numCellCols;
-//                 for (int rowToCov=rowMin; rowToCov<=rowMax; ++rowToCov){
-//                     for (int colToCov=colMin ; colToCov<=colMax; ++colToCov){
-//                         if (!coveredVec[rowToCov][colToCov]) coveredVec[rowToCov][colToCov] = true; //cover cells within the square bounding box with width w
-//                     }
-//                 }
-//             }
-//         }
+        for (unsigned int i=0;i<keyPoints.size();++i){
+            int row = floor(keyPoints[i].pt.y/c); //get position of the cell current point is located at
+            int col = floor(keyPoints[i].pt.x/c);
+            if (coveredVec[row][col]==false){ // if the cell is not covered
+                result.push_back(i);
+                int rowMin = ((row-floor(width/c))>=0)? (row-floor(width/c)) : 0; //get range which current radius is covering
+                int rowMax = ((row+floor(width/c))<=numCellRows)? (row+floor(width/c)) : numCellRows;
+                int colMin = ((col-floor(width/c))>=0)? (col-floor(width/c)) : 0;
+                int colMax = ((col+floor(width/c))<=numCellCols)? (col+floor(width/c)) : numCellCols;
+                for (int rowToCov=rowMin; rowToCov<=rowMax; ++rowToCov){
+                    for (int colToCov=colMin ; colToCov<=colMax; ++colToCov){
+                        if (!coveredVec[rowToCov][colToCov]) coveredVec[rowToCov][colToCov] = true; //cover cells within the square bounding box with width w
+                    }
+                }
+            }
+        }
         
-//         }
-//         else
-//         {
-//             ResultVec = result;
-//             complete = true;
-//         }
+        }
+        else
+        {
+            ResultVec = result;
+            complete = true;
+        }
 
-//         if (result.size()>=Kmin && result.size()<=Kmax){ //solution found
-//             ResultVec = result;
-//             complete = true;
-//         }
-//         else if (result.size()<Kmin) high = width-1; //update binary search range
-//         else low = width+1;
-//         prevWidth = width;
-//     }
-//     // retrieve final keypoints
-//     std::vector<cv::KeyPoint> kp;
-//     for (unsigned int i = 0; i<ResultVec.size(); i++) kp.push_back(keyPoints[ResultVec[i]]);
+        if (result.size()>=Kmin && result.size()<=Kmax){ //solution found
+            ResultVec = result;
+            complete = true;
+        }
+        else if (result.size()<Kmin) high = width-1; //update binary search range
+        else low = width+1;
+        prevWidth = width;
+    }
+    // retrieve final keypoints
+    std::vector<cv::KeyPoint> kp;
+    for (unsigned int i = 0; i<ResultVec.size(); i++)
+    {
+        if ((keyPoints[ResultVec[i]].pt.y > rows - HALF_PATCH_SIZE - 4 ) || (keyPoints[ResultVec[i]].pt.y < HALF_PATCH_SIZE + 4) || (keyPoints[ResultVec[i]].pt.x > cols - HALF_PATCH_SIZE - 4) || (keyPoints[ResultVec[i]].pt.x < HALF_PATCH_SIZE + 4 ))
+            continue;
+        kp.push_back(keyPoints[ResultVec[i]]);
+    } 
 
-//     return kp;
-// }
+    return kp;
+}
 
 void ORBDetector::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
 {

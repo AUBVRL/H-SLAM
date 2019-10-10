@@ -23,7 +23,7 @@ namespace FSLAM
 #define SCALE_A_INVERSE (1.0f / SCALE_A)
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
 
-#if ThreadCount != 0
+#if ThreadCount != 0 //Number of thread is set from cmake, cant use for some built in std::thread to detect number of cores!
 #define NUM_THREADS (ThreadCount) // const int NUM_THREADS = boost::thread::hardware_concurrency();
 #else
 #define NUM_THREADS (6)
@@ -43,6 +43,13 @@ extern int HeightOri;
 extern int PyrLevels;
 extern float PyrScaleFactor;
 extern int numFeatures;
+extern int minThFAST;
+extern float tolerance; //Ssc telerance ratio
+extern bool DoSubPix;
+extern bool DrawDetected;
+
+
+extern bool Pause;
 
 //Display options
 extern bool DisplayOn;
