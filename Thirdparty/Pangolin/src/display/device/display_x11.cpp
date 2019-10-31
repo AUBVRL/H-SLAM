@@ -107,7 +107,7 @@ bool isExtensionSupported(const char *extList, const char *extension)
         GLX_ALPHA_SIZE      , 8,
         GLX_DEPTH_SIZE      , 24,
         GLX_STENCIL_SIZE    , 8,
-        GLX_DOUBLEBUFFER    , glx_doublebuffer ? True : False,
+        GLX_DOUBLEBUFFER    , glx_doublebuffer ? False : False,
         None
     };
 

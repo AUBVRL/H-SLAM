@@ -5,72 +5,46 @@
             "label": "FSLAM",
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/FSLAM",
-            "args": [     
-                "sensor=Monocular", //Monocular, Stereo or RGBD
-                "dataset=TumMono", //Euroc, TumMono or Kitti
-                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
-
-                // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
-                // "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
-
+            "args": [
+                "sensor=Monocular",
+                "dataset=TumMono",
+                "photomCalibmodel=HaveCalib",
+                "intrinsics=/home/gy/devel/git/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml",
                 "vocabulary=pathtovocab",
-
-                // "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
-                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
-                // "path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/", //Kitti      
-
-                // "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
-                // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
-
+                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip",
+                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt",
                 "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "vignetteL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
                 "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-
                 "start=0",
                 "end=9999999",
                 "reverse=0",
                 "nogui=0",
                 "prefetch=0",
                 "playbackspeed=0",
-
                 "PyrLevels=8",
                 "PyrScaleFactor=1.2",
                 "numFeatures=1500"
             ],
             "problemMatcher": []
         },
-
         {
             "label": "FSLAM_alien",
             "type": "shell",
-            "command":"${workspaceFolder}/build/bin/FSLAM",
-            "args": [ 
-                "sensor=Stereo", //Monocular, Stereo or RGBD
-                "dataset=Euroc", //Euroc, TumMono or Kitti
-                "photomCalibmodel=NoCalib", //OnlineCalib, HaveCalib, NoCalib
-
-                "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
-                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
-
+            "command": "${workspaceFolder}/build/bin/FSLAM",
+            "args": [
+                "sensor=Stereo",
+                "dataset=Euroc",
+                "photomCalibmodel=NoCalib",
+                "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml",
                 "vocabulary=pathtovocab",
-
-                "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",//Euroc 
-                // "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
-                // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti      
-
-                "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
-                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
-
+                "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",
+                "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv",
                 "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "gammaR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
                 "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
                 "vignetteR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-
                 "start=0",
                 "end=9999999",
                 "reverse=0",
@@ -82,6 +56,38 @@
                 "numFeatures=1500"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "FSLAM_Daniel",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/bin/FSLAM",
+            "args": [
+                "sensor=Stereo",
+                "dataset=Euroc",
+                "photomCalibmodel=NoCalib",
+                "intrinsics=/home/d/FSLAM/Extras/Calib/EuRoC.yaml",
+                "vocabulary=pathtovocab",
+                "path=/home/d/Desktop/Parallels Shared Folders/Home/Desktop/VSLAM_datasets/Euroc/MH_01_easy",
+                "timestampsL=/home/d/Desktop/Parallels Shared Folders/Home/Desktop/VSLAM_datasets/Euroc/MH_01_easy/mav0/cam0/data.csv",
+                "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "gammaR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                "vignetteR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                "start=0",
+                "end=9999999",
+                "reverse=0",
+                "nogui=0",
+                "prefetch=0",
+                "playbackspeed=0",
+                "PyrLevels=1",
+                "PyrScaleFactor=1.2",
+                "numFeatures=1500"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
