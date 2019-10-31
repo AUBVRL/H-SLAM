@@ -100,13 +100,13 @@ public:
         float foption;
         char buf[1000];
 
-        if (1 == sscanf(arg, "path=%s", buf))
+        if (1 == sscanf(arg, "path=%[^\']s", buf))
         {
             Path = buf;
             printf("loading data from %s!\n", Path.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "intrinsics=%s", buf))
+        else if (1 == sscanf(arg, "intrinsics=%[^\']s", buf))
         {
             IntrinCalib = buf;
             if (IntrinCalib.length() > 4 && IntrinCalib.substr(IntrinCalib.length() - 5) != ".yaml")
@@ -114,37 +114,37 @@ public:
             printf("loading Intrinsics from %s!\n", IntrinCalib.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "timestampsL=%s", buf))
+        else if (1 == sscanf(arg, "timestampsL=%[^\']s", buf))
         {
             timestampsL = buf;
             printf("loading left camera timestamps from %s!\n", timestampsL.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "gammaL=%s", buf))
+        else if (1 == sscanf(arg, "gammaL=%[^\']s", buf))
         {
             GammaL = buf;
             printf("loading Gamma Left from %s!\n", GammaL.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "gammaR=%s", buf))
+        else if (1 == sscanf(arg, "gammaR=%[^\']s", buf))
         {
             GammaR = buf;
             printf("loading Gamma Right from %s!\n", GammaR.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "vignetteL=%s", buf))
+        else if (1 == sscanf(arg, "vignetteL=%[^\']s", buf))
         {
             VignetteL = buf;
             printf("loading vignette left from %s!\n", VignetteL.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "vignetteR=%s", buf))
+        else if (1 == sscanf(arg, "vignetteR=%[^\']s", buf))
         {
             VignetteR = buf;
             printf("loading vignette right from %s!\n", VignetteR.c_str());
             return;
         }
-        else if (1 == sscanf(arg, "vocabulary=%s", buf))
+        else if (1 == sscanf(arg, "vocabulary=%[^\']s", buf))
         {
             Vocabulary = buf;
             printf("loading Vocabulary from %s!\n", Vocabulary.c_str());
@@ -196,7 +196,7 @@ public:
             printf("playback speed %f!\n", PlaybackSpeed);
             return;
         }
-        else if (1 == sscanf(arg, "dataset=%s", buf))
+        else if (1 == sscanf(arg, "dataset=%[^\']s", buf))
         {
             std::string data = buf;
             if (data == "Euroc")
@@ -207,7 +207,7 @@ public:
                 dataset_ = Kitti;
             return;
         }
-        else if (1 == sscanf(arg, "sensor=%s", buf))
+        else if (1 == sscanf(arg, "sensor=%[^\']s", buf))
         {
             std::string data = buf;
             if (data == "Monocular")
@@ -218,7 +218,7 @@ public:
                 Sensortype = RGBD;
             return;
         }
-        else if (1 == sscanf(arg, "photomCalibmodel=%s", buf))
+        else if (1 == sscanf(arg, "photomCalibmodel=%[^\']s", buf))
         {
             std::string data = buf;
             if (data == "HaveCalib")
