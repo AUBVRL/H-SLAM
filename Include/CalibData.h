@@ -25,7 +25,7 @@ class CalibData
     VecC value_zero; //VecC contains the camera parameters (fx fy cx cy)
     VecC value_scaled;
     VecCf value_scaledf;
-    VecCf value_scaledi; //This contains the inverse of the camera parameters: 1/fx, 1/fy, -cx/fx, -cy/fy
+    VecCf value_scaledi; //contains the inverse of the camera parameters: 1/fx, 1/fy, -cx/fx, -cy/fy
     VecC value;
     VecC step;
     VecC step_backup;
@@ -36,6 +36,11 @@ class CalibData
     std::vector<float> pyrfx, pyrfxi, pyrfy, pyrfyi, pyrcx, pyrcxi, pyrcy, pyrcyi;
     
     std::vector<Mat33f> pyrK, pyrKi;
+
+    std::vector<cv::Size> IndPyrSizes;
+    std::vector<float> IndScaleFactors;
+    std::vector<float> IndInvScaleFactors;
+
 
     inline void setValueScaled(const VecC &_value_scaled)
     {
@@ -81,15 +86,9 @@ class CalibData
 
     inline CalibData(int _Width, int _Height, Mat33f K, float baseline, std::shared_ptr<PhotometricUndistorter> _PhoUndL,
                      std::shared_ptr<PhotometricUndistorter> _PhoUndR, int DirPyrSize, float DirScaleFactor) : Width(_Width), Height(_Height), PhotoUnDistL(_PhoUndL), 
-                                                                         PhotoUnDistR(_PhoUndL), mbf(baseline)
+                     PhotoUnDistR(_PhoUndL), mbf(baseline)
     {
-        // PyrWidth.push_back(Width);
-        // PyrHeight.push_back(Height);
-        // for (int i = 1; i < PyrSize; i++)
-        // {r
-        //     PyrWidth.push_back(cvRound((float)PyrWidth[i-1]/ScaleFactor));
-        //     PyrHeight.push_back(cvRound((float)PyrHeight[i-1]/ScaleFactor));
-        // }
+
         VecC initial_value = VecC::Zero();
         initial_value[0] = (double)K(0, 0);
         initial_value[1] = (double)K(1, 1);
@@ -119,14 +118,33 @@ class CalibData
             pyrcx.push_back((pyrcx[0] + 0.5) / ((int)1 << i) - 0.5);
             pyrcy.push_back((pyrcy[0] + 0.5) / ((int)1 << i) - 0.5);
 			pyrK[i] << pyrfx[i], 0.0f, pyrcx[i], 0.0f, pyrfy[i], pyrcy[i], 0.0f, 0.0f, 1.0f;
-        }
-        for (int i = 0; i < DirPyrSize; i ++)
-        {
+
             pyrKi[i] = pyrK[i].inverse();
 			pyrfxi[i] = pyrKi[i](0,0);
 			pyrfyi[i] = pyrKi[i](1,1);
 			pyrcxi[i] = pyrKi[i](0,2);
 			pyrcyi[i] = pyrKi[i](1,2);
+
+        }
+
+        //Setup Indirect pyramid data
+        IndPyrSizes.resize(IndPyrLevels);
+        IndScaleFactors.resize(IndPyrLevels);
+        IndInvScaleFactors.resize(IndPyrLevels);
+        for (int i = 0 ; i < IndPyrLevels; ++i)
+        {
+            if(i == 0)
+            {
+                IndPyrSizes[i] = cv::Size(Width, Height);
+                IndScaleFactors[i] = 1;
+                IndInvScaleFactors[i] = 1;
+            }
+            else
+            {
+                IndScaleFactors[i] = IndScaleFactors[i-1] * IndPyrScaleFactor;
+                IndInvScaleFactors[i] = IndInvScaleFactors[i-1] / IndPyrScaleFactor;
+                IndPyrSizes[i] = cv::Size(cvRound((float) Width * IndInvScaleFactors[i]), cvRound((float)Height * IndInvScaleFactors[i]));
+            }
         }
     }
 

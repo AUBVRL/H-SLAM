@@ -44,25 +44,17 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
     Pyr.resize(IndPyrLevels);
     for (int i = 0; i < IndPyrLevels; ++i)
     {
-        if (i == 0)
+        cv::Size wholeSize(Calib->IndPyrSizes[i].width + EDGE_THRESHOLD * 2, Calib->IndPyrSizes[i].height + EDGE_THRESHOLD * 2);
+        cv::Mat temp(wholeSize, Img.type());
+        Pyr[i] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, Calib->IndPyrSizes[i].width, Calib->IndPyrSizes[i].height));
+        if(i != 0)
         {
-            cv::Size sz = cv::Size(Img.cols, Img.rows);
-            cv::Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
-            cv::Mat temp(wholeSize, Img.type());
-            Pyr[i] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
-            copyMakeBorder(Img, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-                           cv::BORDER_REFLECT_101);
+            cv::resize(Pyr[i - 1], Pyr[i], Calib->IndPyrSizes[i], 0, 0, cv::INTER_LINEAR);
+            copyMakeBorder(Pyr[i], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, cv::BORDER_REFLECT_101);
+
         }
         else
-        {
-            cv::Size sz = cv::Size(cvRound((float)Pyr[i - 1].cols / IndPyrScaleFactor), cvRound((float)Pyr[i - 1].rows / IndPyrScaleFactor));
-            cv::Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
-            cv::Mat temp(wholeSize, Img.type());
-            Pyr[i] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
-            cv::resize(Pyr[i - 1], Pyr[i], sz, 0, 0, cv::INTER_LINEAR);
-            copyMakeBorder(Pyr[i], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-                           cv::BORDER_REFLECT_101 + cv::BORDER_ISOLATED);
-        }
+            copyMakeBorder(Img, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, cv::BORDER_REFLECT_101);
     }
 }
 

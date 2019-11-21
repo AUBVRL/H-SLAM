@@ -24,7 +24,7 @@ public:
     void ProcessNewFrame(std::shared_ptr<ImageData> DataIn);
 	
     std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft;
-    std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight;
+    // std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight;
 
     std::shared_ptr<IndexThreadReduce<Vec10>> BackEndThreadPool;
 
