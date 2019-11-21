@@ -48,11 +48,12 @@ endif()
 
 add_definitions("-DENABLE_SSE")
 
+#detect and number of processors
 include(ProcessorCount)
 ProcessorCount(NUMTHREADS)
 add_definitions("-DThreadCount=${NUMTHREADS}")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O0 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations ") #-fno-omit-frame-pointer"
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O0 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations") #-fno-omit-frame-pointer"
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
@@ -68,6 +69,7 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/photometricUndistorter.cpp
   ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/OnlineCalibrator.cpp
+  # ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp
 
 )
 

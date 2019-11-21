@@ -20,7 +20,7 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
     if (PhoUndistMode == NoCalib) //do not use vignette nor gamma.
     {
         printf("Photometric distortion is off!\n");
-        for(int i=0;i<256;i++) inG[i]= (float)i;
+        for(int i=0;i<256;++i) inG[i]= (float)i;
         UpdateGamma(inG);
         //should reset vignette here too!!
         return;
@@ -111,7 +111,7 @@ PhotometricUndistorter::PhotometricUndistorter(std::string gamma_path, std::stri
     else if(PhoUndistMode == OnlineCalib)
     {
         //initialize data for online calib
-        for(int i=0;i<256;i++) inG[i]= (float)i;
+        for(int i=0;i<256;++i) inG[i]= (float)i;
         UpdateGamma(inG);
         // initialize vignette here
         

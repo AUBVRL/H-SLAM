@@ -52,7 +52,7 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
     
     cv::FAST(Image, vKpTemp, minThFAST, true);
     std::sort(vKpTemp.begin(), vKpTemp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
-    mvKeys = Ssc(vKpTemp, numFeatures, tolerance, width, height);
+    mvKeys = Ssc(vKpTemp, IndNumFeatures, tolerance, width, height);
     if (vKpTemp.size() > 2200)
         vKpTemp.resize(2200);
     nOrb = mvKeys.size();
@@ -61,16 +61,18 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
     cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
 
     Descriptors = cv::Mat::zeros((int)mvKeys.size(), 32, CV_8UC1);
+    
+
     thPool->reduce(boost::bind(&ORBDetector::computeOrbDescriptor, this, Image, ImageBlurred, mvKeys, Descriptors,_1,_2),0,mvKeys.size(), std::ceil(mvKeys.size()/NUM_THREADS));
     
-     if (DoSubPix)
+    if (DoSubPix)
     {
         std::vector<cv::Point2f> TempPt;
-        for (int i = 0; i < mvKeys.size(); i++)
+        for (int i = 0; i < mvKeys.size(); ++i)
             TempPt.push_back(mvKeys[i].pt);
         if (!TempPt.empty())
             cv::cornerSubPix(Image, TempPt, cv::Size(1, 1), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 20, 0.01));
-        for (int i = 0; i < TempPt.size(); i++)
+        for (int i = 0; i < TempPt.size(); ++i)
             mvKeys[i].pt = TempPt[i];
     }
 
@@ -283,7 +285,7 @@ std::vector<cv::KeyPoint> ORBDetector::Ssc(std::vector<cv::KeyPoint> keyPoints, 
     }
     // retrieve final keypoints
     std::vector<cv::KeyPoint> kp;
-    for (unsigned int i = 0; i<ResultVec.size(); i++)
+    for (unsigned int i = 0; i<ResultVec.size(); ++i)
     {
         if ((keyPoints[ResultVec[i]].pt.y > rows - HALF_PATCH_SIZE - 4 ) || (keyPoints[ResultVec[i]].pt.y < HALF_PATCH_SIZE + 4) || (keyPoints[ResultVec[i]].pt.x > cols - HALF_PATCH_SIZE - 4) || (keyPoints[ResultVec[i]].pt.x < HALF_PATCH_SIZE + 4 ))
             continue;

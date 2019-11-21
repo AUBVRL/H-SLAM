@@ -37,26 +37,26 @@ public:
 
 private:
     void ProcessInput();
-    void RenderInputFrameImage(std::unique_ptr<InternalImage>& ImageToRender, std::unique_ptr<pangolin::View>& CanvasFrame);
+    void RenderInputFrameImage(std::unique_ptr<InternalImage>& ImageToRender, pangolin::View* CanvasFrame);
 
     int MenuWidth = 150; //pixel units
     pangolin::OpenGlRenderState scene_cam;
-    std::unique_ptr<pangolin::View> display_cam;
+    pangolin::View* display_cam;
 
     //configuration panel settings
-    std::unique_ptr<pangolin::View> panel;
-    std::unique_ptr<pangolin::View> Nopanel;
-    std::unique_ptr<pangolin::Var<bool>> ShowPanel;
-    std::unique_ptr<pangolin::Var<bool>> HidePanel;
-    std::unique_ptr<pangolin::View> FeatureFrame;
-    std::unique_ptr<pangolin::Var<bool>> ShowDetectedFeatures;
-    std::unique_ptr<pangolin::Var<bool>> ShowFeatureFrames;
-    std::unique_ptr<pangolin::Var<bool>> Show3D;
-    std::unique_ptr<pangolin::Var<bool>> RecordScreen;
-    std::unique_ptr<pangolin::Var<bool>> _Pause;
+    pangolin::View* panel;
+    pangolin::View* Nopanel;
+    pangolin::Var<bool>* ShowPanel;
+    pangolin::Var<bool>* HidePanel;
+    pangolin::View* FeatureFrame;
+    pangolin::Var<bool>* ShowDetectedFeatures;
+    pangolin::Var<bool>* ShowFeatureFrames;
+    pangolin::Var<bool>* Show3D;
+    pangolin::Var<bool>* RecordScreen;
+    pangolin::Var<bool>* _Pause;
     // pangolin::Var<double> a_double;//("ui.A_Double",3,0,5);
     // pangolin::Var<int> a_int; //("ui.An_Int",2,0,5);
-    std::unique_ptr<pangolin::View> FramesPanel;
+    pangolin::View* FramesPanel;
 
     boost::mutex mSLAMThread;
     std::unique_ptr<InternalImage> FrameImage; 

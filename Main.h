@@ -49,7 +49,7 @@ public:
             Prefetch(false), PlaybackSpeed(0), Start(0), End(9999999), Mode(0), linc(1)
            
     {
-        for (int i = 1; i < argc; i++)
+        for (int i = 1; i < argc; ++i)
             parseargument(In_[i]);
         ValidateInput();
 
@@ -229,39 +229,61 @@ public:
                 PhoUndistMode = NoCalib;
             return;
         }
-        else if (1 == sscanf(arg, "PyrLevels=%i", &option))
+        else if (1 == sscanf(arg, "IndPyrLevels=%i", &option))
         {
             if(option >= 1 && option <= 10)
             {
-                PyrLevels = option;
-                printf("Using %i pyramid levels\n", PyrLevels);
+                IndPyrLevels = option;
+                printf("Using %i pyramid levels\n", IndPyrLevels);
             }
             else
-                printf("PyrLevel chosen is invalid, using default %i levels\n", PyrLevels);
+                printf("IndPyrLevel chosen is invalid, using default %i levels\n", IndPyrLevels);
 
             return;
         }
-        else if (1 == sscanf(arg, "PyrScaleFactor=%f", &foption))
+        else if (1 == sscanf(arg, "IndPyrScaleFactor=%f", &foption))
         {
             if (foption >= 1.0f && foption <= 4.0f)
             {
-                PyrScaleFactor = foption;
-                printf("Using %f as a scale factor\n", PyrScaleFactor);
+                IndPyrScaleFactor = foption;
+                printf("Using %f as an Indirect scale factor\n", IndPyrScaleFactor);
             }
             else
-                printf("Scale factor chosen is invalid, using default %f\n", PyrScaleFactor);
-
+                printf("Indirect Scale factor chosen is invalid, using default %f\n", IndPyrScaleFactor);
             return;
         }
-        else if (1 == sscanf(arg, "numFeatures=%i", &option))
+        else if (1 == sscanf(arg, "IndNumFeatures=%i", &option))
         {
             if (option >= 500 && option <= 5000)
             {
-                numFeatures = option;
-                printf("Extracting %i features\n", numFeatures);
+                IndNumFeatures = option;
+                printf("Extracting %i features\n", IndNumFeatures);
             }
             else
-                printf("Number of features chosen is invalid, using default %i features\n", numFeatures);
+                printf("Number of features chosen is invalid, using default %i features\n", IndNumFeatures);
+
+            return;
+        }
+        else if (1 == sscanf(arg, "DirPyrLevels=%i", &option))
+        {
+            if(option >= 1 && option <= 10)
+            {
+                DirPyrLevels = option;
+                printf("Using %i pyramid levels\n", DirPyrLevels);
+            }
+            else
+                printf("DirPyrLevel chosen is invalid, using default %i levels\n", DirPyrLevels);
+            return;
+        }
+        else if (1 == sscanf(arg, "DirPyrScaleFactor=%f", &foption))
+        {
+            if (foption >= 1.0f && foption <= 4.0f)
+            {
+                DirPyrScaleFactor = foption;
+                printf("Using %f as a scale factor\n", DirPyrScaleFactor);
+            }
+            else
+                printf("Direct Scale factor chosen is invalid, using default %f\n", DirPyrScaleFactor);
 
             return;
         }

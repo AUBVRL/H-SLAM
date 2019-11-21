@@ -7,38 +7,46 @@ namespace FSLAM
 
 class ORBDetector;
 class ImageData;
+class CalibData;
 template<typename Type> class IndexThreadReduce;
 
 class Frame
 {
 public:
-	// EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft,
-            std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight);
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft);
+     //std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight)
     ~Frame();
-    void CreatePyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);
-    void RightThread(cv::Mat& Img, std::vector<cv::Mat>& Pyr, std::vector<cv::KeyPoint>& mvKeysR, cv::Mat& DescriptorsR, int& nFeaturesR, std::shared_ptr<IndexThreadReduce<Vec10>>& FrontEndThreadPoolRight);
+
+    void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);
+    // void RightThread(cv::Mat& Img, std::vector<cv::Mat>& Pyr, std::vector<cv::KeyPoint>& mvKeysR, cv::Mat& DescriptorsR, int& nFeaturesR, std::shared_ptr<IndexThreadReduce<Vec10>>& FrontEndThreadPoolRight);
+    
+    void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
 
     std::shared_ptr<ORBDetector> Detector;
     
     
-    std::vector<cv::Mat> LeftPyr;
-    std::vector<cv::Mat> RightPyr;
+    std::vector<cv::Mat> LeftIndPyr; //temporary CV_8U pyramids to extract features
+    std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx and dIy
+    std::vector<std::vector<Vec3f>> RightDirPyr;
 
-    // Vec6f* Image; //[0]I, [1]Ix, [2]Iy, [3]Ixy, [4]Ixx, [5]Iyy
 
     std::vector<cv::KeyPoint> mvKeysL;
-    std::vector<cv::KeyPoint> mvKeysR;
+    // std::vector<cv::KeyPoint> mvKeysR;
 
     cv::Mat DescriptorsL;
-    cv::Mat DescriptorsR;
+    // cv::Mat DescriptorsR;
 
     int nFeaturesL;
-    int nFeaturesR;
+    // int nFeaturesR;
 
     //Pyramid params
     int EDGE_THRESHOLD; 
+
+    cv::Mat ImgR;
+
+    std::shared_ptr<CalibData> Calib;
 
 
 

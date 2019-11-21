@@ -1,7 +1,7 @@
 #!/bin/bash 
 # gy - 17/7/2019
 # Run this script once as it will clean up after itself. Everytime you run it will recompile packages (except opencv)
-BuildType="Release"
+BuildType="RelWithDebInfo"
 
 SCRIPTPATH=$(dirname $0)
 if [ $SCRIPTPATH = '.' ]

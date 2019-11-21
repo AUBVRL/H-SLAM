@@ -25,7 +25,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
     cv::FileStorage CalibIn(GeomCalibPath, cv::FileStorage::READ);
     if(!CalibIn.isOpened())
-        throw std::runtime_error("could not read Geometric calibration data from %s \n"+ GeomCalibPath);
+        throw std::runtime_error("could not read Geometric calibration data from: "+ GeomCalibPath + "\n");
     
     wOrg = CalibIn["Input.width"]; hOrg = CalibIn["Input.height"];
     w = CalibIn["Output.width"]; h = CalibIn["Output.height"];

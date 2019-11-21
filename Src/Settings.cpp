@@ -10,10 +10,10 @@ namespace FSLAM
     int WidthOri; 
     int HeightOri;
 
-    //Detector params (settings here are overriden by explicitly changing the input to software)
-    int PyrLevels = 8;
-    float PyrScaleFactor = 1.2;
-    int numFeatures = 2000;
+    //feature Detector params (settings here are overriden by explicitly changing the input to software)
+    int IndPyrLevels = 8;
+    float IndPyrScaleFactor = 1.2;
+    int IndNumFeatures = 2000;
     int minThFAST = 4;
     float tolerance = 0.1; //SSC tolerance - no longer used consider removing SSC
 
@@ -21,8 +21,17 @@ namespace FSLAM
     bool DrawDetected = true;
     bool Pause = false;
 
+    //Direct data dector
+    int DirPyrLevels = 4;
+    float DirPyrScaleFactor = 2;
+
+
     //Display options
     bool DisplayOn = true;
 
+    //feature pattern settings
+    int patternNum = 8;
+    std::vector<std::vector<int>> patternP = staticPattern[8];
+    int patternPadding = 2;
 
 }

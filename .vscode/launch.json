@@ -40,9 +40,11 @@
                 // "nogui=0",
                 // "prefetch=0",
                 // "playbackspeed=0",
-                // "PyrLevels=8",
-                // "PyrScaleFactor=1.2",
-                // "numFeatures=1500"
+                // "IndPyrLevels=1",
+                // "IndPyrScaleFactor=1.2",
+                // "IndNumFeatures=1500",
+                // "DirPyrLevels=4",
+                // "DirPyrScaleFactor=2"
 
 
                 //Alienware
@@ -75,10 +77,11 @@
                 "nogui=0",
                 "prefetch=0",
                 "playbackspeed=0",
-                "PyrLevels=8",
-                "PyrScaleFactor=1.2",
-                "numFeatures=1500"
-                
+                "IndPyrLevels=1",
+                "IndPyrScaleFactor=1.2",
+                "IndNumFeatures=1500",
+                "DirPyrLevels=4",
+                "DirPyrScaleFactor=2"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

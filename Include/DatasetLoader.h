@@ -250,7 +250,7 @@ public:
 
             // check if exposures are correct, (possibly skip)
             bool exposuresGood = ((int)exposuresL.size() == nImgL);
-            for (int i = 0; i < (int)exposuresL.size(); i++)
+            for (int i = 0; i < (int)exposuresL.size(); ++i)
             {
                 if (exposuresL[i] == 0)
                 {

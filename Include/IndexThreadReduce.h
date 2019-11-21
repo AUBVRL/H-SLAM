@@ -47,7 +47,7 @@ public:
 		callPerIndex = boost::bind(&IndexThreadReduce::callPerIndexDefault, this, _1, _2, _3, _4);
 
 		running = true;
-		for(int i=0;i<NUM_THREADS;i++)
+		for(int i=0;i<NUM_THREADS;++i)
 		{
 			isDone[i] = false;
 			gotOne[i] = true;
@@ -63,7 +63,7 @@ public:
 		todo_signal.notify_all();
 		exMutex.unlock();
 
-		for(int i=0;i<NUM_THREADS;i++)
+		for(int i=0;i<NUM_THREADS;++i)
 			workerThreads[i].join();
 	}
 
@@ -95,7 +95,7 @@ public:
 		this->stepSize = stepSize;
 
 		// go worker threads!
-		for(int i=0;i<NUM_THREADS;i++)
+		for(int i=0;i<NUM_THREADS;++i)
 		{
 			isDone[i] = false;
 			gotOne[i] = false;
@@ -115,7 +115,7 @@ public:
 
 			// check if actually all are finished.
 			bool allDone = true;
-			for(int i=0;i<NUM_THREADS;i++)
+			for(int i=0;i<NUM_THREADS;++i)
 				allDone = allDone && isDone[i];
 
 			// all are finished! exit.
