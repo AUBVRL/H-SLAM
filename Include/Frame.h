@@ -28,7 +28,7 @@ public:
     
     
     std::vector<cv::Mat> LeftIndPyr; //temporary CV_8U pyramids to extract features
-    std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx and dIy
+    std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx ad dIy
     std::vector<std::vector<Vec3f>> RightDirPyr;
 
 
