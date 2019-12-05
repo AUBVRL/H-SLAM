@@ -27,7 +27,8 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
     PhoUndistR = _PhoUndistR;
     PhoUndistL = _PhoUndistL;
 
-    Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR, DirPyrLevels, DirPyrScaleFactor));
+    Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR,
+                                        DirPyrLevels, DirPyrScaleFactor, IndPyrLevels, IndPyrScaleFactor));
     //Setup Online Photometric Calibrators
     // OnlinePhCalibL = OnlinePhCalibL = NULL;
     // if (PhoUndistMode == OnlineCalib)

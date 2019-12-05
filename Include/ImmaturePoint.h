@@ -35,7 +35,7 @@ enum ImmaturePointStatus {
 class ImmaturePoint
 {
 public:
-	// EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	// static values
 	float color[MAX_RES_PER_POINT];
 	float weights[MAX_RES_PER_POINT];
@@ -51,13 +51,14 @@ public:
 	float quality;
 
 	float my_type;
-
 	float idepth_min;
 	float idepth_max;
-	ImmaturePoint(int u_, int v_, std::weak_ptr<Frame> host_, float type, std::weak_ptr<CalibData> HCalib);
+
+	ImmaturePoint(int u_, int v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib);
 	~ImmaturePoint();
 
-	ImmaturePointStatus traceOn(std::weak_ptr<Frame> frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine, std::weak_ptr<CalibData> HCalib, bool debugPrint=false);
+	ImmaturePointStatus traceOn(std::vector<Vec3f> &frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine,
+								std::shared_ptr<CalibData> Calib, bool debugPrint = false);
 
 	ImmaturePointStatus lastTraceStatus;
 	Vec2f lastTraceUV;
@@ -65,13 +66,19 @@ public:
 
 	float idepth_GT;
 
-	double linearizeResidual( std::weak_ptr<CalibData> HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual* tmpRes, float &Hdd, float &bd, float idepth);
-	float getdPixdd(std::weak_ptr<CalibData> HCalib, ImmaturePointTemporaryResidual* tmpRes, float idepth);
+	double linearizeResidual(std::shared_ptr<CalibData> Calib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes, float &Hdd, float &bd,
+							 float idepth);
 
-	float calcResidual(
-			std::weak_ptr<CalibData> HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual* tmpRes, float idepth);
 private:
+	EIGEN_STRONG_INLINE float derive_idepth(const Vec3f &t, const float &u, const float &v, const int &dx, const int &dy, const float &dxInterp,
+											const float &dyInterp, const float &drescale)
+	{
+		return (dxInterp * drescale * (t[0] - t[2] * u) + dyInterp * drescale * (t[1] - t[2] * v)) * SCALE_IDEPTH;
+	}
 
+	EIGEN_STRONG_INLINE bool projectPoint( const float &u_pt, const float &v_pt, const float &idepth, const int &dx, const int &dy,
+											std::shared_ptr<CalibData> const &Calib, const Mat33f &R, const Vec3f &t, float &drescale, 
+											float &u, float &v, float &Ku, float &Kv, Vec3f &KliP, float &new_idepth);
 };
 
 }

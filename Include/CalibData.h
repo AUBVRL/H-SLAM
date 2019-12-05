@@ -85,8 +85,8 @@ class CalibData
     inline float &cyli() { return value_scaledi[3]; }
 
     inline CalibData(int _Width, int _Height, Mat33f K, float baseline, std::shared_ptr<PhotometricUndistorter> _PhoUndL,
-                     std::shared_ptr<PhotometricUndistorter> _PhoUndR, int DirPyrSize, float DirScaleFactor) : Width(_Width), Height(_Height), PhotoUnDistL(_PhoUndL), 
-                     PhotoUnDistR(_PhoUndL), mbf(baseline)
+                     std::shared_ptr<PhotometricUndistorter> _PhoUndR, int DirPyrSize, float DirScaleFactor, int IndPyrLevels,
+                     int IndPyrScaleFactor) : Width(_Width), Height(_Height), PhotoUnDistL(_PhoUndL), PhotoUnDistR(_PhoUndL), mbf(baseline)
     {
 
         VecC initial_value = VecC::Zero();

@@ -44,7 +44,7 @@ public:
     //Pyramid params
     int EDGE_THRESHOLD; 
 
-    cv::Mat ImgR;
+    cv::Mat ImgR; //For display purposes only!
 
     std::shared_ptr<CalibData> Calib;
 

@@ -34,4 +34,20 @@ namespace FSLAM
     std::vector<std::vector<int>> patternP = staticPattern[8];
     int patternPadding = 2;
 
+    float setting_outlierTHSumComponent = 50*50; // higher -> less strong gradient-based reweighting .
+    float setting_outlierTH = 12*12; // higher -> less strict
+    float setting_overallEnergyTHWeight = 1;
+
+    float setting_huberTH = 9; //Huber Threshold!
+
+    //Immatureure point tracking
+    float setting_maxPixSearch = 0.027f;
+    float setting_trace_slackInterval = 1.5f;
+    float setting_trace_stepsize = 1.0f;
+    float setting_trace_minImprovementFactor = 2;
+    int setting_minTraceTestRadius = 2;
+    int setting_trace_GNIterations = 3;
+    float setting_trace_GNThreshold = 0.1f;
+    float setting_trace_extraSlackOnTH = 1.2;
+
 }
