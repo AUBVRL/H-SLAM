@@ -11,7 +11,7 @@ namespace FSLAM
     int HeightOri;
 
     //feature Detector params (settings here are overriden by explicitly changing the input to software)
-    int IndPyrLevels = 8;
+    int IndPyrLevels = 1;
     float IndPyrScaleFactor = 1.2;
     int IndNumFeatures = 2000;
     int minThFAST = 4;
@@ -49,5 +49,20 @@ namespace FSLAM
     int setting_trace_GNIterations = 3;
     float setting_trace_GNThreshold = 0.1f;
     float setting_trace_extraSlackOnTH = 1.2;
+
+
+    //Fixing priors on unobservable/initial dimensions
+    float setting_initialRotPrior = 1e11;
+    float setting_initialTransPrior = 1e10;
+    float setting_initialAffBPrior = 1e14;
+    float setting_initialAffAPrior = 1e14;
+
+    float setting_affineOptModeA = 1e12; //-1: fix. >=0: optimize (with prior, if > 0).
+    float setting_affineOptModeB = 1e8; //-1: fix. >=0: optimize (with prior, if > 0).
+    
+    
+    //Solver Settings
+    int setting_solverMode = SOLVER_FIX_LAMBDA | SOLVER_ORTHOGONALIZE_X_LATER;
+
 
 }

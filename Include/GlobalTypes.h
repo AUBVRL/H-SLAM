@@ -30,6 +30,19 @@
 #define SCALE_A_INVERSE (1.0f / SCALE_A)
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
 
+#define SOLVER_SVD (int)1
+#define SOLVER_ORTHOGONALIZE_SYSTEM (int)2
+#define SOLVER_ORTHOGONALIZE_POINTMARG (int)4
+#define SOLVER_ORTHOGONALIZE_FULL (int)8
+#define SOLVER_SVD_CUT7 (int)16
+#define SOLVER_REMOVE_POSEPRIOR (int)32
+#define SOLVER_USE_GN (int)64
+#define SOLVER_FIX_LAMBDA (int)128
+#define SOLVER_ORTHOGONALIZE_X (int)256
+#define SOLVER_MOMENTUM (int)512
+#define SOLVER_STEPMOMENTUM (int)1024
+#define SOLVER_ORTHOGONALIZE_X_LATER (int)2048
+
 #if ThreadCount != 0              //Number of thread is set from cmake, cant use for some built in std::thread to detect number of cores!
 #define NUM_THREADS (ThreadCount) // const int NUM_THREADS = boost::thread::hardware_concurrency();
 #else
@@ -60,6 +73,8 @@ enum PhotoUnDistMode
     NoCalib,
     Emptyp
 };
+
+enum ResState {IN=0, OOB, OUTLIER};
 
 struct ImageData
 {
@@ -285,6 +300,34 @@ static int staticPatternPadding[10] = {
 		4
 };
 
+struct AffLight
+{
+	AffLight(double a_, double b_) : a(a_), b(b_) {};
+	AffLight() : a(0), b(0) {};
+
+	// Affine Parameters:
+	double a,b;	// I_frame = exp(a)*I_global + b. // I_global = exp(-a)*(I_frame - b).
+
+	static Vec2 fromToVecExposure(float exposureF, float exposureT, AffLight g2F, AffLight g2T)
+	{
+		if(exposureF==0 || exposureT==0)
+		{
+			exposureT = exposureF = 1;
+			//printf("got exposure value of 0! please choose the correct model.\n");
+			//assert(setting_brightnessTransferFunc < 2);
+		}
+
+		double a = exp(g2T.a-g2F.a) * exposureT / exposureF;
+		double b = g2T.b - a*g2F.b;
+		return Vec2(a,b);
+	}
+
+	Vec2 vec()
+	{
+		return Vec2(a,b);
+	}
+};
+
 // EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
 EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const std::vector<Vec3f>& mat, const float x, const float y, const int width)
 
@@ -342,6 +385,7 @@ EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const std::vector<Vec3f>& mat
 	        + (dx-dxdy) * (*(const Eigen::Vector3f*)(bp+1))[0]
 			+ (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
 }
+
 
 } // namespace FSLAM
 #endif

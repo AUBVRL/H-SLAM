@@ -13,8 +13,6 @@ class CalibData;
 struct ImmaturePointTemporaryResidual
 {
 public:
-	enum ResState {IN=0, OOB, OUTLIER};
-
 	ResState state_state;
 	double state_energy;
 	ResState state_NewState;
@@ -45,6 +43,7 @@ public:
 	Mat22f gradH_eig;
 	float energyTH;
 	float u,v;
+	int index;
 	std::weak_ptr<Frame> hostFrame;
 	int idxInImmaturePoints;
 
@@ -54,7 +53,7 @@ public:
 	float idepth_min;
 	float idepth_max;
 
-	ImmaturePoint(int u_, int v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib);
+	ImmaturePoint(int u_, int v_, int index_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib);
 	~ImmaturePoint();
 
 	ImmaturePointStatus traceOn(std::vector<Vec3f> &frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine,

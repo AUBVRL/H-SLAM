@@ -7,7 +7,7 @@
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
 #include "Display.h"
-
+#include "ImmaturePoint.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -46,7 +46,15 @@ System::~System()
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    CurrentFrame = std::make_shared<Frame>(DataIn, Detector, Calib ,FrontEndThreadPoolLeft); //FrontEndThreadPoolRight
+
+    CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib ,FrontEndThreadPoolLeft)); //FrontEndThreadPoolRight
+    if(Sensortype == Stereo)
+    {
+        CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeysL.size());
+        FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1,_2), 0, CurrentFrame->mvKeysL.size(), std::ceil(CurrentFrame->mvKeysL.size()/NUM_THREADS));
+
+    }
+    
     std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 

@@ -52,6 +52,18 @@ extern int setting_trace_GNIterations;
 extern float setting_trace_GNThreshold;
 extern float setting_trace_extraSlackOnTH;
 
+//Fixing priors on unobservable/initial dimensions
+
+extern float setting_initialRotPrior;
+extern float setting_initialTransPrior;
+extern float setting_initialAffBPrior;
+extern float setting_initialAffAPrior;
+
+extern float setting_affineOptModeA; 
+extern float setting_affineOptModeB;
+
+//Solver Settings
+extern int setting_solverMode;
 
 } // namespace FSLAM
 

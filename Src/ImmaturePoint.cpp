@@ -1,13 +1,14 @@
 #include "ImmaturePoint.h"
 #include "CalibData.h"
 #include "Frame.h"
+#include "OptimizationClasses.h"
 // #include "util/FrameShell.h"
 // #include "FullSystem/ResidualProjections.h"
 
 namespace FSLAM
 {
-ImmaturePoint::ImmaturePoint(int u_, int v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib)
-	: u(u_), v(v_), hostFrame(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED)
+ImmaturePoint::ImmaturePoint(int u_, int v_, int index_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib)
+	: u(u_), v(v_), index(index_), hostFrame(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED)
 {
 	std::shared_ptr<Frame> lHost = hostFrame.lock();
 	if (!lHost)
@@ -407,18 +408,21 @@ EIGEN_STRONG_INLINE bool ImmaturePoint::projectPoint(const float &u_pt, const fl
 double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes,
 										float &Hdd, float &bd, float idepth)
 {
-	if (tmpRes->state_state == ImmaturePointTemporaryResidual::ResState::OOB)
+	if (tmpRes->state_state == ResState::OOB)
 	{
-		tmpRes->state_NewState = ImmaturePointTemporaryResidual::ResState::OOB;
+		tmpRes->state_NewState = ResState::OOB;
 		return tmpRes->state_energy;
 	}
 
-	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
+	if(hostFrame.expired())
+		return 999999; // this should never happen, in case it does return very large energy so it gets removed.
+	FrameFramePrecalc *precalc = &(hostFrame.lock()->targetPrecalc[tmpRes->target.lock()->idx]);
 
 	// check OOB due to scale angle change.
 
 	float energyLeft = 0;
-	const Eigen::Vector3f *dIl = tmpRes->target->dI;
+	const std::vector<Vec3f> *dIl =  &tmpRes->target.lock()->LeftDirPyr[0];
+	//const Eigen::Vector3f *dIl = tmpRes->target.lock()->dI;
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 
@@ -435,7 +439,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 
 		if (!projectPoint(this->u, this->v, idepth, dx, dy, Calib, PRE_RTll, PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
 		{
-			tmpRes->state_NewState = ImmaturePointTemporaryResidual::ResState::OOB;
+			tmpRes->state_NewState = ResState::OOB;
 			return tmpRes->state_energy;
 		}
 
@@ -443,7 +447,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 
 		if (!std::isfinite((float)hitColor[0]))
 		{
-			tmpRes->state_NewState = ImmaturePointTemporaryResidual::ResState::OOB;
+			tmpRes->state_NewState = ResState::OOB;
 			return tmpRes->state_energy;
 		}
 		float residual = hitColor[0] - (affLL[0] * color[idx] + affLL[1]);
@@ -465,11 +469,11 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 	if (energyLeft > energyTH * outlierTHSlack)
 	{
 		energyLeft = energyTH * outlierTHSlack;
-		tmpRes->state_NewState = ImmaturePointTemporaryResidual::ResState::OUTLIER;
+		tmpRes->state_NewState = ResState::OUTLIER;
 	}
 	else
 	{
-		tmpRes->state_NewState = ImmaturePointTemporaryResidual::ResState::IN;
+		tmpRes->state_NewState = ResState::IN;
 	}
 
 	tmpRes->state_NewEnergy = energyLeft;
