@@ -63,6 +63,7 @@ void GUI::run()
             RenderInputFrameImage(FrameImage, FeatureFrame);
         
         pangolin::FinishFrame();
+        usleep(10000);
     }
 
     Pause = false;
