@@ -20,14 +20,18 @@ extern float IndPyrScaleFactor;
 extern int IndNumFeatures;
 extern int minThFAST;
 extern float tolerance; //Ssc telerance ratio
+extern int EnforcedMinDist;
 extern bool DoSubPix;
 extern bool DrawDetected;
+extern bool DrawDepthKf;
 
 //Direct data dector
 extern int DirPyrLevels;
 extern float DirPyrScaleFactor;
 
 extern bool Pause;
+
+extern bool SequentialOperation;
 
 //Display options
 extern bool DisplayOn;

@@ -199,6 +199,15 @@ void PhotometricUndistorter::UpdateGamma(float *_BInv)
     return;
 }
 
+void PhotometricUndistorter::Reset()
+{
+    if(PhoUndistMode == HaveCalib)
+    {
+        ResetGamma();
+        ResetVignette();
+    }
+}
+
 void PhotometricUndistorter::ResetGamma() //when system is reset, call this to reset gamma estimates
 {
     boost::unique_lock<boost::mutex> lock (mlock);

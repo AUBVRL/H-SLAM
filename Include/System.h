@@ -12,6 +12,7 @@ class CalibData;
 class GeometricUndistorter;
 class PhotometricUndistorter;
 class GUI;
+class Map;
 
 class System
 {
@@ -24,34 +25,43 @@ public:
     void ProcessNewFrame(std::shared_ptr<ImageData> DataIn);
 	
     std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft;
-    // std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolRight;
-
     std::shared_ptr<IndexThreadReduce<Vec10>> BackEndThreadPool;
 
 
 private:
-    void DrawImages();
+    void DrawImages(std::shared_ptr<Frame> CurrentFrame);
+    void AddKeyframe(std::shared_ptr<Frame> Frame);
+    void ProcessNonKeyframe(std::shared_ptr<Frame> Frame);
+    void BlockUntilMappingIsFinished();
+    void MappingThread();
+
+    bool Initialized;
     std::shared_ptr<CalibData> Calib; //Calibration data that is used for projection and optimization
     std::shared_ptr<GUI> DisplayHandler;
 
+    std::shared_ptr<Map> SlamMap;
 
-    
-    
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibL;
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibR;
 
     std::shared_ptr<ORBDetector> Detector;
-    std::shared_ptr<Frame> CurrentFrame;
-
-
-
-
 
     //stored here without being used within the system.
     std::shared_ptr<PhotometricUndistorter> PhoUndistL; //The input photometric undistorter 
     std::shared_ptr<PhotometricUndistorter> PhoUndistR; //The input photometric undistorter 
     std::shared_ptr<GeometricUndistorter> GeomUndist;     //geometric calib data used for undistorting the images. Only used to initialize the calib ptr.
-                                                
+
+    
+    boost::thread tMappingThread;
+    boost::mutex MapThreadMutex;
+    boost::condition_variable TrackedFrameSignal;
+	boost::condition_variable MappedFrameSignal;
+	std::deque<std::shared_ptr<Frame>> UnmappedTrackedFrames;
+    bool RunMapping;
+    bool NeedToCatchUp;
+    int NeedNewKFAfter;
+    boost::mutex shellPoseMutex;
+
 
 
     /* data */

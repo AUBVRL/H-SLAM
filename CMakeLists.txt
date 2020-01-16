@@ -70,7 +70,10 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
   ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/OnlineCalibrator.cpp
   ${PROJECT_SOURCE_DIR}/Src/OptimizationClasses.cpp
-  ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp
+  ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp  
+  ${PROJECT_SOURCE_DIR}/Src/Map.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Mapping.cpp
+  ${PROJECT_SOURCE_DIR}/Src/CoarseInitializer.cpp
 
 )
 

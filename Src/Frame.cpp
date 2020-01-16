@@ -1,7 +1,7 @@
 #include "Frame.h"
 #include "Detector.h"
 #include <opencv2/imgproc.hpp>
-#include "IndexThreadReduce.h"
+// #include "IndexThreadReduce.h"
 #include "CalibData.h"
 #include "ImmaturePoint.h"
 
@@ -11,12 +11,16 @@
 namespace FSLAM
 {
 
-Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib,
-        std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft): Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
+Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib): //std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft
+Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
     static size_t Globalid = 0; id = Globalid; Globalid++; //Set frameId
-
+    poseValid=true;
+    marginalizedAt=-1;
+    movedByOpt=0;
+	statistics_outlierResOnThis = statistics_goodResOnThis = 0;
     camToWorld = SE3();
+    camToTrackingRef = SE3();
     aff_g2l_internal = AffLight(0,0); //Past to present affine model of left image
     aff_g2l_internalR = AffLight(0,0); //Left to right affine model
     ab_exposure = Img->ExposureL; //Exposure time of the left image
@@ -34,10 +38,11 @@ Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detec
     CreateIndPyrs(Img->cvImgL, LeftIndPyr);
 
     //for now I'm only extracting features from highest resolution image!!
-    Detector->ExtractFeatures(LeftIndPyr[0], mvKeysL, DescriptorsL, nFeaturesL, FrontEndThreadPoolLeft); 
     CreateDirPyrs(Img->fImgL,LeftDirPyr);
     if (RightImageThread.joinable())
         RightImageThread.join();
+    FrameState = RegularFrame;
+    isKeyFrame = false;
 }
 
 void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
@@ -126,12 +131,32 @@ void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, int min, int max
         std::shared_ptr<ImmaturePoint> impt = std::make_shared<ImmaturePoint>(FramePtr->mvKeysL[i].pt.x, FramePtr->mvKeysL[i].pt.y, i, FramePtr, 0, Calib);
 	    if(std::isfinite(impt->energyTH))
             FramePtr->ImmaturePointsLeftRight[i] = impt;
-        
     }
    
 	return ;
 }
 
+void Frame::ReduceToEssential(bool KeepIndirectData)
+{
+    FrameState = ReducedFrame;
+    if(!KeepIndirectData) //if true (global keyframe) keep these
+    {
+        mvKeysL.clear(); mvKeysL.shrink_to_fit();   
+        DescriptorsL.release();
+    }
+    Detector.reset();
+    LeftIndPyr.clear(); LeftIndPyr.shrink_to_fit();
+    LeftDirPyr.clear(); LeftDirPyr.shrink_to_fit();  
+    RightDirPyr.clear(); RightDirPyr.shrink_to_fit();   
+    
+    ImmaturePointsLeftRight.clear(); ImmaturePointsLeftRight.shrink_to_fit();
+    targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
+
+    
+    ImgR.release();
+    Calib.reset();
+    return;
+}
 
 
 

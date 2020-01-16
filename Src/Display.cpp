@@ -22,20 +22,25 @@ void GUI::setup()
     glEnable(GL_DEPTH_TEST);
 
     FrameImage = std::unique_ptr<InternalImage>(new InternalImage());
+    DepthKfImage = std::unique_ptr<InternalImage>(new InternalImage());
+
     scene_cam = OpenGlRenderState(ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100), ModelViewLookAt(-2, 2, -2, 0, 0, 0, AxisY));
     display_cam = &CreateDisplay().SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f / 480.0f).SetHandler(new pangolin::Handler3D(scene_cam));
     panel = &CreateNewPanel("ui").SetBounds(1.0, Attach::ReversePix(500), 0.0, Attach::Pix(MenuWidth));
     Nopanel = &CreateNewPanel("noui").SetBounds(1.0, Attach::ReversePix(35), 0.0, Attach::Pix(MenuWidth));
     ShowPanel = new Var<bool>("noui.Show Settings", false, false);
     HidePanel = new Var<bool>("ui.Hide Settings", false, false);
-    ShowFeatureFrames = new Var<bool>("ui.Show Frames", true, true);
+    Show2D = new Var<bool>("ui.Show 2D", true, true);
+    ShowDepthKF = new Var<bool>("ui.Show Depth KF", true, true);
+    ShowImages = new Var<bool>("ui.Show Images", true, true);
     ShowDetectedFeatures = new Var<bool>("ui.Show Features", DrawDetected, true);
     Show3D = new Var<bool>("ui.Show3D", true, true);
     RecordScreen = new Var<bool>("ui.Record Screen!Stop Recording", false, false);
     FeatureFrame = &Display("FeatureFrame");
+    DepthKeyFrame = &Display("DepthKeyFrame");
 
     _Pause = new Var<bool>("ui.Pause!Resume", Pause, false);
-    FramesPanel = &CreateDisplay().SetBounds(0.0, 0.2, 0.0, 1.0).SetLayout(LayoutEqual).AddDisplay(*FeatureFrame);
+    FramesPanel = &CreateDisplay().SetBounds(0.0, 0.2, 0.0, 1.0).SetLayout(LayoutEqual).AddDisplay(*DepthKeyFrame).AddDisplay(*FeatureFrame);
     FramesPanel->SetHandler(new HandlerResize());
     panel->Show(false); Nopanel->Show(true);
 
@@ -59,8 +64,16 @@ void GUI::run()
             pangolin::glDrawColouredCube();
         }
 
-        if (ShowFeatureFrames->Get())
-            RenderInputFrameImage(FrameImage, FeatureFrame);
+        if(Show2D->Get())
+        {
+            if (ShowImages->Get())
+                RenderInputFrameImage(FrameImage, FeatureFrame);
+
+            if (ShowDepthKF->Get())
+                RenderInputFrameImage(DepthKfImage, DepthKeyFrame);
+
+        }
+        
         
         pangolin::FinishFrame();
         usleep(10000);
@@ -72,7 +85,7 @@ void GUI::run()
 
 void GUI::ProcessInput()
 {
-    if (ShowFeatureFrames->Get()) 
+    if (Show2D->Get()) 
     {
         if (!FramesPanel->IsShown()) 
             FramesPanel->Show(true); 
@@ -93,7 +106,7 @@ void GUI::ProcessInput()
 
 void GUI::UploadFrameImage(unsigned char* _In, int width, int height)
 {
-    if (ShowFeatureFrames->Get())
+    if (Show2D->Get() && ShowImages->Get())
     {
         boost::unique_lock<boost::mutex> lock(mSLAMThread);
         if(FrameImage->Image.empty())
@@ -131,6 +144,25 @@ void GUI::RenderInputFrameImage(std::unique_ptr<InternalImage> &ImageToRender, V
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         ImageToRender->FeatureFrameTexture.RenderToViewportFlipY();
     }
+}
+
+void GUI::UploadDepthKeyFrameImage(unsigned char* _In, int width, int height)
+{
+    if (Show2D->Get() && ShowDepthKF->Get())
+    {
+        boost::unique_lock<boost::mutex> lock(mSLAMThread);
+        if(DepthKfImage->Image.empty())
+        {
+            DepthKfImage->Width = width;
+            DepthKfImage->Height = height;
+            DepthKfImage->SizeToCopy = width * height * 3;
+            DepthKfImage->Image.resize(DepthKfImage->SizeToCopy);
+        }
+        memcpy(&DepthKfImage->Image[0], _In, DepthKfImage->SizeToCopy);
+        DepthKfImage->HaveNewImage = true;
+    }
+    
+    return;
 }
 
 } // namespace FSLAM

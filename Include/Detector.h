@@ -13,7 +13,7 @@ class ORBDetector
 public:
     ORBDetector();
     ~ORBDetector();
-    void ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
+    void ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
 
 private:
 
@@ -23,7 +23,7 @@ private:
     int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
     void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);
     float IC_Angle(const cv::Mat &image, cv::Point2f pt, const std::vector<int> &u_max);
-    std::vector<cv::KeyPoint> Ssc(std::vector<cv::KeyPoint> keyPoints, int numRetPoints,float tolerance, int cols, int rows);
+    std::vector<cv::KeyPoint> Ssc(std::vector<cv::KeyPoint> keyPoints, int numRetPoints, int minDist, float tolerance, int cols, int rows);
 
 
     std::vector<int> umax;

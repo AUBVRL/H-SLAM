@@ -14,17 +14,20 @@ namespace FSLAM
     int IndPyrLevels = 1;
     float IndPyrScaleFactor = 1.2;
     int IndNumFeatures = 2000;
-    int minThFAST = 4;
-    float tolerance = 0.1; //SSC tolerance - no longer used consider removing SSC
+    int minThFAST = 8;
+    float tolerance = 0.1; //SSC tolerance 
+    int EnforcedMinDist = 5;
 
     bool DoSubPix = false;
     bool DrawDetected = true;
+    bool DrawDepthKf = true;
     bool Pause = false;
 
     //Direct data dector
     int DirPyrLevels = 4;
     float DirPyrScaleFactor = 2;
 
+    bool SequentialOperation = false;
 
     //Display options
     bool DisplayOn = true;

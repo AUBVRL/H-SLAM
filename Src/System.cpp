@@ -7,6 +7,7 @@
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
 #include "Display.h"
+#include "Map.h"
 #include "ImmaturePoint.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
@@ -16,19 +17,38 @@ namespace FSLAM
 
 
 System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_ptr<PhotometricUndistorter> _PhoUndistL, 
-            std::shared_ptr<PhotometricUndistorter> _PhoUndistR,    std::shared_ptr<GUI> _DisplayHandler): DisplayHandler(_DisplayHandler)
+            std::shared_ptr<PhotometricUndistorter> _PhoUndistR,    std::shared_ptr<GUI> _DisplayHandler): DisplayHandler(_DisplayHandler), Initialized(false),
+            NeedNewKFAfter(-1)
 {
-    FrontEndThreadPoolLeft = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
-    // FrontEndThreadPoolRight = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
-    BackEndThreadPool = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
-
-    Detector = std::make_shared<ORBDetector>();
     GeomUndist = _GeomUndist;
     PhoUndistR = _PhoUndistR;
-    PhoUndistL = _PhoUndistL;
-
+    PhoUndistL = PhoUndistL;
+    FrontEndThreadPoolLeft = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
+    BackEndThreadPool = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
+    Detector = std::make_shared<ORBDetector>();
     Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR,
                                         DirPyrLevels, DirPyrScaleFactor, IndPyrLevels, IndPyrScaleFactor));
+    SlamMap = std::shared_ptr<Map>(new Map());
+
+    // selectionMap = new float[wG[0]*hG[0]];
+	// coarseDistanceMap = new CoarseDistanceMap(wG[0], hG[0]);
+	// coarseTracker = new CoarseTracker(wG[0], hG[0]);
+	// coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
+	// coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
+	// pixelSelector = new PixelSelector(wG[0], hG[0]);
+    // lastCoarseRMSE.setConstant(100);
+	// currentMinActDist=2;
+
+    // ef = new EnergyFunctional();
+	// ef->red = &this->treadReduce;
+	// isLost=false;
+	// initFailed=false;
+
+    // RunMapping = true;
+    // lastRefStopID=0;
+
+	tMappingThread = boost::thread(&System::MappingThread, this);
+
     //Setup Online Photometric Calibrators
     // OnlinePhCalibL = OnlinePhCalibL = NULL;
     // if (PhoUndistMode == OnlineCalib)
@@ -41,18 +61,76 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
 
 System::~System()
 {
+    BlockUntilMappingIsFinished();
+    if(PhoUndistL)
+        PhoUndistL->Reset(); 
+    if(PhoUndistR)
+        PhoUndistR->Reset();
 }
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    
+    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib)); //FrontEndThreadPoolLeft FrontEndThreadPoolRight
 
-    CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib ,FrontEndThreadPoolLeft)); //FrontEndThreadPoolRight
-    if(Sensortype == Stereo)
+    if(!Initialized)
+    {   //Initialize..
+        Detector->ExtractFeatures(CurrentFrame->LeftIndPyr[0], CurrentFrame->mvKeysL, CurrentFrame->DescriptorsL, CurrentFrame->nFeaturesL, 2*IndNumFeatures, FrontEndThreadPoolLeft); 
+
+        if(Sensortype == Monocular)
+        {
+
+        }
+        else if (Sensortype == Stereo)
+        {
+
+        }
+        else if(Sensortype == RGBD)
+        {
+
+        }
+        
+        //Initialized = true;
+    }
+    else
     {
-        CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeysL.size());
-        FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1,_2), 0, CurrentFrame->mvKeysL.size(), std::ceil(CurrentFrame->mvKeysL.size()/NUM_THREADS));
+        Detector->ExtractFeatures(CurrentFrame->LeftIndPyr[0], CurrentFrame->mvKeysL, CurrentFrame->DescriptorsL, CurrentFrame->nFeaturesL, IndNumFeatures, FrontEndThreadPoolLeft);
+        
+        bool NeedNewKf = false;
+        switch (Sensortype)
+        {
+        case Monocular: 
+            //TrackMonocular()
+            break;
+        case Stereo:
+            CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeysL.size());
+            FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeysL.size(), std::ceil(CurrentFrame->mvKeysL.size() / NUM_THREADS));
+            //TrackStereo()
+            break;
+        case RGBD: 
+            //TrackRGBD()
+            break;
+        }
 
+        if (SequentialOperation)
+        {
+            if (NeedNewKf)
+                AddKeyframe(CurrentFrame);
+            else
+                ProcessNonKeyframe(CurrentFrame);
+        }
+        else //Parallel Computation
+        {
+            boost::unique_lock<boost::mutex> lock(MapThreadMutex);
+            UnmappedTrackedFrames.push_back(CurrentFrame);
+            if (NeedNewKf)
+                NeedNewKFAfter = CurrentFrame->id;
+            TrackedFrameSignal.notify_all();
+            while (!Initialized)
+                MappedFrameSignal.wait(lock);
+            lock.unlock();
+        }
     }
     
     std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
@@ -61,35 +139,52 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);
     // if(OnlinePhCalibR)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
+    DrawImages(CurrentFrame);
 
-
-
-    DrawImages();
 }
 
-void System::DrawImages()
+void System::DrawImages(std::shared_ptr<Frame> CurrentFrame)
 {
-    cv::Mat Dest;
-    if (Sensortype == Stereo || Sensortype == RGBD)
-        cv::hconcat(CurrentFrame->LeftIndPyr[0], CurrentFrame->ImgR, Dest);
-    else
-        Dest = CurrentFrame->LeftIndPyr[0];
+    if(!DisplayHandler)
+        return;
 
-    cv::cvtColor(Dest, Dest, CV_GRAY2BGR);
+    if(!DisplayHandler->Show2D->Get())
+        return;
 
-    if (DrawDetected)
+    if(DisplayHandler->ShowImages->Get())
     {
+        cv::Mat Dest;
+        if (Sensortype == Stereo || Sensortype == RGBD)
+            cv::hconcat(CurrentFrame->LeftIndPyr[0], CurrentFrame->ImgR, Dest);
+        else
+            Dest = CurrentFrame->LeftIndPyr[0];
 
-        for (size_t i = 0; i < CurrentFrame->mvKeysL.size(); ++i)
-            cv::circle(Dest, CurrentFrame->mvKeysL[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
-        // if (Sensortype == Stereo)
-        // {
-        //     cv::Point2f Shift(CurrentFrame->LeftIndPyr[0].size().width, 0.0f);
-        //     for (size_t i = 0; i < CurrentFrame->mvKeysR.size(); ++i)
-        //         cv::circle(Dest, CurrentFrame->mvKeysR[i].pt + Shift, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
-        // }
+       cv::cvtColor(Dest, Dest, CV_GRAY2BGR);
+
+        if (DrawDetected)
+        {
+
+            for (size_t i = 0; i < CurrentFrame->mvKeysL.size(); ++i)
+                cv::circle(Dest, CurrentFrame->mvKeysL[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
+            // if (Sensortype == Stereo)
+            // {
+            //     cv::Point2f Shift(CurrentFrame->LeftIndPyr[0].size().width, 0.0f);
+            //     for (size_t i = 0; i < CurrentFrame->mvKeysR.size(); ++i)
+            //         cv::circle(Dest, CurrentFrame->mvKeysR[i].pt + Shift, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
+            // }
+        }
+        DisplayHandler->UploadFrameImage(Dest.data, Dest.size().width, Dest.size().height);
+        
+        // DisplayHandler->UploadDepthKeyFrameImage(Dest.data, Dest.size().width, Dest.size().height);
+
     }
-    DisplayHandler->UploadFrameImage(Dest.data, Dest.size().width, Dest.size().height);
 }
+
+void System::ProcessNonKeyframe(std::shared_ptr<Frame> Frame)
+{
+    return;
+}
+
+
 
 } // namespace FSLAM

@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/FSLAM",
             "args": [     
-                "sensor=Stereo", //Monocular, Stereo or RGBD
+                "sensor=Monocular", //Monocular, Stereo or RGBD
                 "dataset=Euroc", //Euroc, TumMono or Kitti
                 "photomCalibmodel=NoCalib", //OnlineCalib, HaveCalib, NoCalib
 

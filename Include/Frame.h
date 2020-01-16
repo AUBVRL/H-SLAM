@@ -14,7 +14,7 @@ class ImageData;
 class CalibData;
 class Frame;
 class ImmaturePoint;
-template<typename Type> class IndexThreadReduce;
+// template<typename Type> class IndexThreadReduce;
 
 class Frame
 {
@@ -22,7 +22,7 @@ public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     size_t id; //frame id number
     size_t idx; // frame number in the moving optimization window
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft);
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib); //, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft
     ~Frame();
 
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
@@ -30,7 +30,9 @@ public:
 
 
     void ComputeStereoDepth( std::shared_ptr<Frame> FramePtr, int min, int max);
-
+    void ReduceToEssential(bool KeepIndirectData);
+    enum State{RegularFrame = 0, ReducedFrame} FrameState;
+    bool isKeyFrame;
     boost::thread RightImageThread;
 
     std::shared_ptr<ORBDetector> Detector;
@@ -40,9 +42,7 @@ public:
     std::vector<std::vector<Vec3f>> RightDirPyr;
 
     std::vector<cv::KeyPoint> mvKeysL;
-
     cv::Mat DescriptorsL;
-
     int nFeaturesL;
 
     //Pyramid params
@@ -52,7 +52,18 @@ public:
 
     std::shared_ptr<CalibData> Calib;
 
-    SE3 camToWorld;
+    SE3 camToTrackingRef;
+	std::shared_ptr<Frame> trackingRef;
+    bool poseValid;
+
+    // statisitcs
+	int statistics_outlierResOnThis;
+	int statistics_goodResOnThis;
+	int marginalizedAt;
+	double movedByOpt;
+
+	// constantly adapted.
+	SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
 	bool flaggedForMarginalization;
 
     //Lighting Model

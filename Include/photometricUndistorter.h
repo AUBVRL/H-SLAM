@@ -19,6 +19,7 @@ public:
 
     void ResetGamma();
     void ResetVignette();
+    void Reset();
     void UpdateGamma(float *_BInv);
 
     EIGEN_STRONG_INLINE float getBGradOnly(float color)

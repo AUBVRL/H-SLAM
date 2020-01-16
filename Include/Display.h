@@ -32,10 +32,12 @@ public:
     void setup();
     void run();
     void UploadFrameImage(unsigned char* In_, int width, int height);
+    void UploadDepthKeyFrameImage(unsigned char* _In, int width, int height);
+
     boost::thread render_loop;
     bool isDead = false;
 
-private:
+// public:
     void ProcessInput();
     void RenderInputFrameImage(std::unique_ptr<InternalImage>& ImageToRender, pangolin::View* CanvasFrame);
 
@@ -49,8 +51,12 @@ private:
     pangolin::Var<bool>* ShowPanel;
     pangolin::Var<bool>* HidePanel;
     pangolin::View* FeatureFrame;
+    pangolin::View* DepthKeyFrame;
+
     pangolin::Var<bool>* ShowDetectedFeatures;
-    pangolin::Var<bool>* ShowFeatureFrames;
+    pangolin::Var<bool>* ShowImages;
+    pangolin::Var<bool>* ShowDepthKF;
+    pangolin::Var<bool>* Show2D;
     pangolin::Var<bool>* Show3D;
     pangolin::Var<bool>* RecordScreen;
     pangolin::Var<bool>* _Pause;
@@ -60,6 +66,7 @@ private:
 
     boost::mutex mSLAMThread;
     std::unique_ptr<InternalImage> FrameImage; 
+    std::unique_ptr<InternalImage> DepthKfImage;
 
 };
 
