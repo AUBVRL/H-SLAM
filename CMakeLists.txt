@@ -73,7 +73,8 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp  
   ${PROJECT_SOURCE_DIR}/Src/Map.cpp
   ${PROJECT_SOURCE_DIR}/Src/Mapping.cpp
-  ${PROJECT_SOURCE_DIR}/Src/CoarseInitializer.cpp
+  # ${PROJECT_SOURCE_DIR}/Src/CoarseInitializer.cpp
+  ${PROJECT_SOURCE_DIR}/Src/IndirectInitializer.cpp
 
 )
 

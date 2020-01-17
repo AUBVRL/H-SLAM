@@ -13,6 +13,7 @@ class GeometricUndistorter;
 class PhotometricUndistorter;
 class GUI;
 class Map;
+class IndirectInitializer;
 
 class System
 {
@@ -40,6 +41,8 @@ private:
     std::shared_ptr<GUI> DisplayHandler;
 
     std::shared_ptr<Map> SlamMap;
+
+    std::shared_ptr<IndirectInitializer> Initializer;
 
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibL;
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibR;

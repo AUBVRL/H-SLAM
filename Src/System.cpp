@@ -9,6 +9,7 @@
 #include "Display.h"
 #include "Map.h"
 #include "ImmaturePoint.h"
+#include "IndirectInitializer.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -44,7 +45,7 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
 	// isLost=false;
 	// initFailed=false;
 
-    // RunMapping = true;
+    RunMapping = true;
     // lastRefStopID=0;
 
 	tMappingThread = boost::thread(&System::MappingThread, this);
@@ -72,30 +73,16 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     
-    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib)); //FrontEndThreadPoolLeft FrontEndThreadPoolRight
+    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight
 
     if(!Initialized)
     {   //Initialize..
-        Detector->ExtractFeatures(CurrentFrame->LeftIndPyr[0], CurrentFrame->mvKeysL, CurrentFrame->DescriptorsL, CurrentFrame->nFeaturesL, 2*IndNumFeatures, FrontEndThreadPoolLeft); 
-
-        if(Sensortype == Monocular)
-        {
-
-        }
-        else if (Sensortype == Stereo)
-        {
-
-        }
-        else if(Sensortype == RGBD)
-        {
-
-        }
-        
-        //Initialized = true;
+        if(!Initializer)
+            Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector));
+        Initialized = Initializer->Initialize(CurrentFrame);
     }
     else
     {
-        Detector->ExtractFeatures(CurrentFrame->LeftIndPyr[0], CurrentFrame->mvKeysL, CurrentFrame->DescriptorsL, CurrentFrame->nFeaturesL, IndNumFeatures, FrontEndThreadPoolLeft);
         
         bool NeedNewKf = false;
         switch (Sensortype)
@@ -104,8 +91,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
             //TrackMonocular()
             break;
         case Stereo:
-            CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeysL.size());
-            FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeysL.size(), std::ceil(CurrentFrame->mvKeysL.size() / NUM_THREADS));
+            CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeys.size());
+            FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeys.size(), std::ceil(CurrentFrame->mvKeys.size() / NUM_THREADS));
             //TrackStereo()
             break;
         case RGBD: 
@@ -164,8 +151,8 @@ void System::DrawImages(std::shared_ptr<Frame> CurrentFrame)
         if (DrawDetected)
         {
 
-            for (size_t i = 0; i < CurrentFrame->mvKeysL.size(); ++i)
-                cv::circle(Dest, CurrentFrame->mvKeysL[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
+            for (size_t i = 0; i < CurrentFrame->mvKeys.size(); ++i)
+                cv::circle(Dest, CurrentFrame->mvKeys[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
             // if (Sensortype == Stereo)
             // {
             //     cv::Point2f Shift(CurrentFrame->LeftIndPyr[0].size().width, 0.0f);

@@ -14,7 +14,7 @@ class ImageData;
 class CalibData;
 class Frame;
 class ImmaturePoint;
-// template<typename Type> class IndexThreadReduce;
+template<typename Type> class IndexThreadReduce;
 
 class Frame
 {
@@ -22,7 +22,7 @@ public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     size_t id; //frame id number
     size_t idx; // frame number in the moving optimization window
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib); //, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
 
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
@@ -31,6 +31,11 @@ public:
 
     void ComputeStereoDepth( std::shared_ptr<Frame> FramePtr, int min, int max);
     void ReduceToEssential(bool KeepIndirectData);
+    std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
+    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+
+    std::vector<std::vector<std::vector<size_t>>> mGrid;
+
     enum State{RegularFrame = 0, ReducedFrame} FrameState;
     bool isKeyFrame;
     boost::thread RightImageThread;
@@ -41,9 +46,12 @@ public:
     std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx ad dIy
     std::vector<std::vector<Vec3f>> RightDirPyr;
 
-    std::vector<cv::KeyPoint> mvKeysL;
-    cv::Mat DescriptorsL;
-    int nFeaturesL;
+    std::vector<cv::KeyPoint> mvKeys;
+    cv::Mat Descriptors;
+    int nFeatures;
+
+    int mnGridCols, mnGridRows;
+    float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
 
     //Pyramid params
     int EDGE_THRESHOLD; 

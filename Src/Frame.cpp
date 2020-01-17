@@ -1,7 +1,7 @@
 #include "Frame.h"
 #include "Detector.h"
 #include <opencv2/imgproc.hpp>
-// #include "IndexThreadReduce.h"
+#include "IndexThreadReduce.h"
 #include "CalibData.h"
 #include "ImmaturePoint.h"
 
@@ -11,7 +11,7 @@
 namespace FSLAM
 {
 
-Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib): //std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft
+Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):
 Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
     static size_t Globalid = 0; id = Globalid; Globalid++; //Set frameId
@@ -27,7 +27,12 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     ab_exposureR = 1;
     flaggedForMarginalization = false;
     frameEnergyTH = 8*8*patternNum;
-    
+
+    mnGridCols = std::ceil(Img->cvImgL.cols / 10);
+    mnGridRows = std::ceil(Img->cvImgL.rows / 10);
+    mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
+    mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
+    mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
     if (Sensortype == Stereo)
     {
         Img->cvImgR.copyTo(ImgR);
@@ -41,6 +46,20 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     CreateDirPyrs(Img->fImgL,LeftDirPyr);
     if (RightImageThread.joinable())
         RightImageThread.join();
+    
+    Detector->ExtractFeatures(LeftIndPyr[0], mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+
+    //Assign Features to Grid
+    mGrid.resize(mnGridCols);
+    for (int i = 0; i < mnGridCols; ++i)
+        mGrid[i].resize(mnGridRows);
+    for (unsigned short int i = 0; i < nFeatures; ++i)
+    {
+        int nGridPosX, nGridPosY;
+        if (PosInGrid(mvKeys[i], nGridPosX, nGridPosY))
+            mGrid[nGridPosX][nGridPosY].push_back(i);
+    }
+    
     FrameState = RegularFrame;
     isKeyFrame = false;
 }
@@ -128,7 +147,7 @@ void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, int min, int max
 {
     for (size_t i = min ; i < max; ++i)
     {
-        std::shared_ptr<ImmaturePoint> impt = std::make_shared<ImmaturePoint>(FramePtr->mvKeysL[i].pt.x, FramePtr->mvKeysL[i].pt.y, i, FramePtr, 0, Calib);
+        std::shared_ptr<ImmaturePoint> impt = std::make_shared<ImmaturePoint>(FramePtr->mvKeys[i].pt.x, FramePtr->mvKeys[i].pt.y, i, FramePtr, 0, Calib);
 	    if(std::isfinite(impt->energyTH))
             FramePtr->ImmaturePointsLeftRight[i] = impt;
     }
@@ -141,8 +160,8 @@ void Frame::ReduceToEssential(bool KeepIndirectData)
     FrameState = ReducedFrame;
     if(!KeepIndirectData) //if true (global keyframe) keep these
     {
-        mvKeysL.clear(); mvKeysL.shrink_to_fit();   
-        DescriptorsL.release();
+        mvKeys.clear(); mvKeys.shrink_to_fit();   
+        Descriptors.release();
     }
     Detector.reset();
     LeftIndPyr.clear(); LeftIndPyr.shrink_to_fit();
@@ -158,6 +177,55 @@ void Frame::ReduceToEssential(bool KeepIndirectData)
     return;
 }
 
+std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
+{
+    std::vector<size_t> vIndices;
+    vIndices.reserve(nFeatures);
+
+    const int nMinCellX = std::max(0,(int)std::floor((x-mnMinX-r)*mfGridElementWidthInv));
+    if(nMinCellX>=mnGridCols)
+        return vIndices;
+
+    const int nMaxCellX = std::min((int)mnGridCols-1,(int)std::ceil((x-mnMinX+r)*mfGridElementWidthInv));
+    if(nMaxCellX<0)
+        return vIndices;
+
+    const int nMinCellY = std::max(0,(int)std::floor((y-mnMinY-r)*mfGridElementHeightInv));
+    if(nMinCellY>=mnGridRows)
+        return vIndices;
+
+    const int nMaxCellY = std::min((int)mnGridRows-1,(int)std::ceil((y-mnMinY+r)*mfGridElementHeightInv));
+    if(nMaxCellY<0)
+        return vIndices;
+
+    for(int ix = nMinCellX; ix<=nMaxCellX; ix++)
+    {
+        for(int iy = nMinCellY; iy<=nMaxCellY; iy++)
+        {
+            const std::vector<size_t> vCell = mGrid[ix][iy];
+            for(size_t j=0, jend=vCell.size(); j<jend; j++)
+            {
+                const cv::KeyPoint &kpUn = mvKeys[vCell[j]];
+                const float distx = kpUn.pt.x-x;
+                const float disty = kpUn.pt.y-y;
+
+                if(fabs(distx)<r && fabs(disty)<r)
+                    vIndices.push_back(vCell[j]);
+            }
+        }
+    }
+
+    return vIndices;
+}
+
+bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
+{
+    posX = std::round((kp.pt.x ) * mfGridElementWidthInv);
+    posY = std::round((kp.pt.y) * mfGridElementHeightInv);
+    if (posX < 0 || posX >= mnGridCols || posY < 0 || posY >= mnGridRows)
+        return false;
+    return true;
+}
 
 
 
