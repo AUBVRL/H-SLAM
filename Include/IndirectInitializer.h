@@ -32,9 +32,8 @@ private:
                 const cv::Mat &K, std::vector<cv::Point3f> &vP3D, float th2, std::vector<bool> &vbGood, float &parallax);
     void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t);
     int FindMatches(std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize=10, int TH_LOW = 50, float mfNNratio = 0.9, bool CheckOrientation = true);
-
-
-
+    bool FindTransformation(const std::vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D,
+                            std::vector<bool> &vbTriangulated);
 
     std::shared_ptr<ORBDetector> Detector;
 

@@ -3,6 +3,10 @@
 #pragma once
 
 #include "GlobalTypes.h"
+namespace cv
+{
+    class Mat;
+}
 
 namespace FSLAM
 {
@@ -41,6 +45,17 @@ class CalibData
     std::vector<float> IndScaleFactors;
     std::vector<float> IndInvScaleFactors;
 
+    inline cv::Mat GetCvK()
+    {
+        float data[9] = { value_scaledf[0], 0, value_scaledf[2], 0.0f, value_scaledf[1], value_scaledf[3], 0.0f, 0.0f, 1.0f };
+        return cv::Mat(3, 3, CV_32F, data);
+    }
+
+    inline cv::Mat GetCvInvK()
+    {
+        float data[9] = { value_scaledi[0], 0, value_scaledi[2], 0.0f, value_scaledi[1], value_scaledi[3], 0.0f, 0.0f, 1.0f };
+        return cv::Mat(3, 3, CV_32F, data);
+    }
 
     inline void setValueScaled(const VecC &_value_scaled)
     {

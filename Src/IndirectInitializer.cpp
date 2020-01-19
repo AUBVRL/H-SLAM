@@ -50,31 +50,28 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame>_Frame)
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
             return false;
         }
-
-        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
         
-        // int nmatches = FindMatches(mvbPrevMatched,mvIniMatches,15);
-        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
-        std::vector<std::vector<cv::DMatch>> knn_matches;
-        matcher->knnMatch(FirstFrame->Descriptors, SecondFrame->Descriptors, knn_matches, 2);
-        //-- Filter matches using the Lowe's ratio test
-        const float ratio_thresh = 0.7f;
+        int nmatches = FindMatches(mvbPrevMatched,mvIniMatches,30,30,0.9,true);
+
+        // cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+        // std::vector<std::vector<cv::DMatch>> knn_matches;
+        // matcher->knnMatch(FirstFrame->Descriptors, SecondFrame->Descriptors, knn_matches, 2);
+        // //-- Filter matches using the Lowe's ratio test
+        // const float ratio_thresh = 0.7f;
+        // std::vector<cv::DMatch> good_matches;
+        // for (size_t i = 0; i < knn_matches.size(); i++)
+        // {
+        //     if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
+        //     {
+        //         good_matches.push_back(knn_matches[i][0]);
+        //     }
+        // }
+        
         std::vector<cv::DMatch> good_matches;
-        for (size_t i = 0; i < knn_matches.size(); i++)
-        {
-            if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
-            {
-                good_matches.push_back(knn_matches[i][0]);
-            }
-        }
-        std::cout << "time match: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
-        
-        // std::vector<cv::DMatch> dMatches;
 
-        // for (int i=0; i<mvIniMatches.size(); ++i )
-        //     if(mvIniMatches[i]!=-1)
-        //         if(dMatches.size()<50)
-        //             dMatches.push_back(cv::DMatch(i,mvIniMatches[i],1));
+        for (int i=0; i<mvIniMatches.size(); ++i )
+            if(mvIniMatches[i]!=-1)
+                    good_matches.push_back(cv::DMatch(i,mvIniMatches[i],1));
 
         cv::Mat MatchesImage;
         cv::drawMatches(FirstFrame->LeftIndPyr[0],FirstFrame->mvKeys,SecondFrame->LeftIndPyr[0],SecondFrame->mvKeys, good_matches ,MatchesImage,cv::Scalar(0.0f,255.0f,0.0f));
@@ -83,15 +80,36 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame>_Frame)
         cv::waitKey(0);
 
         // std::cout<<nmatches<<std::endl;
-        // if(nmatches<100)
-        // {
-        //     FirstFrame.reset();
-        //     SecondFrame.reset();
-        //     return false;
-        // }
+        if(nmatches<100)
+        {
+            FirstFrame.reset();
+            SecondFrame.reset();
+            return false;
+        }
+        cv::Mat Rcw;                 // Current Camera Rotation
+        cv::Mat tcw;                 // Current Camera Translation
+        std::vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
+        if(FindTransformation(mvIniMatches, Rcw, tcw, mvIniP3D,vbTriangulated))
+        {
+             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
+            {
+                if(mvIniMatches[i]>=0 && !vbTriangulated[i])
+                {
+                    mvIniMatches[i]=-1;
+                    nmatches--;
+                }
+            }
 
+            // Set Frame Poses
+            // mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
+            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
+            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
+            tcw.copyTo(Tcw.rowRange(0,3).col(3));
+            // mCurrentFrame.SetPose(Tcw);
 
-
+            // CreateInitialMapMonocular();
+            std::cout<<"found transofmration"<<std::endl;
+        }
 
     }
     else if (Sensortype == Stereo)
@@ -100,6 +118,84 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame>_Frame)
     else if (Sensortype == RGBD)
     {
     }
+
+    return false;
+}
+
+bool IndirectInitializer::FindTransformation(const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
+                             vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
+{
+    //  mvKeys2 = CurrentFrame.mvKeysUn;
+
+    mvMatches12.clear();
+    mvMatches12.reserve(SecondFrame->mvKeys.size());
+    mvbMatched1.resize(FirstFrame->mvKeys.size());
+    for(size_t i=0, iend=vMatches12.size();i<iend; i++)
+    {
+        if(vMatches12[i]>=0)
+        {
+            mvMatches12.push_back(make_pair(i,vMatches12[i]));
+            mvbMatched1[i]=true;
+        }
+        else
+            mvbMatched1[i]=false;
+    }
+
+    const int N = mvMatches12.size();
+
+    // Indices for minimum set selection
+    vector<size_t> vAllIndices;
+    vAllIndices.reserve(N);
+    vector<size_t> vAvailableIndices;
+
+    for(int i=0; i<N; i++)
+    {
+        vAllIndices.push_back(i);
+    }
+
+    // Generate sets of 8 points for each RANSAC iteration
+    mvSets = vector< vector<size_t> >(mMaxIterations,vector<size_t>(8,0));
+
+    static cv::RNG randomGen(0);
+    // DUtils::Random::SeedRandOnce(0);
+
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        vAvailableIndices = vAllIndices;
+
+        // Select a minimum set
+        for(size_t j=0; j<8; j++)
+        {
+            int randi = randomGen.uniform((int)0, (int)vAvailableIndices.size()-1);
+            // int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
+            int idx = vAvailableIndices[randi];
+
+            mvSets[it][j] = idx;
+
+            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices.pop_back();
+        }
+    }
+
+    // Launch threads to compute in parallel a fundamental matrix and a homography
+    vector<bool> vbMatchesInliersH, vbMatchesInliersF;
+    float SH, SF;
+    cv::Mat H, F;
+
+    boost::thread threadH(&IndirectInitializer::FindHomography,this,boost::ref(vbMatchesInliersH), boost::ref(SH), boost::ref(H));
+    FindFundamental(vbMatchesInliersF, SF, F);
+
+    // Wait until both threads have finished
+    threadH.join();
+
+    // Compute ratio of scores
+    float RH = SH/(SH+SF);
+    cv::Mat mK = Calib->GetCvK();
+    // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
+    if(RH>0.40)
+        return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+    else //if(pF_HF>0.6)
+        return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
 
     return false;
 }
