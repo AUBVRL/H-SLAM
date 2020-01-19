@@ -15,24 +15,22 @@ Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detec
 Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
     static size_t Globalid = 0; id = Globalid; Globalid++; //Set frameId
-    poseValid=true;
+    poseValid=false;
+    
     marginalizedAt=-1;
     movedByOpt=0;
 	statistics_outlierResOnThis = statistics_goodResOnThis = 0;
+    
     camToWorld = SE3();
     camToTrackingRef = SE3();
     aff_g2l_internal = AffLight(0,0); //Past to present affine model of left image
     aff_g2l_internalR = AffLight(0,0); //Left to right affine model
+    
     ab_exposure = Img->ExposureL; //Exposure time of the left image
     ab_exposureR = 1;
     flaggedForMarginalization = false;
     frameEnergyTH = 8*8*patternNum;
 
-    mnGridCols = std::ceil(Img->cvImgL.cols / 10);
-    mnGridRows = std::ceil(Img->cvImgL.rows / 10);
-    mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
-    mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
-    mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
     if (Sensortype == Stereo)
     {
         Img->cvImgR.copyTo(ImgR);
@@ -50,6 +48,11 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     Detector->ExtractFeatures(LeftIndPyr[0], mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
 
     //Assign Features to Grid
+    mnGridCols = std::ceil(Img->cvImgL.cols / 10);
+    mnGridRows = std::ceil(Img->cvImgL.rows / 10);
+    mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
+    mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
+    mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
     mGrid.resize(mnGridCols);
     for (int i = 0; i < mnGridCols; ++i)
         mGrid[i].resize(mnGridRows);
@@ -60,7 +63,7 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
             mGrid[nGridPosX][nGridPosY].push_back(i);
     }
     
-    FrameState = RegularFrame;
+    isReduced = false;
     isKeyFrame = false;
 }
 
@@ -142,14 +145,19 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
 
 Frame::~Frame() {}
 
-
-void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, int min, int max)
+void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, std::vector<std::shared_ptr<ImmaturePoint>>& ImPts, int min, int max)
 {
     for (size_t i = min ; i < max; ++i)
     {
-        std::shared_ptr<ImmaturePoint> impt = std::make_shared<ImmaturePoint>(FramePtr->mvKeys[i].pt.x, FramePtr->mvKeys[i].pt.y, i, FramePtr, 0, Calib);
+        std::shared_ptr<ImmaturePoint> impt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(FramePtr->mvKeys[i].pt.x, FramePtr->mvKeys[i].pt.y, i, FramePtr, 0, Calib));
 	    if(std::isfinite(impt->energyTH))
-            FramePtr->ImmaturePointsLeftRight[i] = impt;
+            ImPts[i] = impt;
+        impt->idepth_max_stereo = NAN;
+        impt->idepth_min_stereo = 0;
+
+        impt->traceStereo(FramePtr->RightDirPyr[0],Calib);
+        // if(impt->lastTraceStatus == ImmaturePointStatus::IPS_GOOD)
+        //     std::cout<<impt->idepth_stereo<<std::endl;
     }
    
 	return ;
@@ -157,7 +165,7 @@ void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, int min, int max
 
 void Frame::ReduceToEssential(bool KeepIndirectData)
 {
-    FrameState = ReducedFrame;
+    isReduced = true;
     if(!KeepIndirectData) //if true (global keyframe) keep these
     {
         mvKeys.clear(); mvKeys.shrink_to_fit();   

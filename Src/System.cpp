@@ -92,7 +92,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
             break;
         case Stereo:
             CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeys.size());
-            FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeys.size(), std::ceil(CurrentFrame->mvKeys.size() / NUM_THREADS));
+            GetStereoDepth(CurrentFrame);
+            // FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeys.size(), std::ceil(CurrentFrame->mvKeys.size() / NUM_THREADS));
             //TrackStereo()
             break;
         case RGBD: 
@@ -172,6 +173,18 @@ void System::ProcessNonKeyframe(std::shared_ptr<Frame> Frame)
     return;
 }
 
+//MOVE THIS INTO FRAME.CC
+void System::GetStereoDepth(std::shared_ptr<Frame> _In)
+{
+    if(Sensortype != Stereo)
+        return;
+
+    int NumImmature = _In->mvKeys.size();
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmatureStereoPoints;
+    ImmatureStereoPoints.resize(NumImmature);
+    FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, _In, _In, ImmatureStereoPoints, _1,_2), 0, NumImmature, std::ceil(NumImmature/NUM_THREADS));
+    return;
+}
 
 
 } // namespace FSLAM

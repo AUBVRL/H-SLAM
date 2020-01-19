@@ -29,14 +29,14 @@ public:
     void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
 
 
-    void ComputeStereoDepth( std::shared_ptr<Frame> FramePtr, int min, int max);
+    void ComputeStereoDepth( std::shared_ptr<Frame> FramePtr, std::vector<std::shared_ptr<ImmaturePoint>>& ImPts, int min, int max);
     void ReduceToEssential(bool KeepIndirectData);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 
     std::vector<std::vector<std::vector<size_t>>> mGrid;
 
-    enum State{RegularFrame = 0, ReducedFrame} FrameState;
+    bool isReduced;
     bool isKeyFrame;
     boost::thread RightImageThread;
 

@@ -33,6 +33,7 @@ private:
     void DrawImages(std::shared_ptr<Frame> CurrentFrame);
     void AddKeyframe(std::shared_ptr<Frame> Frame);
     void ProcessNonKeyframe(std::shared_ptr<Frame> Frame);
+    void GetStereoDepth(std::shared_ptr<Frame> _In);
     void BlockUntilMappingIsFinished();
     void MappingThread();
 
