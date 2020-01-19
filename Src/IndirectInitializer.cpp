@@ -50,7 +50,7 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame>_Frame)
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
             return false;
         }
-        
+
         int nmatches = FindMatches(mvbPrevMatched,mvIniMatches,30,30,0.9,true);
 
         // cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
@@ -66,26 +66,28 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame>_Frame)
         //         good_matches.push_back(knn_matches[i][0]);
         //     }
         // }
-        
-        std::vector<cv::DMatch> good_matches;
+        if (ShowInitializationMatches)
+        {
+            std::vector<cv::DMatch> good_matches;
 
-        for (int i=0; i<mvIniMatches.size(); ++i )
-            if(mvIniMatches[i]!=-1)
-                    good_matches.push_back(cv::DMatch(i,mvIniMatches[i],1));
+            for (int i = 0; i < mvIniMatches.size(); ++i)
+                if (mvIniMatches[i] != -1)
+                    good_matches.push_back(cv::DMatch(i, mvIniMatches[i], 1));
 
-        cv::Mat MatchesImage;
-        cv::drawMatches(FirstFrame->LeftIndPyr[0],FirstFrame->mvKeys,SecondFrame->LeftIndPyr[0],SecondFrame->mvKeys, good_matches ,MatchesImage,cv::Scalar(0.0f,255.0f,0.0f));
-        cv::namedWindow("Matches",cv::WindowFlags::WINDOW_GUI_NORMAL|cv::WindowFlags::WINDOW_KEEPRATIO);
-        cv::imshow("Matches",MatchesImage);
-        cv::waitKey(0);
+            cv::Mat MatchesImage;
+            cv::drawMatches(FirstFrame->LeftIndPyr[0], FirstFrame->mvKeys, SecondFrame->LeftIndPyr[0], SecondFrame->mvKeys, good_matches, MatchesImage, cv::Scalar(0.0f, 255.0f, 0.0f));
+            cv::namedWindow("Matches", cv::WindowFlags::WINDOW_GUI_NORMAL | cv::WindowFlags::WINDOW_KEEPRATIO);
+            cv::imshow("Matches", MatchesImage);
+            cv::waitKey(1);
+        }
 
-        // std::cout<<nmatches<<std::endl;
         if(nmatches<100)
         {
             FirstFrame.reset();
             SecondFrame.reset();
             return false;
         }
+
         cv::Mat Rcw;                 // Current Camera Rotation
         cv::Mat tcw;                 // Current Camera Translation
         std::vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
@@ -194,7 +196,7 @@ bool IndirectInitializer::FindTransformation(const vector<int> &vMatches12, cv::
     // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
     if(RH>0.40)
         return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
-    else //if(pF_HF>0.6)
+    else 
         return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
 
     return false;

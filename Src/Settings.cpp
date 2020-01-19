@@ -31,6 +31,7 @@ namespace FSLAM
 
     //Display options
     bool DisplayOn = true;
+    bool ShowInitializationMatches = false;
 
     //feature pattern settings
     int patternNum = 8;

@@ -3,7 +3,7 @@
 # Camera Parameters.
 #===================
 # If monocular, stereo or RGBD. If your input is unrectified distorted stereo, pinhole and radtan are not supported.
-Calibration.model: "ATan"  # RadTan, Atan, Pinhole, EquiDistant, KannalaBrandt
+Calibration.model: "Atan"  # RadTan, Atan, Pinhole, EquiDistant, KannalaBrandt
 
 Input.width: 1280
 Input.height: 1024

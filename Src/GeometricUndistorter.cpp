@@ -102,10 +102,10 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
             if (w != wOrg || h != hOrg)
                 throw std::runtime_error("ERROR: rectification mode none requires input and output dimenstions to match!\n");
             K.setIdentity();
-            ic[0] = K(0, 0) = K_l.at<float>(0, 0);
-            ic[1] = K(1, 1) = K_l.at<float>(1, 1);
-            ic[2] = K(0, 2) = K_l.at<float>(0, 2); //-0.5
-            ic[3] = K(1, 2) = K_l.at<float>(1, 2); //-0.5
+            K(0, 0) = K_l.at<float>(0, 0); //ic[0] = 
+            K(1, 1) = K_l.at<float>(1, 1); //ic[1] = 
+            K(0, 2) = K_l.at<float>(0, 2); //-0.5;  //ic[2] = 
+            K(1, 2) = K_l.at<float>(1, 2);// -0.5; //ic[3] = 
             passthrough = true;
         }
         else if (CalibProcess == "useK")
@@ -116,10 +116,10 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
                 throw std::runtime_error("Error reading desired camera calibration! it should be fx fy cx cy relative to the width and height exit.\n");
 
             K.setIdentity();
-            ic[0] = K(0, 0) = DesiredK.at<float>(0, 0) * w;
-            ic[1] = K(1, 1) = DesiredK.at<float>(0, 1) * h;
-            ic[2] = K(0, 2) = DesiredK.at<float>(0, 2) * w; // - 0.5;
-            ic[3] = K(1, 2) = DesiredK.at<float>(0, 3) * h; // - 0.5;
+            K(0, 0) = DesiredK.at<float>(0, 0) * w; //ic[0]=
+            K(1, 1) = DesiredK.at<float>(0, 1) * h;  //ic[1]=
+            K(0, 2) = DesiredK.at<float>(0, 2) * w;// -0.5;  //ic[2]=
+            K(1, 2) = DesiredK.at<float>(0, 3) * h;// -0.5;  //ic[3]=
         }
     }
     else //rquire stereo rectification
@@ -142,10 +142,10 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
         hOrg = h; wOrg=w;
         K.setIdentity();
-        ic[0] = K(0, 0) = NewInt.at<float>(0,0);
-        ic[1] = K(1, 1) = NewInt.at<float>(1,1);
-        ic[2] = K(0, 2) = NewInt.at<float>(0,2);
-        ic[3] = K(1, 2) = NewInt.at<float>(1,2);
+        K(0, 0) = NewInt.at<float>(0,0); //ic[0] =
+        K(1, 1) = NewInt.at<float>(1,1); //ic[1] = 
+        K(0, 2) = NewInt.at<float>(0,2); //ic[2] =
+        K(1, 2) = NewInt.at<float>(1,2); //ic[3] = 
 
         baseline = CalibIn["Stereo.bf"];
         if(baseline<=0)
