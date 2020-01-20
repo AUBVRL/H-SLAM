@@ -36,6 +36,7 @@ extern bool SequentialOperation;
 //Display options
 extern bool DisplayOn;
 extern bool ShowInitializationMatches;
+extern bool show_gradient_image;
 
 extern int patternNum;
 extern std::vector<std::vector<int>> patternP;

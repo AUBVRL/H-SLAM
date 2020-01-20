@@ -4,6 +4,7 @@
 #include "IndexThreadReduce.h"
 #include "CalibData.h"
 #include "ImmaturePoint.h"
+#include "photometricUndistorter.h"
 
 #include <chrono>
 #include <opencv2/highgui.hpp>
@@ -89,6 +90,7 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
 {
     DirPyr.resize(DirPyrLevels);
+    absSquaredGrad.resize(Calib->wpyr[0] * Calib->hpyr[0]); // store the absolute squared intensity gradient per pixel
     for (int i = 0; i < DirPyrLevels; ++i)
         DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
 
@@ -131,16 +133,27 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
             dI_l[idx][1] = dx;
             dI_l[idx][2] = dy;
 
-            // dabs_l[idx] = dx*dx+dy*dy;
-
-            // if(setting_gammaWeightsPixelSelect==1 && HCalib!=0)
-            // {
-            // 	float gw = HCalib->getBGradOnly((float)(dI_l[idx][0]));
-            // 	dabs_l[idx] *= gw*gw;	// convert to gradient of original color space (before removing response).
-            // }
+            if (lvl == 0)
+            {
+                absSquaredGrad[idx] = dx * dx + dy * dy;
+                if (Calib->PhotoUnDistL) //this only works in the left image for now! (consider removing dir pyrs for right images and only keeping highest res with no abssquaredgrad)
+                    if (Calib->PhotoUnDistL->GammaValid)
+                    {
+                        float gw = Calib->PhotoUnDistL->getBGradOnly((float)(dI_l[idx][0]));
+                        absSquaredGrad[idx] *= gw * gw; // convert to gradient of original color space (before removing response).
+                    }
+            }
         }
-	}
-
+    }
+    if (show_gradient_image) //make sure this does not get called in stereo system (parallel thread- remove right image createDirPyr?)
+    {
+        cv::namedWindow("AbsSquaredGrad", cv::WindowFlags::WINDOW_KEEPRATIO);
+        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F, &absSquaredGrad[0]);
+        imGrad.convertTo(imGrad,CV_8U);
+        cv::imshow("AbsSquaredGrad", imGrad);
+        cv::waitKey(1);
+    }
+    
 }
 
 Frame::~Frame() {}
@@ -175,6 +188,7 @@ void Frame::ReduceToEssential(bool KeepIndirectData)
     LeftIndPyr.clear(); LeftIndPyr.shrink_to_fit();
     LeftDirPyr.clear(); LeftDirPyr.shrink_to_fit();  
     RightDirPyr.clear(); RightDirPyr.shrink_to_fit();   
+    absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
     
     ImmaturePointsLeftRight.clear(); ImmaturePointsLeftRight.shrink_to_fit();
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();

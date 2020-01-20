@@ -40,13 +40,13 @@ public:
         return Binv[c + 1] - Binv[c];
     }
     int GDepth;
-
+    bool GammaValid;
+    bool VignetteValid;
 
 private:
     float inG[256]; //Read from preCalibrated information. Otherwise initialize to identity.
     float *invignetteMapInv; //Read from preCalibrated information. Otherwise initialize to identity.
-    bool GammaValid;
-    bool VignetteValid;
+    
     cv::Mat incvVignette; //Read from preCalibrated information.
 
     float B[256];

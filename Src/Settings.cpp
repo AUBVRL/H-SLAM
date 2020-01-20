@@ -32,6 +32,7 @@ namespace FSLAM
     //Display options
     bool DisplayOn = true;
     bool ShowInitializationMatches = false;
+    bool show_gradient_image = false;
 
     //feature pattern settings
     int patternNum = 8;
