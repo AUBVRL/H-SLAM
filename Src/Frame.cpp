@@ -11,11 +11,15 @@
 
 namespace FSLAM
 {
+size_t Frame::Globalid = 0;
+size_t Frame::GlobalIncoming_id = 0;
+
 
 Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):
 Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
-    static size_t Globalid = 0; id = Globalid; Globalid++; //Set frameId
+    frameNumb = GlobalIncoming_id; GlobalIncoming_id++; //keeps track of the number of frames processed
+    id = Globalid; Globalid++; //Set the frame id (this might be reset to 0 in the initializer so that the first keyframe in the map has id= 0)
     poseValid=false;
     
     marginalizedAt=-1;

@@ -2,6 +2,7 @@
 #define __IndirectInitializer_H__
 
 #include "Settings.h"
+#include "MatrixAccumulators.h"
 #include <opencv2/core/types.hpp>
 
 namespace FSLAM
@@ -9,6 +10,43 @@ namespace FSLAM
 class Frame;
 class CalibData;
 class ORBDetector;
+
+struct Pnt
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	// index in jacobian. never changes (actually, there is no reason why).
+	float u,v;
+
+	// idepth / isgood / energy during optimization.
+	float idepth;
+	bool isGood;
+	Vec2f energy;		// (UenergyPhotometric, energyRegularizer)
+	bool isGood_new;
+	float idepth_new;
+	Vec2f energy_new;
+
+	float iR;
+	float iRSumNum;
+
+	float lastHessian;
+	float lastHessian_new;
+
+	// max stepsize for idepth (corresponding to max. movement in pixel-space).
+	float maxstep;
+
+	// idx (x+y*w) of closest point one pyramid level above.
+	int parent;
+	float parentDist;
+
+	// idx (x+y*w) of up to 10 nearest points in pixel space.
+	int neighbours[10];
+	float neighboursDist[10];
+
+	float my_type;
+	float outlierTH;
+};
+
 
 class IndirectInitializer
 {
@@ -34,6 +72,15 @@ private:
     int FindMatches(std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize=10, int TH_LOW = 50, float mfNNratio = 0.9, bool CheckOrientation = true);
     bool FindTransformation(const std::vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D,
                             std::vector<bool> &vbTriangulated);
+    float ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
+    bool OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std::vector<bool> &vbTriangulated, SE3 &thisToNext);
+    void resetPoints(std::vector<std::shared_ptr<Pnt>>& Points); //int lvl
+    void doStep(std::vector<std::shared_ptr<Pnt>>& Points, float lambda, Vec8f inc); //int lvl 
+    void applyStep(std::vector<std::shared_ptr<Pnt>>& Points); //int lvl
+    Vec3f calcResAndGS(std::vector<std::shared_ptr<Pnt>>& Points, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew, AffLight refToNew_aff, bool plot); //int lvl 
+    Vec3f calcEC(std::vector<std::shared_ptr<Pnt>>& Points); //int lvl 
+    void optReg(std::vector<std::shared_ptr<Pnt>> & Points); //int lvl 
+    void debugPlot(std::vector<std::shared_ptr<Pnt>>&Points);
 
     std::shared_ptr<ORBDetector> Detector;
 
@@ -47,8 +94,6 @@ private:
     std::vector<int> mvIniMatches;
     std::vector<cv::Point3f> mvIniP3D;
 
-
-
     // Standard Deviation and Variance
     float mSigma, mSigma2;
     // Ransac max iterations
@@ -57,9 +102,28 @@ private:
     std::vector<std::vector<size_t> > mvSets;   
     std::vector<cv::Point2f> mvbPrevMatched;
 
+    Eigen::DiagonalMatrix<float, 8> wM;
+    // temporary buffers for H and b.
+	Vec10f* JbBuffer;			// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
+	Vec10f* JbBuffer_new;
+    bool fixAffine;
+	Accumulator9 acc9;
+	Accumulator9 acc9SC;
+
+    std::vector<int> maxIterations; // increase the size of this according to number of pyramids used
+	float alphaK ;
+	float alphaW;
+	float regWeight;
+	float couplingWeight;
+
+	bool snapped;
+	int snappedAt;
+    int frameID;
+
     static const int HISTO_LENGTH = 30;
 
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     IndirectInitializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<ORBDetector> _Detector);
     ~IndirectInitializer();
     bool Initialize(std::shared_ptr<Frame> _Frame);

@@ -21,6 +21,10 @@ class Frame
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     size_t id; //frame id number
+    size_t frameNumb;
+    static size_t Globalid;
+    static size_t GlobalIncoming_id; //frame id number
+
     size_t idx; // frame number in the moving optimization window
     Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
@@ -83,7 +87,9 @@ public:
     AffLight aff_g2l_internal;
     AffLight aff_g2l_internalR;
 
-    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePointsLeftRight;
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePointsLeftRight; //used for stereo depth estimation
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
+
     boost::mutex ImmatureMutex;
 
     inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}

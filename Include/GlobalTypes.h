@@ -386,6 +386,33 @@ EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const std::vector<Vec3f>& mat
 			+ (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
 }
 
+inline Vec3b makeRainbow3B(float id)
+{
+	if(!(id > 0))
+		return Vec3b(255,255,255);
+
+	int icP = id;
+	float ifP = id-icP;
+	icP = icP%3;
+	if(icP == 0) return Vec3b(255*(1-ifP), 255*ifP,     0);
+	if(icP == 1) return Vec3b(0,           255*(1-ifP), 255*ifP);
+	if(icP == 2) return Vec3b(255*ifP,     0,           255*(1-ifP));
+	return Vec3b(255,255,255);
+}
+
+inline void setPixel9(cv::Mat& Img, const int &u, const int &v, Vec3b& val)
+{
+	Img.at<cv::Vec3b>(u+1,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u+1,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u+1,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+
+}
 
 } // namespace FSLAM
 #endif
