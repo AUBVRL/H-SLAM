@@ -8,7 +8,7 @@
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 
-#include <DBoW3/DBoW3.h>
+#include "DBoW3/DBoW3.h"
 #include "sophus/se3.hpp"
 #include "sophus/sim3.hpp"
 

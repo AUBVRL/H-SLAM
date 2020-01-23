@@ -19,28 +19,38 @@ Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detec
 Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
     frameNumb = GlobalIncoming_id; GlobalIncoming_id++; //keeps track of the number of frames processed
-    id = Globalid; Globalid++; //Set the frame id (this might be reset to 0 in the initializer so that the first keyframe in the map has id = 0)
-    
+    id = Globalid; Globalid++; //Set the frame id (this might be reset to 0 in the initializer so that the first keyframe in the map has id= 0)
     poseValid=false;
-    MarginalizedAt=-1;
-    MovedByOpt=0;
+    
+    marginalizedAt=-1;
+    movedByOpt=0;
 	statistics_outlierResOnThis = statistics_goodResOnThis = 0;
-    TimeStamp = Img->timestamp;
+    
     camToWorld = SE3();
     camToTrackingRef = SE3();
     aff_g2l_internal = AffLight(0,0); //Past to present affine model of left image
+    aff_g2l_internalR = AffLight(0,0); //Left to right affine model
     
     ab_exposure = Img->ExposureL; //Exposure time of the left image
-    FlaggedForMarginalization = false;
+    ab_exposureR = 1;
+    flaggedForMarginalization = false;
     frameEnergyTH = 8*8*patternNum;
 
-    CreateIndPyrs(Img->cvImgL, IndPyr);
+    if (Sensortype == Stereo)
+    {
+        Img->cvImgR.copyTo(ImgR);
+        ab_exposureR = Img->ExposureR;
+        RightImageThread = boost::thread(&Frame::CreateDirPyrs, this, boost::ref(Img->fImgR), boost::ref(RightDirPyr));
+    }
+
+    CreateIndPyrs(Img->cvImgL, LeftIndPyr);
 
     //for now I'm only extracting features from highest resolution image!!
-    CreateDirPyrs(Img->fImgL, DirPyr);
-
-    nFeatures = 0;
-    // Detector->ExtractFeatures(LeftIndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    CreateDirPyrs(Img->fImgL,LeftDirPyr);
+    if (RightImageThread.joinable())
+        RightImageThread.join();
+    
+    Detector->ExtractFeatures(LeftIndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
 
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);
@@ -157,6 +167,24 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
 
 Frame::~Frame() {}
 
+void Frame::ComputeStereoDepth(std::shared_ptr<Frame> FramePtr, std::vector<std::shared_ptr<ImmaturePoint>>& ImPts, int min, int max)
+{
+    for (size_t i = min ; i < max; ++i)
+    {
+        std::shared_ptr<ImmaturePoint> impt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(FramePtr->mvKeys[i].pt.x, FramePtr->mvKeys[i].pt.y, i, FramePtr, 0, Calib));
+	    if(std::isfinite(impt->energyTH))
+            ImPts[i] = impt;
+        impt->idepth_max_stereo = NAN;
+        impt->idepth_min_stereo = 0;
+
+        impt->traceStereo(FramePtr->RightDirPyr[0],Calib);
+        // if(impt->lastTraceStatus == ImmaturePointStatus::IPS_GOOD)
+        //     std::cout<<impt->idepth_stereo<<std::endl;
+    }
+   
+	return ;
+}
+
 void Frame::ReduceToEssential(bool KeepIndirectData)
 {
     isReduced = true;
@@ -166,12 +194,16 @@ void Frame::ReduceToEssential(bool KeepIndirectData)
         Descriptors.release();
     }
     Detector.reset();
-    IndPyr.clear(); IndPyr.shrink_to_fit();
-    DirPyr.clear(); DirPyr.shrink_to_fit();  
+    LeftIndPyr.clear(); LeftIndPyr.shrink_to_fit();
+    LeftDirPyr.clear(); LeftDirPyr.shrink_to_fit();  
+    RightDirPyr.clear(); RightDirPyr.shrink_to_fit();   
     absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
     
+    ImmaturePointsLeftRight.clear(); ImmaturePointsLeftRight.shrink_to_fit();
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
 
+    
+    ImgR.release();
     Calib.reset();
     return;
 }

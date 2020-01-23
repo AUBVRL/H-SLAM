@@ -11,65 +11,28 @@
             "program": "${workspaceFolder}/build/bin/FSLAM",
             "args": [
                 //VIP machine
-                "sensor=Monocular", //Monocular, Stereo or RGBD
-                "dataset=TumMono", //Euroc, TumMono or Kitti
-                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
-
-                // "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
-                // // "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
-
-                "vocabulary=pathtovocab",
-
-                // "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
-                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/images.zip", //TumMono 
-                // // "path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/", //Kitti      
-
-                // "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/times.txt", //TumMono
-                // // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
-
-                "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/pcalib.txt",
-                "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/pcalib.txt",
-                "vignetteL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/vignette.png",
-                "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/vignette.png",
-
-                "start=0",
-                "end=9999999",
-                "reverse=0",
-                "nogui=0",
-                "prefetch=0",
-                "playbackspeed=0",
-                "IndPyrLevels=1",
-                "IndPyrScaleFactor=1.2",
-                "IndNumFeatures=1500",
-                "DirPyrLevels=4",
-                "DirPyrScaleFactor=2"
-
-
-                //Alienware
-                // "sensor=Stereo", //Monocular, Stereo or RGBD
-                // "dataset=Euroc", //Euroc, TumMono or Kitti
+                // "sensor=Monocular", //Monocular, Stereo or RGBD
+                // "dataset=TumMono", //Euroc, TumMono or Kitti
                 // "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
-                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
-                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
+                // // "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
+                // "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34
+                // // // "intrinsics=/home/gy/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
 
                 // "vocabulary=pathtovocab",
 
-                // "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
-                // "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
-                // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti 
+                // // "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
+                // "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/images.zip", //TumMono 
+                // // // "path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/", //Kitti      
 
-                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
-                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
+                // // "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
+                // "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/times.txt", //TumMono
+                // // // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
 
-                // "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
-                // "gammaR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
-                // "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
-                // "vignetteR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                // "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/pcalib.txt",
+                // "gammaR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/pcalib.txt",
+                // "vignetteL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/vignette.png",
+                // "vignetteR=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/vignette.png",
 
                 // "start=0",
                 // "end=9999999",
@@ -81,7 +44,42 @@
                 // "IndPyrScaleFactor=1.2",
                 // "IndNumFeatures=1500",
                 // "DirPyrLevels=4",
-                // "DirPyrScaleFactor=2"
+
+
+                //Alienware
+                "sensor=Monocular", //Monocular, Stereo or RGBD
+                "dataset=TumMono", //Euroc, TumMono or Kitti
+                "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
+
+                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
+                "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34.yaml
+                // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
+
+                "vocabulary=pathtovocab",
+
+                // "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",//Euroc 
+                "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
+                // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti      
+
+                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
+                "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
+                // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
+
+                "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "gammaR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "vignetteL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                "vignetteR=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+
+                "start=0",
+                "end=9999999",
+                "reverse=0",
+                "nogui=0",
+                "prefetch=0",
+                "playbackspeed=0",
+                "IndPyrLevels=1",
+                "IndPyrScaleFactor=1.2",
+                "IndNumFeatures=1500",
+                "DirPyrLevels=4",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

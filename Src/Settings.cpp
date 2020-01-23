@@ -25,7 +25,6 @@ namespace FSLAM
 
     //Direct data dector
     int DirPyrLevels = 4;
-    float DirPyrScaleFactor = 2;
 
     bool SequentialOperation = false;
 

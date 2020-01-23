@@ -20,63 +20,87 @@ class Frame
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
-    ~Frame();
-    void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
-    void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
-    void ReduceToEssential(bool KeepIndirectData);
-    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-    std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
-
-
-    std::shared_ptr<ORBDetector> Detector;    
-    std::vector<cv::Mat> IndPyr; //temporary CV_8U pyramids to extract features
-    std::vector<std::vector<Vec3f>> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
-    std::vector<std::vector<float>> absSquaredGrad;
-    std::vector<std::vector<float>> CurvatureImage;
-
-    std::vector<std::vector<std::vector<size_t>>> mGrid;
-    std::vector<cv::KeyPoint> mvKeys;
-    std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
-    // std::vector<PointHessian*> pointHessians;				// contains all ACTIVE points.
-	// std::vector<PointHessian*> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
-	// std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
-    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
-
-    cv::Mat Descriptors;
-
     size_t id; //frame id number
     size_t frameNumb;
     static size_t Globalid;
     static size_t GlobalIncoming_id; //frame id number
-    size_t idx; // frame number in the moving optimization window
-    
-    int nFeatures; // number of extracted keypoints
-    int mnGridCols, mnGridRows;
-    // statisitcs
-	int statistics_outlierResOnThis;
-	int statistics_goodResOnThis;
-	int MarginalizedAt;
 
-	double MovedByOpt;
-    double TimeStamp;
-    float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
-    float ab_exposure;
-    float frameEnergyTH;
+    size_t idx; // frame number in the moving optimization window
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
+    ~Frame();
+
+    void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
+    void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
+
+
+    void ComputeStereoDepth( std::shared_ptr<Frame> FramePtr, std::vector<std::shared_ptr<ImmaturePoint>>& ImPts, int min, int max);
+    void ReduceToEssential(bool KeepIndirectData);
+    std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
+    bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+
+    std::vector<std::vector<std::vector<size_t>>> mGrid;
 
     bool isReduced;
     bool isKeyFrame;
+    boost::thread RightImageThread;
+
+    std::shared_ptr<ORBDetector> Detector;
+    
+    std::vector<cv::Mat> LeftIndPyr; //temporary CV_8U pyramids to extract features
+    std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx ad dIy
+    std::vector<std::vector<Vec3f>> RightDirPyr;
+    std::vector<std::vector<float>> absSquaredGrad;
+
+    std::vector<cv::KeyPoint> mvKeys;
+    cv::Mat Descriptors;
+    int nFeatures;
+
+    int mnGridCols, mnGridRows;
+    float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
+
+    //Pyramid params
+    int EDGE_THRESHOLD; 
+
+    cv::Mat ImgR; //For display purposes only!
+
+    std::shared_ptr<CalibData> Calib;
+
+    SE3 camToTrackingRef;
+	std::shared_ptr<Frame> trackingRef;
     bool poseValid;
-    bool FlaggedForMarginalization;
 
+    // statisitcs
+	int statistics_outlierResOnThis;
+	int statistics_goodResOnThis;
+	int marginalizedAt;
+	double movedByOpt;
+
+	// constantly adapted.
+	SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+	bool flaggedForMarginalization;
+
+    //Lighting Model
+    float ab_exposure;
+    float ab_exposureR;
+
+    float frameEnergyTH;
     AffLight aff_g2l_internal;
-    // EFFrame* efFrame;
+    AffLight aff_g2l_internalR;
 
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePointsLeftRight; //used for stereo depth estimation
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
 
-    SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+    boost::mutex ImmatureMutex;
+
+    inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
+    inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
+    inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
+	
+    //Precalc
     SE3 PRE_worldToCam;
 	SE3 PRE_camToWorld;
+    std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
+
     SE3 worldToCam_evalPT;
 	Vec10 state_zero;
 	Vec10 state_scaled;
@@ -89,18 +113,6 @@ public:
 	Mat42 nullspaces_affine;
 	Vec6 nullspaces_scale;
     
-    int EDGE_THRESHOLD; 
-
-    std::shared_ptr<CalibData> Calib;
-
-    SE3 camToTrackingRef;
-	std::shared_ptr<Frame> trackingRef;
-
-    inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
-    inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
-    inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
-	
-   
     EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
     EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
     EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
@@ -124,6 +136,8 @@ public:
             SE3 w2c_leftEps_M_x0 = (get_worldToCam_evalPT() * EepsM) * get_worldToCam_evalPT().inverse();
             nullspaces_pose.col(i) = (w2c_leftEps_P_x0.log() - w2c_leftEps_M_x0.log()) / (2e-3);
         }
+        //nullspaces_pose.topRows<3>() *= SCALE_XI_TRANS_INVERSE;
+        //nullspaces_pose.bottomRows<3>() *= SCALE_XI_ROT_INVERSE;
 
         // scale change
         SE3 w2c_leftEps_P_x0 = (get_worldToCam_evalPT());
@@ -153,10 +167,12 @@ public:
 
         PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
         PRE_camToWorld = PRE_worldToCam.inverse();
+        //setCurrentNullspace();
     };
 
     inline void setStateScaled(const Vec10 &state_scaled)
     {
+
         this->state_scaled = state_scaled;
         state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(0);
         state.segment<3>(3) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3>(3);
@@ -171,6 +187,7 @@ public:
 
     inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state)
     {
+
         this->worldToCam_evalPT = worldToCam_evalPT;
         setState(state);
         setStateZero(state);

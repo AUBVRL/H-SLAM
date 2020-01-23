@@ -21,7 +21,7 @@ ImmaturePoint::ImmaturePoint(int u_, int v_, int index_, std::shared_ptr<Frame> 
 		int dx = patternP[idx][0];
 		int dy = patternP[idx][1];
 
-		Vec3f ptc = getInterpolatedElement33BiLin(lHost->LeftDirPyr[0], u + dx, v + dy, Calib->wpyr[0]);
+		Vec3f ptc = getInterpolatedElement33BiLin(lHost->DirPyr[0], u + dx, v + dy, Calib->wpyr[0]);
 
 		color[idx] = ptc[0];
 		if (!std::isfinite(color[idx]))
@@ -724,7 +724,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 	// check OOB due to scale angle change.
 
 	float energyLeft = 0;
-	const std::vector<Vec3f> *dIl =  &tmpRes->target.lock()->LeftDirPyr[0];
+	const std::vector<Vec3f> *dIl =  &tmpRes->target.lock()->DirPyr[0];
 	//const Eigen::Vector3f *dIl = tmpRes->target.lock()->dI;
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;

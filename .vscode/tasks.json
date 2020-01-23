@@ -39,7 +39,6 @@
                 "IndPyrLevels=8",
                 "IndPyrScaleFactor=1.2",
                 "DirPyrLevels=4",
-                "DirPyrScaleFactor=2",
                 "IndNumFeatures=1500"
             ],
             "problemMatcher": []
@@ -83,7 +82,6 @@
                 "IndPyrScaleFactor=1.2",
                 "IndNumFeatures=1500",
                 "DirPyrLevels=4",
-                "DirPyrScaleFactor=2"
             ],
             "problemMatcher": []
         }

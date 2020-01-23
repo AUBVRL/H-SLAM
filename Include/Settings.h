@@ -27,7 +27,6 @@ extern bool DrawDepthKf;
 
 //Direct data dector
 extern int DirPyrLevels;
-extern float DirPyrScaleFactor;
 
 extern bool Pause;
 

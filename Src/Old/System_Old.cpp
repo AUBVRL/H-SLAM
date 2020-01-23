@@ -9,7 +9,7 @@
 #include "Display.h"
 #include "Map.h"
 #include "ImmaturePoint.h"
-// #include "IndirectInitializer.h"
+#include "IndirectInitializer.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -77,20 +77,24 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 
     if(!Initialized)
     {   //Initialize..
-        // if(!Initializer)
-        //     Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector,DisplayHandler));
-        // Initialized = Initializer->Initialize(CurrentFrame);
+        if(!Initializer)
+            Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector,DisplayHandler));
+        Initialized = Initializer->Initialize(CurrentFrame);
         
     }
     else
     {
+        
         bool NeedNewKf = false;
         switch (Sensortype)
         {
         case Monocular: 
             //TrackMonocular()
             break;
-        case Stereo:            
+        case Stereo:
+            CurrentFrame->ImmaturePointsLeftRight.resize(CurrentFrame->mvKeys.size());
+            GetStereoDepth(CurrentFrame);
+            // FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, CurrentFrame, CurrentFrame, _1, _2), 0, CurrentFrame->mvKeys.size(), std::ceil(CurrentFrame->mvKeys.size() / NUM_THREADS));
             //TrackStereo()
             break;
         case RGBD: 
@@ -124,11 +128,11 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);
     // if(OnlinePhCalibR)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
-    DrawImages(DataIn, CurrentFrame);
+    DrawImages(CurrentFrame);
 
 }
 
-void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<Frame> CurrentFrame)
+void System::DrawImages(std::shared_ptr<Frame> CurrentFrame)
 {
     if(!DisplayHandler)
         return;
@@ -140,14 +144,15 @@ void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<Frame
     {
         cv::Mat Dest;
         if (Sensortype == Stereo || Sensortype == RGBD)
-            cv::hconcat(DataIn->cvImgL, DataIn->cvImgR, Dest);
+            cv::hconcat(CurrentFrame->LeftIndPyr[0], CurrentFrame->ImgR, Dest);
         else
-            Dest = DataIn->cvImgL;
+            Dest = CurrentFrame->LeftIndPyr[0];
 
        cv::cvtColor(Dest, Dest, CV_GRAY2BGR);
 
         if (DrawDetected)
         {
+
             for (size_t i = 0; i < CurrentFrame->mvKeys.size(); ++i)
                 cv::circle(Dest, CurrentFrame->mvKeys[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
             // if (Sensortype == Stereo)
@@ -168,5 +173,19 @@ void System::ProcessNonKeyframe(std::shared_ptr<Frame> Frame)
 {
     return;
 }
+
+//MOVE THIS INTO FRAME.CC
+void System::GetStereoDepth(std::shared_ptr<Frame> _In)
+{
+    if(Sensortype != Stereo)
+        return;
+
+    int NumImmature = _In->mvKeys.size();
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmatureStereoPoints;
+    ImmatureStereoPoints.resize(NumImmature);
+    FrontEndThreadPoolLeft->reduce(boost::bind(&Frame::ComputeStereoDepth, _In, _In, ImmatureStereoPoints, _1,_2), 0, NumImmature, std::ceil(NumImmature/NUM_THREADS));
+    return;
+}
+
 
 } // namespace FSLAM

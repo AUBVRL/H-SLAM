@@ -275,18 +275,6 @@ public:
                 printf("DirPyrLevel chosen is invalid, using default %i levels\n", DirPyrLevels);
             return;
         }
-        else if (1 == sscanf(arg, "DirPyrScaleFactor=%f", &foption))
-        {
-            if (foption >= 1.0f && foption <= 4.0f)
-            {
-                DirPyrScaleFactor = foption;
-                printf("Using %f as a scale factor\n", DirPyrScaleFactor);
-            }
-            else
-                printf("Direct Scale factor chosen is invalid, using default %f\n", DirPyrScaleFactor);
-
-            return;
-        }
     }
 };
 }
