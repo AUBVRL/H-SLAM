@@ -83,15 +83,33 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
 {
+    std::vector<std::vector<float>> dIxx;
+    std::vector<std::vector<float>> dIxy;
+    std::vector<std::vector<float>> dIy;
+    std::vector<std::vector<float>> dIx;
+    std::vector<std::vector<float>> dIx2;
+    std::vector<std::vector<float>> dIy2;
+
     DirPyr.resize(DirPyrLevels);
-    absSquaredGrad.resize(DirPyrLevels);
-    
+    CurvatureImage.resize(DirPyrLevels);
+    dIxx.resize(DirPyrLevels);
+    dIxy.resize(DirPyrLevels);
+    dIy.resize(DirPyrLevels);
+    dIx.resize(DirPyrLevels);
+    dIx2.resize(DirPyrLevels);
+    dIy2.resize(DirPyrLevels);
+
     for (int i = 0; i < DirPyrLevels; ++i)
     {
-        absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
+        dIxx.resize(DirPyrLevels);
+        dIxy.resize(DirPyrLevels);
+        dIy.resize(DirPyrLevels);
+        dIx.resize(DirPyrLevels);
+        dIx2.resize(DirPyrLevels);
+        dIy2.resize(DirPyrLevels);
+        CurvatureImage[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
         DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
     }
-        
 
     size_t imSize = Calib->wpyr[0] * Calib->hpyr[0];
     for (int i = 0; i < imSize; ++i) //populate the data of the highest resolution pyramid level
@@ -131,15 +149,17 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
 
             dI_l[idx][1] = dx;
             dI_l[idx][2] = dy;
+            dIx[idx] = dx;
+            dIy[idx] dy;
 
             // if (lvl == 0)
             // {
-                absSquaredGrad[lvl][idx] = dx * dx + dy * dy;
+                CurvatureImage[lvl][idx] = dx * dx + dy * dy;
                 if (Calib->PhotoUnDistL) //this only works in the left image for now! (consider removing dir pyrs for right images and only keeping highest res with no abssquaredgrad)
                     if (Calib->PhotoUnDistL->GammaValid)
                     {
                         float gw = Calib->PhotoUnDistL->getBGradOnly((float)(dI_l[idx][0]));
-                        absSquaredGrad[lvl][idx] *= gw * gw; // convert to gradient of original color space (before removing response).
+                        CurvatureImage[lvl][idx] *= gw * gw; // convert to gradient of original color space (before removing response).
                     }
             // }
         }
