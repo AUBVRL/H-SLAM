@@ -78,7 +78,7 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     if(!Initialized)
     {   //Initialize..
         if(!Initializer)
-            Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector));
+            Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector,DisplayHandler));
         Initialized = Initializer->Initialize(CurrentFrame);
         
     }

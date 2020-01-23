@@ -33,6 +33,7 @@ public:
     void run();
     void UploadFrameImage(unsigned char* In_, int width, int height);
     void UploadDepthKeyFrameImage(unsigned char* _In, int width, int height);
+    void UploadPoints(std::vector<float> Points);
 
     boost::thread render_loop;
     bool isDead = false;
@@ -67,6 +68,7 @@ public:
     boost::mutex mSLAMThread;
     std::unique_ptr<InternalImage> FrameImage; 
     std::unique_ptr<InternalImage> DepthKfImage;
+    std::vector<float> Pts;
 
 };
 

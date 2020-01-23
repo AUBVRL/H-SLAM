@@ -61,7 +61,17 @@ void GUI::run()
         if (Show3D->Get())
         {
             display_cam->Activate(scene_cam);
-            pangolin::glDrawColouredCube();
+            boost::unique_lock<boost::mutex> lock(mSLAMThread);
+            glPointSize(5);
+            glBegin(GL_POINTS);
+            glColor3f(255.0, 0.0, 0.0);
+            size_t sz = Pts.size();
+            for (size_t i = 0; i < sz; i = i + 3)
+            {
+                glVertex3f(Pts[i], Pts[i + 1], Pts[i + 2]);
+            }
+            glEnd();
+            // pangolin::glDrawColouredCube();
         }
 
         if(Show2D->Get())
@@ -121,6 +131,13 @@ void GUI::UploadFrameImage(unsigned char* _In, int width, int height)
     }
     
     return;
+}
+
+void GUI::UploadPoints(std::vector<float> Points)
+{
+    boost::unique_lock<boost::mutex> lock(mSLAMThread);
+    Pts = Points;
+
 }
 
 void GUI::RenderInputFrameImage(std::unique_ptr<InternalImage> &ImageToRender, View* CanvasFrame)

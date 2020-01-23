@@ -39,7 +39,7 @@ ORBDetector::~ORBDetector()
 {
 }
 
-void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool )
+void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<std::vector<float>>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool )
 {
     if (Image.empty())
         return;
@@ -80,6 +80,13 @@ void ORBDetector::ExtractFeatures(cv::Mat &Image, std::vector<cv::KeyPoint> &mvK
     }
 
     return;
+}
+
+void ORBDetector::DetectFeatures(std::vector<std::vector<float>>& Gradients, std::vector<cv::KeyPoint>& Kpts)
+{
+    //for now work only on first pyr
+    
+
 }
 
 void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)

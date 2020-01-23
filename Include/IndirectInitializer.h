@@ -10,6 +10,18 @@ namespace FSLAM
 class Frame;
 class CalibData;
 class ORBDetector;
+class GUI;
+
+struct InitializerTempResidual
+{
+public:
+	ResState state_state;
+	double state_energy;
+	ResState state_NewState;
+	double state_NewEnergy;
+    std::weak_ptr<Frame> target;
+
+};
 
 struct Pnt
 {
@@ -45,7 +57,13 @@ public:
 
 	float my_type;
 	float outlierTH;
+
+
+    float color[MAX_RES_PER_POINT];
+	float weights[MAX_RES_PER_POINT];
+    InitializerTempResidual Residual;
 };
+
 
 
 class IndirectInitializer
@@ -81,9 +99,13 @@ private:
     Vec3f calcEC(std::vector<std::shared_ptr<Pnt>>& Points); //int lvl 
     void optReg(std::vector<std::shared_ptr<Pnt>> & Points); //int lvl 
     void debugPlot(std::vector<std::shared_ptr<Pnt>>&Points);
-
+    void StructureOnlyDirectOptimization(std::vector<std::shared_ptr<Pnt>>& Points, std::vector<cv::Point3f> &mvIniP3D, std::vector<bool> &vbTriangulated, SE3 &thisToNext);
+    double linearizeResidual(std::shared_ptr<Pnt> Points, const float outlierTHSlack, float &Hdd, float &bd, float idepth);
+    EIGEN_STRONG_INLINE bool projectPoint(const float &u_pt, const float &v_pt, const float &idepth, const int &dx, const int &dy,
+													 std::shared_ptr<CalibData> const &Calib, const Mat33f &R, const Vec3f &t, float &drescale,
+													 float &u, float &v, float &Ku, float &Kv, Vec3f &KliP, float &new_idepth);
     std::shared_ptr<ORBDetector> Detector;
-
+    std::shared_ptr<GUI> displayhandler;
     //Camera calibration information
     std::shared_ptr<CalibData> Calib;
 
@@ -107,10 +129,12 @@ private:
 	Vec10f* JbBuffer;			// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
 	Vec10f* JbBuffer_new;
     bool fixAffine;
+    AffLight thisToNext_aff;
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
 
     std::vector<int> maxIterations; // increase the size of this according to number of pyramids used
+    int GNDirStrucOnlytMaxIter;
 	float alphaK ;
 	float alphaW;
 	float regWeight;
@@ -120,11 +144,14 @@ private:
 	int snappedAt;
     int frameID;
 
+    std::shared_ptr<cv::RNG> randomGen;
+
+
     static const int HISTO_LENGTH = 30;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    IndirectInitializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<ORBDetector> _Detector);
+    IndirectInitializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<GUI>_DisplayHandler);
     ~IndirectInitializer();
     bool Initialize(std::shared_ptr<Frame> _Frame);
     
@@ -132,6 +159,8 @@ public:
     std::shared_ptr<Frame> FirstFrame;
     std::shared_ptr<Frame> SecondFrame;
 };
+
+
 
 } // namespace FSLAM
 

@@ -50,7 +50,7 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     if (RightImageThread.joinable())
         RightImageThread.join();
     
-    Detector->ExtractFeatures(LeftIndPyr[0], mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    Detector->ExtractFeatures(LeftIndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
 
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);
@@ -94,9 +94,14 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
 {
     DirPyr.resize(DirPyrLevels);
-    absSquaredGrad.resize(Calib->wpyr[0] * Calib->hpyr[0]); // store the absolute squared intensity gradient per pixel
+    absSquaredGrad.resize(DirPyrLevels);
+    
     for (int i = 0; i < DirPyrLevels; ++i)
+    {
+        absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
         DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
+    }
+        
 
     size_t imSize = Calib->wpyr[0] * Calib->hpyr[0];
     for (int i = 0; i < imSize; ++i) //populate the data of the highest resolution pyramid level
@@ -137,16 +142,16 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
             dI_l[idx][1] = dx;
             dI_l[idx][2] = dy;
 
-            if (lvl == 0)
-            {
-                absSquaredGrad[idx] = dx * dx + dy * dy;
+            // if (lvl == 0)
+            // {
+                absSquaredGrad[lvl][idx] = dx * dx + dy * dy;
                 if (Calib->PhotoUnDistL) //this only works in the left image for now! (consider removing dir pyrs for right images and only keeping highest res with no abssquaredgrad)
                     if (Calib->PhotoUnDistL->GammaValid)
                     {
                         float gw = Calib->PhotoUnDistL->getBGradOnly((float)(dI_l[idx][0]));
-                        absSquaredGrad[idx] *= gw * gw; // convert to gradient of original color space (before removing response).
+                        absSquaredGrad[lvl][idx] *= gw * gw; // convert to gradient of original color space (before removing response).
                     }
-            }
+            // }
         }
     }
     if (show_gradient_image) //make sure this does not get called in stereo system (parallel thread- remove right image createDirPyr?)

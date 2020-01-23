@@ -7,13 +7,15 @@
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
+#include "Display.h"
 #include <opencv2/imgproc/imgproc.hpp>
 #include <chrono>
 using namespace std;
 namespace FSLAM
 {
 
-IndirectInitializer::IndirectInitializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<ORBDetector> _Detector) : Calib(_Calib), Detector(_Detector)
+IndirectInitializer::IndirectInitializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<GUI>_DisplayHandler): 
+Calib(_Calib), Detector(_Detector), thisToNext_aff(0,0), displayhandler(_DisplayHandler)
 {
 
     mSigma = 1.0;
@@ -28,12 +30,14 @@ IndirectInitializer::IndirectInitializer(std::shared_ptr<CalibData> _Calib, std:
 	wM.diagonal()[7] = SCALE_B;
     fixAffine=true;
 
-    maxIterations.push_back(20); //number of direct optimization iterations. increase the size of this according to number of pyramids used
+    randomGen = std::shared_ptr<cv::RNG>(new cv::RNG(0));
+
+    maxIterations.push_back(200); //number of direct optimization iterations. increase the size of this according to number of pyramids used
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
 	alphaW = 150*150;//*freeDebugParam2*freeDebugParam2;
 	regWeight = 0.8;//*freeDebugParam4;
 	couplingWeight = 1;//*freeDebugParam5;
-
+    GNDirStrucOnlytMaxIter = 50;
 }
 
 IndirectInitializer::~IndirectInitializer()
@@ -54,7 +58,7 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame> _Frame)
                 mvbPrevMatched.resize(FirstFrame->nFeatures);
                 for (size_t i = 0; i < FirstFrame->nFeatures; ++i)
                     mvbPrevMatched[i] = FirstFrame->mvKeys[i].pt;
-                std::fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
+                fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
                 snapped = false;
                 Frame::Globalid = 0;
 	            frameID = snappedAt = 0;
@@ -64,15 +68,20 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame> _Frame)
 
         //Processing Second Frame
         if (_Frame->nFeatures > 100)
+        {
             SecondFrame = _Frame;
+        }
         else
         {
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
+            for (size_t i = 0; i < FirstFrame->nFeatures; ++i)
+                    mvbPrevMatched[i] = FirstFrame->mvKeys[i].pt;
             return false;
         }
-
-        int nmatches = FindMatches(mvbPrevMatched, mvIniMatches, 30, 30, 0.9, true);
-
+        int nmatches;
+        
+        nmatches = FindMatches(mvbPrevMatched, mvIniMatches, 30, 30, 0.9, true);
+      
         // cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
         // std::vector<std::vector<cv::DMatch>> knn_matches;
         // matcher->knnMatch(FirstFrame->Descriptors, SecondFrame->Descriptors, knn_matches, 2);
@@ -84,8 +93,17 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame> _Frame)
         //     if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
         //     {
         //         good_matches.push_back(knn_matches[i][0]);
+        //         nmatches++;
+
         //     }
         // }
+        // mvIniMatches = vector<int>(FirstFrame->mvKeys.size(), -1);
+
+        // for(int i = 0; i < good_matches.size(); ++i)
+        //     mvIniMatches[good_matches[i].queryIdx] = good_matches[i].trainIdx;
+
+        
+
         if (ShowInitializationMatches)
         {
             std::vector<cv::DMatch> good_matches;
@@ -140,8 +158,21 @@ bool IndirectInitializer::Initialize(std::shared_ptr<Frame> _Frame)
             SecondFrame->camToWorld = SE3(Pose.cast<double>());
             SecondFrame->camToWorld = SecondFrame->camToWorld.inverse();
             
-            OptimizeDirect(mvIniP3D, vbTriangulated, SecondFrame->camToWorld);
-                      
+            
+            std::vector<float> pts;
+            for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            {
+                if (mvIniMatches[i]>=0)
+                {
+                    pts.push_back(mvIniP3D[i].x); pts.push_back(mvIniP3D[i].y); pts.push_back(mvIniP3D[i].z);
+                }
+            }
+            displayhandler->UploadPoints(pts);
+            
+            // OptimizeDirect(mvIniP3D, vbTriangulated, SecondFrame->camToWorld);
+           
+            // std::vector<std::shared_ptr<Pnt>> Points;
+            // StructureOnlyDirectOptimization(Points, mvIniP3D, vbTriangulated, SecondFrame->camToWorld);
 
             // mCurrentFrame.SetPose(Tcw);
 
@@ -193,7 +224,6 @@ bool IndirectInitializer::FindTransformation(const vector<int> &vMatches12, cv::
     // Generate sets of 8 points for each RANSAC iteration
     mvSets = vector<vector<size_t>>(mMaxIterations, vector<size_t>(8, 0));
 
-    static cv::RNG randomGen(0);
     // DUtils::Random::SeedRandOnce(0);
 
     for (int it = 0; it < mMaxIterations; it++)
@@ -203,7 +233,7 @@ bool IndirectInitializer::FindTransformation(const vector<int> &vMatches12, cv::
         // Select a minimum set
         for (size_t j = 0; j < 8; j++)
         {
-            int randi = randomGen.uniform((int)0, (int)vAvailableIndices.size() - 1);
+            int randi = randomGen->uniform((int)0, (int)vAvailableIndices.size() - 1);
             // int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
             int idx = vAvailableIndices[randi];
 
@@ -220,6 +250,7 @@ bool IndirectInitializer::FindTransformation(const vector<int> &vMatches12, cv::
     cv::Mat H, F;
 
     boost::thread threadH(&IndirectInitializer::FindHomography, this, boost::ref(vbMatchesInliersH), boost::ref(SH), boost::ref(H));
+    // FindHomography(vbMatchesInliersH, SH, H);
     FindFundamental(vbMatchesInliersF, SF, F);
 
     // Wait until both threads have finished
@@ -1165,19 +1196,18 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
         Point->u = FirstFrame->mvKeys[i].pt.x + 0.1;
         Point->v = FirstFrame->mvKeys[i].pt.y + 0.1;
         Point->idepth = vbTriangulated[i] ? 1.0f / mvIniP3D[i].z : 1.0f; // if previously triangulated set it as the inv depth otherwise set it to 1.
-        Point->iR = 1;
+        Point->iR = Point->idepth;//1;
         Point->isGood = true;
         Point->energy.setZero();
         Point->lastHessian = 0;
         Point->lastHessian_new = 0;
         Point->my_type = 1;
         Point->outlierTH = patternNum * setting_outlierTH;
-
         Points[i] = Point;
     }
     
 	SE3 refToNew_current = thisToNext;
-	AffLight refToNew_aff_current = SecondFrame->aff_g2l_internal;
+	AffLight refToNew_aff_current = thisToNext_aff;//SecondFrame->aff_g2l_internal;
 
     if (FirstFrame->ab_exposure > 0 && SecondFrame->ab_exposure > 0)
         refToNew_aff_current = AffLight(logf(SecondFrame->ab_exposure / FirstFrame->ab_exposure), 0); // coarse approximation.
@@ -1218,6 +1248,7 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
             else
                 inc = -(wM * (Hl.ldlt().solve(bl))); //=-H^-1 * b.
 
+            // SE3 refToNew_new = (iteration > 10 && iteration < 25 )? SE3::exp(inc.head<6>().cast<double>()) * refToNew_current : refToNew_current;
             SE3 refToNew_new = SE3::exp(inc.head<6>().cast<double>()) * refToNew_current;
             AffLight refToNew_aff_new = refToNew_aff_current;
             refToNew_aff_new.a += inc[6];
@@ -1264,7 +1295,7 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
                 refToNew_aff_current = refToNew_aff_new;
                 refToNew_current = refToNew_new;
                 applyStep(Points); //lvl
-                optReg(Points); //lvl
+                // optReg(Points); //lvl
                 lambda *= 0.5;
                 fails = 0;
                 if (lambda < 0.0001)
@@ -1280,7 +1311,7 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
 
             bool quitOpt = false;
 
-            if (!(inc.norm() > eps) || iteration >= maxIterations[0] || fails >= 2)  //maxIterations[lvl]
+            if ( !(inc.norm() > eps) || iteration >= maxIterations[0] || fails >= 4)  //maxIterations[lvl] 
             {
                 Mat88f H, Hsc;
                 Vec8f b, bsc;
@@ -1302,11 +1333,11 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
     //     propagateUp(i);
 
     //UPDATE DEPTH DATA PER POINT:
-    for(int i=0;i<FirstFrame->nFeatures; ++i)
-	{
-		if(!Points[i]->isGood) continue;
-		Points[i]->iR += Points[i]->iR * Points[i]->lastHessian;
-	}
+    // for(int i=0;i<FirstFrame->nFeatures; ++i)
+	// {
+	// 	if(!Points[i]->isGood) continue;
+	// 	Points[i]->iR += Points[i]->iR * Points[i]->lastHessian;
+	// }
     // frameID++;
     // if (!snapped)
     //     snappedAt = 0;
@@ -1321,7 +1352,271 @@ bool IndirectInitializer::OptimizeDirect(std::vector<cv::Point3f> &mvIniP3D, std
     
     if(settings_show_InitDepth)
         debugPlot(Points);
-    return snapped ;//&& frameID > snappedAt + 5;
+
+    std::vector<float> pts;
+    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    {
+        if(Points[i]->isGood)
+        {
+            Vec3 Pt; Pt << (double)((Points[i]->u - Calib->cxl()) * Calib->fxli()/Points[i]->idepth), (double)((Points[i]->v - Calib->cyl()) * Calib->fyli()/Points[i]->idepth), (double)(1.0/Points[i]->idepth);
+            Vec3 Pose = (SecondFrame->camToWorld.rotationMatrix().inverse() * Pt + SecondFrame->camToWorld.inverse().translation());
+            // Vec3 Trans = SecondFrame->camToWorld.inverse().translation().transpose();//  translation().inverse();
+            pts.push_back(Pose[0]); pts.push_back(Pose[1]); pts.push_back(Pose[2]);
+        }
+    }
+
+    displayhandler->UploadPoints(pts);
+    return snapped; //&& frameID > snappedAt + 5;
+}
+
+void IndirectInitializer::StructureOnlyDirectOptimization(std::vector<std::shared_ptr<Pnt>>& Points, std::vector<cv::Point3f> &mvIniP3D, std::vector<bool> &vbTriangulated, SE3 &thisToNext)
+{
+    bool print = false;
+    Points.resize(FirstFrame->nFeatures);
+    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    {
+        std::shared_ptr<Pnt> Point = std::shared_ptr<Pnt>(new Pnt);
+        Point->u = FirstFrame->mvKeys[i].pt.x + 0.1;
+        Point->v = FirstFrame->mvKeys[i].pt.y + 0.1;
+        Point->idepth = vbTriangulated[i] ? 1.0f / mvIniP3D[i].z : 1.0f; // if previously triangulated set it as the inv depth otherwise set it to 1.
+        Point->iR = Point->idepth;                                       //1;
+        Point->isGood = true;
+        Point->energy.setZero();
+        Point->lastHessian = 0;
+        Point->lastHessian_new = 0;
+        Point->my_type = 1;
+        Point->outlierTH = patternNum * setting_outlierTH;
+        Points[i] = Point;
+
+        Points[i]->Residual.state_NewEnergy = Points[i]->Residual.state_energy = 0;
+        Points[i]->Residual.state_NewState = ResState::OUTLIER;
+        Points[i]->Residual.state_state = ResState::IN;
+        Points[i]->Residual.target = SecondFrame;
+
+        for (int idx = 0; idx < patternNum; idx++)
+        {
+            int dx = patternP[idx][0];
+            int dy = patternP[idx][1];
+            Points[i]->color[idx] = getInterpolatedElement31(FirstFrame->LeftDirPyr[0], Points[i]->u + dx, Points[i]->v + dy, Calib->wpyr[0]);
+        }
+            
+
+        float lastEnergy = 0;
+        float lastHdd = 0;
+        float lastbd = 0;
+        float currentIdepth = Points[i]->idepth;
+
+        lastEnergy += linearizeResidual(Points[i], 1000, lastHdd, lastbd, currentIdepth);
+        Points[i]->Residual.state_state = Points[i]->Residual.state_NewState;
+        Points[i]->Residual.state_energy = Points[i]->Residual.state_NewEnergy;
+
+        if (!std::isfinite(lastEnergy))
+            continue;
+
+        float lambda = 0.1;
+        for (int iteration = 0; iteration < GNDirStrucOnlytMaxIter; iteration++)
+        {
+            float H = lastHdd;
+            H *= 1 + lambda;
+            float step = (1.0 / H) * lastbd;
+            float newIdepth = currentIdepth - step;
+
+            float newHdd = 0;
+            float newbd = 0;
+            float newEnergy = 0;
+            newEnergy += linearizeResidual(Points[i], 1, newHdd, newbd, newIdepth);
+            // newEnergy += point->linearizeResidual(&Hcalib, 1, residuals + i, newHdd, newbd, newIdepth);
+
+            if (!std::isfinite(lastEnergy) || newHdd < 100) //consider removing this threshold
+            {
+                if (print)
+                    printf("OptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
+                           2,
+                           newHdd,
+                           lastEnergy);
+                continue;
+            }
+
+            if (print)
+                printf("%s %d (L %.2f) %s: %f -> %f (idepth %f)!\n",
+                       (true || newEnergy < lastEnergy) ? "ACCEPT" : "REJECT",
+                       iteration,
+                       log10(lambda),
+                       "",
+                       lastEnergy, newEnergy, newIdepth);
+
+            if (newEnergy < lastEnergy)
+            {
+                currentIdepth = newIdepth;
+                lastHdd = newHdd;
+                lastbd = newbd;
+                lastEnergy = newEnergy;
+                Points[i]->Residual.state_state = Points[i]->Residual.state_NewState;
+                Points[i]->Residual.state_energy = Points[i]->Residual.state_NewEnergy;                
+                lambda *= 0.5;
+            }
+            else
+            {
+                lambda *= 5;
+            }
+
+            if (fabsf(step) < 0.0001 * currentIdepth)
+                break;
+        }
+
+    // bool print = false;//rand()%50==0;
+
+	
+	if(!std::isfinite(currentIdepth) || Points[i]->Residual.state_state !=  ResState::IN)
+	{
+        Points[i]->isGood = false;
+        continue;
+	}
+    Points[i]->idepth = currentIdepth;
+    Points[i]->idepth_new = currentIdepth;
+    Points[i]->iR = currentIdepth;
+
+    }
+    if(settings_show_InitDepth)
+        debugPlot(Points);
+
+    std::vector<float> pts;
+    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    {
+        if(Points[i]->isGood)
+        {
+            Vec3 Pt; Pt << (double)((Points[i]->u - Calib->cxl()) * Calib->fxli()/Points[i]->idepth), (double)((Points[i]->v - Calib->cyl()) * Calib->fyli()/Points[i]->idepth), (double)(1.0/Points[i]->idepth);
+            // Vec3 Pose = (SecondFrame->camToWorld.rotationMatrix().inverse() * Pt);
+            // Vec3 Trans = SecondFrame->camToWorld.inverse().translation().transpose();//  translation().inverse();
+            pts.push_back(Pt[0]); pts.push_back(Pt[1]); pts.push_back(Pt[2]);
+        }
+    }
+
+    displayhandler->UploadPoints(pts);
+	return;
+}
+
+double IndirectInitializer::linearizeResidual(std::shared_ptr<Pnt> Point, const float outlierTHSlack, float &Hdd, float &bd, float idepth)
+{
+	if (Point->Residual.state_state == ResState::OOB)
+	{
+		Point->Residual.state_NewState = ResState::OOB;
+		return Point->Residual.state_energy;
+	}
+
+    float energyTH = patternNum*setting_outlierTH;
+
+    SE3 leftToLeft_0 = SecondFrame->camToWorld.inverse() * FirstFrame->camToWorld.inverse();
+	Mat33f PRE_RTll_0 = (leftToLeft_0.rotationMatrix()).cast<float>();
+	Vec3f PRE_tTll_0 = (leftToLeft_0.translation()).cast<float>();
+
+
+
+	// SE3 leftToLeft = SecondFrame->PRE_worldToCam * FirstFrame->PRE_camToWorld;
+    // SE3 leftToLeft = SecondFrame->camToWorld*SecondFrame->camToWorld.inverse() * FirstFrame->camToWorld * FirstFrame->camToWorld.inverse();
+    SE3 leftToLeft = SE3();//SecondFrame->camToWorld.inverse();
+	Mat33f PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
+	Vec3f PRE_tTll = (leftToLeft.translation()).cast<float>();
+	float distanceLL = leftToLeft.translation().norm();
+
+
+	Mat33f K = Mat33f::Zero();
+	K(0,0) = Calib->fxl();
+	K(1,1) = Calib->fyl();
+	K(0,2) = Calib->cxl();
+	K(1,2) = Calib->cyl();
+	K(2,2) = 1;
+	Mat33f PRE_KRKiTll = K * PRE_RTll * K.inverse();
+	Mat33f PRE_RKiTll = PRE_RTll * K.inverse();
+	Vec3f PRE_KtTll = K * PRE_tTll;
+
+
+	Vec2f PRE_aff_mode = AffLight::fromToVecExposure(FirstFrame->ab_exposure, SecondFrame->ab_exposure, FirstFrame->aff_g2l(), SecondFrame->aff_g2l()).cast<float>();
+	float PRE_b0_mode = FirstFrame->aff_g2l_0().b;
+	
+
+	// check OOB due to scale angle change.
+
+	float energyLeft = 0;
+	// const std::vector<Vec3f> *dIl =  &tmpRes->target.lock()->LeftDirPyr[0];
+	//const Eigen::Vector3f *dIl = tmpRes->target.lock()->dI;
+	// const Mat33f &PRE_RTll = precalc->PRE_RTll;
+	// const Vec3f &PRE_tTll = precalc->PRE_tTll;
+
+	Vec2f affLL = PRE_aff_mode;
+
+	for (int idx = 0; idx < patternNum; idx++)
+	{
+		int dx = patternP[idx][0];
+		int dy = patternP[idx][1];
+
+		float drescale, u, v, new_idepth;
+		float Ku, Kv;
+		Vec3f KliP;
+
+		if (!projectPoint(Point->u, Point->v, idepth, dx, dy, Calib, PRE_RTll, PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
+		{
+			Point->Residual.state_NewState = ResState::OOB;
+			return Point->Residual.state_energy;
+		}
+
+		Vec3f hitColor = (getInterpolatedElement33(SecondFrame->LeftDirPyr[0], Ku, Kv, Calib->wpyr[0]));
+
+		if (!std::isfinite((float)hitColor[0]))
+		{
+			Point->Residual.state_NewState = ResState::OOB;
+			return Point->Residual.state_energy;
+		}
+		float residual = hitColor[0] - (affLL[0] * Point->color[idx] + affLL[1]);
+
+		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
+		energyLeft += Point->weights[idx] * Point->weights[idx] * hw * residual * residual * (2 - hw);
+
+		// depth derivatives.
+		float dxInterp = hitColor[1] * Calib->fxl();
+		float dyInterp = hitColor[2] * Calib->fyl();
+        float d_idepth = dxInterp * drescale * (PRE_tTll[0] - PRE_tTll[2] * u) + dyInterp * drescale * (PRE_tTll[1] - PRE_tTll[2] * v);
+		// float d_idepth = derive_idepth(PRE_tTll, u, v, dx, dy, dxInterp, dyInterp, drescale);
+
+		hw *= Point->weights[idx] * Point->weights[idx];
+
+		Hdd += (hw * d_idepth) * d_idepth;
+		bd += (hw * residual) * d_idepth;
+	}
+
+	if (energyLeft > energyTH * outlierTHSlack)
+	{
+		energyLeft = energyTH * outlierTHSlack;
+		Point->Residual.state_NewState = ResState::OUTLIER;
+	}
+	else
+	{
+		Point->Residual.state_NewState = ResState::IN;
+	}
+
+	Point->Residual.state_NewEnergy = energyLeft;
+	return energyLeft;
+}
+
+EIGEN_STRONG_INLINE bool IndirectInitializer::projectPoint(const float &u_pt, const float &v_pt, const float &idepth, const int &dx, const int &dy,
+													 std::shared_ptr<CalibData> const &Calib, const Mat33f &R, const Vec3f &t, float &drescale,
+													 float &u, float &v, float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)
+{
+	KliP = Vec3f((u_pt + dx - Calib->cxl()) * Calib->fxli(), (v_pt + dy - Calib->cyl()) * Calib->fyli(), 1);
+
+	Vec3f ptp = R * KliP + t * idepth;
+	drescale = 1.0f / ptp[2];
+	new_idepth = idepth * drescale;
+
+	if (!(drescale > 0))
+		return false;
+
+	u = ptp[0] * drescale;
+	v = ptp[1] * drescale;
+	Ku = u * Calib->fxl() + Calib->cxl();
+	Kv = v * Calib->fyl() + Calib->cyl();
+
+	return Ku > 1.1f && Kv > 1.1f && Ku < (Calib->wpyr[0] - 3) && Kv < (Calib->hpyr[0] - 3);
 }
 
 void IndirectInitializer::resetPoints(std::vector<std::shared_ptr<Pnt>> &Points) //int lvl
@@ -1611,7 +1906,7 @@ Vec3f IndirectInitializer::calcEC(std::vector<std::shared_ptr<Pnt>>& Points) //i
 void IndirectInitializer::doStep(std::vector<std::shared_ptr<Pnt>>& Points, float lambda, Vec8f inc) //int lvl
 {
 
-	const float maxPixelStep = 0.25;
+	const float maxPixelStep = 5.0f;//0.25;
 	const float idMaxStep = 1e10;
 	// Pnt* pts = points[lvl];
 	int npts = FirstFrame->nFeatures ;//numPoints[lvl];
@@ -1711,7 +2006,7 @@ void IndirectInitializer::debugPlot(std::vector<std::shared_ptr<Pnt>>&Points)
 		if(Points[i]->isGood)
 		{
 			nid++;
-			sid += (Points[i]->iR); //iR
+			sid += (Points[i]->idepth); //iR
 		}
 	}
 	float fac = nid / sid;
@@ -1721,7 +2016,9 @@ void IndirectInitializer::debugPlot(std::vector<std::shared_ptr<Pnt>>&Points)
 		// Pnt* point = points[lvl]+i;
         Vec3b Color = Vec3b(0,0,0);
         if(Points[i]->isGood)
-            Color = makeRainbow3B(Points[i]->iR*fac);
+        {
+            Color = makeRainbow3B(Points[i]->idepth *fac);
+        }
         setPixel9(Depth, std::floor(Points[i]->v + 0.5f), std::floor(Points[i]->u + 0.5f), Color);
     }
 
