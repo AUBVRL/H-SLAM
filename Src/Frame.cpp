@@ -83,16 +83,13 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
 {
-    if(DirPyr.size() != DirPyrLevels)
-        DirPyr.resize(DirPyrLevels);
-    // if(absSquaredGrad.size() != DirPyrLevels)
-        absSquaredGrad.resize(DirPyrLevels);
-   
+
+    DirPyr.resize(DirPyrLevels);
+    absSquaredGrad.resize(DirPyrLevels);
 
     for (int i = 0; i < DirPyrLevels; ++i)
     {
-        absSquaredGrad[i].reserve(Calib->wpyr[i] * Calib->hpyr[i]);
-        // absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
+        absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
         DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
     }
 
@@ -150,8 +147,12 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
     if (show_gradient_image) //make sure this does not get called in stereo system (parallel thread- remove right image createDirPyr?)
     {
         cv::namedWindow("AbsSquaredGrad", cv::WindowFlags::WINDOW_KEEPRATIO);
-        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F, &DirPyr[0], 3*sizeof(float));
-        imGrad.convertTo(imGrad,CV_8U);
+        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F);
+        float* dataptr = imGrad.ptr<float>(0);
+        for (int i = 0, iend = Calib->hpyr[0]* Calib->wpyr[0]; i < iend; ++i)
+            dataptr[i] = absSquaredGrad[0][i];
+        
+        // imGrad.convertTo(imGrad,CV_8U);
         cv::imshow("AbsSquaredGrad", imGrad);
         cv::waitKey(1);
     }
