@@ -83,31 +83,16 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
 
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
 {
-    std::vector<std::vector<float>> dIxx;
-    std::vector<std::vector<float>> dIxy;
-    std::vector<std::vector<float>> dIy;
-    std::vector<std::vector<float>> dIx;
-    std::vector<std::vector<float>> dIx2;
-    std::vector<std::vector<float>> dIy2;
-
-    DirPyr.resize(DirPyrLevels);
-    CurvatureImage.resize(DirPyrLevels);
-    dIxx.resize(DirPyrLevels);
-    dIxy.resize(DirPyrLevels);
-    dIy.resize(DirPyrLevels);
-    dIx.resize(DirPyrLevels);
-    dIx2.resize(DirPyrLevels);
-    dIy2.resize(DirPyrLevels);
+    if(DirPyr.size() != DirPyrLevels)
+        DirPyr.resize(DirPyrLevels);
+    // if(absSquaredGrad.size() != DirPyrLevels)
+        absSquaredGrad.resize(DirPyrLevels);
+   
 
     for (int i = 0; i < DirPyrLevels; ++i)
     {
-        dIxx.resize(DirPyrLevels);
-        dIxy.resize(DirPyrLevels);
-        dIy.resize(DirPyrLevels);
-        dIx.resize(DirPyrLevels);
-        dIx2.resize(DirPyrLevels);
-        dIy2.resize(DirPyrLevels);
-        CurvatureImage[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
+        absSquaredGrad[i].reserve(Calib->wpyr[i] * Calib->hpyr[i]);
+        // absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]); // store the absolute squared intensity gradient per pixel
         DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
     }
 
@@ -149,17 +134,15 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
 
             dI_l[idx][1] = dx;
             dI_l[idx][2] = dy;
-            dIx[idx] = dx;
-            dIy[idx] dy;
 
             // if (lvl == 0)
             // {
-                CurvatureImage[lvl][idx] = dx * dx + dy * dy;
+                absSquaredGrad[lvl][idx] = dx * dx + dy * dy;
                 if (Calib->PhotoUnDistL) //this only works in the left image for now! (consider removing dir pyrs for right images and only keeping highest res with no abssquaredgrad)
                     if (Calib->PhotoUnDistL->GammaValid)
                     {
                         float gw = Calib->PhotoUnDistL->getBGradOnly((float)(dI_l[idx][0]));
-                        CurvatureImage[lvl][idx] *= gw * gw; // convert to gradient of original color space (before removing response).
+                        absSquaredGrad[lvl][idx] *= gw * gw; // convert to gradient of original color space (before removing response).
                     }
             // }
         }
@@ -167,7 +150,7 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
     if (show_gradient_image) //make sure this does not get called in stereo system (parallel thread- remove right image createDirPyr?)
     {
         cv::namedWindow("AbsSquaredGrad", cv::WindowFlags::WINDOW_KEEPRATIO);
-        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F, &absSquaredGrad[0]);
+        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F, &DirPyr[0], 3*sizeof(float));
         imGrad.convertTo(imGrad,CV_8U);
         cv::imshow("AbsSquaredGrad", imGrad);
         cv::waitKey(1);

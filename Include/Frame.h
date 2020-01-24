@@ -33,8 +33,7 @@ public:
     std::shared_ptr<ORBDetector> Detector;    
     std::vector<cv::Mat> IndPyr; //temporary CV_8U pyramids to extract features
     std::vector<std::vector<Vec3f>> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
-    // std::vector<std::vector<float>> absSquaredGrad;
-    std::vector<std::vector<float>> CurvatureImage;
+    std::vector<std::vector<float>> absSquaredGrad;
 
     std::vector<std::vector<std::vector<size_t>>> mGrid;
     std::vector<cv::KeyPoint> mvKeys;
