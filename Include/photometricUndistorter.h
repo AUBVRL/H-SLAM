@@ -3,7 +3,6 @@
 
 namespace FSLAM
 {
-class ORBDetector;
 class PhotometricUndistorter
 {
 public:

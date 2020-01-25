@@ -9,7 +9,7 @@ namespace FSLAM
 
 // OnlineCalibrator::OnlineCalibrator()
 // {
-//     Detector = std::make_shared<ORBDetector>();
+//     Detector = std::make_shared<FeatureDetector>();
 //     NumFrames = 100;
 // }
 
@@ -51,7 +51,7 @@ namespace FSLAM
 
 
 // /* Frame class */
-// Frame::Frame(cv::Mat Image, std::shared_ptr<ORBDetector> Detector_): image(Image), Detector(Detector_)
+// Frame::Frame(cv::Mat Image, std::shared_ptr<FeatureDetector> Detector_): image(Image), Detector(Detector_)
 // {
 //     Detector->ExtractFeatures(image, mvKeys, Descriptors, nOrb);
 //     for (int i = 0; i < nOrb; i ++)

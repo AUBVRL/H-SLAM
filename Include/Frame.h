@@ -9,7 +9,7 @@
 namespace FSLAM
 {
 
-class ORBDetector;
+class FeatureDetector;
 class ImageData;
 class CalibData;
 class Frame;
@@ -21,7 +21,7 @@ class Frame
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<FeatureDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
     void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
@@ -30,7 +30,7 @@ public:
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
 
 
-    std::shared_ptr<ORBDetector> Detector;    
+    std::shared_ptr<FeatureDetector> Detector;    
     std::vector<cv::Mat> IndPyr; //temporary CV_8U pyramids to extract features
     std::vector<std::vector<Vec3f>> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
     std::vector<std::vector<float>> absSquaredGrad;

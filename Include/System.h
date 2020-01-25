@@ -6,7 +6,7 @@ namespace FSLAM
 {
 class ImageData;
 class OnlineCalibrator;
-class ORBDetector;
+class FeatureDetector;
 class Frame;
 class CalibData;
 class GeometricUndistorter;
@@ -47,7 +47,7 @@ private:
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibL;
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibR;
 
-    std::shared_ptr<ORBDetector> Detector;
+    std::shared_ptr<FeatureDetector> Detector;
 
     //stored here without being used within the system.
     std::shared_ptr<PhotometricUndistorter> PhoUndistL; //The input photometric undistorter 

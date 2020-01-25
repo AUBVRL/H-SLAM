@@ -15,7 +15,7 @@ size_t Frame::Globalid = 0;
 size_t Frame::GlobalIncoming_id = 0;
 
 
-Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<ORBDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):
+Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<FeatureDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):
 Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
 {
     frameNumb = GlobalIncoming_id; GlobalIncoming_id++; //keeps track of the number of frames processed
@@ -152,7 +152,7 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
         for (int i = 0, iend = Calib->hpyr[0]* Calib->wpyr[0]; i < iend; ++i)
             dataptr[i] = absSquaredGrad[0][i];
         
-        // imGrad.convertTo(imGrad,CV_8U);
+        imGrad.convertTo(imGrad,CV_8U);
         cv::imshow("AbsSquaredGrad", imGrad);
         cv::waitKey(1);
     }

@@ -26,7 +26,7 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
     PhoUndistL = PhoUndistL;
     FrontEndThreadPoolLeft = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
     BackEndThreadPool = std::shared_ptr<IndexThreadReduce<Vec10>>(new IndexThreadReduce<Vec10>);
-    Detector = std::make_shared<ORBDetector>();
+    Detector = std::make_shared<FeatureDetector>();
     Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR,
                                         DirPyrLevels, IndPyrLevels, IndPyrScaleFactor));
     SlamMap = std::shared_ptr<Map>(new Map());

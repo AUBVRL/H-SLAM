@@ -8,14 +8,14 @@ namespace FSLAM
 {
 //     class Frame;
 //     class LandMark;
-//     class ORBDetector;
+//     class FeatureDetector;
 
 // class OnlineCalibrator
 // {
 // public:
 //     OnlineCalibrator();
 //     ~OnlineCalibrator() {}
-//     std::shared_ptr<ORBDetector> Detector;
+//     std::shared_ptr<FeatureDetector> Detector;
 //     void ProcessFrame(cv::Mat Image);
 
 
@@ -31,7 +31,7 @@ namespace FSLAM
 // {
 // public:
 // 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-//     Frame(cv::Mat Image, std::shared_ptr<ORBDetector> Detector_);
+//     Frame(cv::Mat Image, std::shared_ptr<FeatureDetector> Detector_);
 //     ~Frame() {}
 //     void InterpolateFeaturePatches(int keyInd);
 
@@ -47,7 +47,7 @@ namespace FSLAM
 //     std::vector<std::vector<double>> mvKeysPatches; // unrotated interpolated patch
 //     int nOrb;
 //     std::vector<cv::KeyPoint> mvKeys;
-//     std::shared_ptr<ORBDetector> Detector;
+//     std::shared_ptr<FeatureDetector> Detector;
 //     const int patchsize = 2; 
 
 // };

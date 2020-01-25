@@ -9,7 +9,7 @@
 namespace FSLAM
 {
 
-class ORBDetector;
+class Detector;
 class ImageData;
 class CalibData;
 class Frame;
@@ -26,7 +26,7 @@ public:
     static size_t GlobalIncoming_id; //frame id number
 
     size_t idx; // frame number in the moving optimization window
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<ORBDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
+    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<Detector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
 
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
@@ -44,7 +44,7 @@ public:
     bool isKeyFrame;
     boost::thread RightImageThread;
 
-    std::shared_ptr<ORBDetector> Detector;
+    std::shared_ptr<Detector> Detector;
     
     std::vector<cv::Mat> LeftIndPyr; //temporary CV_8U pyramids to extract features
     std::vector<std::vector<Vec3f>> LeftDirPyr; //float representation of image pyramid with computation of dIx ad dIy

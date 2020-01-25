@@ -26,9 +26,13 @@
 #endif
 #endif
 
+using namespace std;
+using namespace boost;
+using namespace cv;
+
 namespace FSLAM
 {
-ORBDetector::ORBDetector()
+FeatureDetector::FeatureDetector()
 {
     HALF_PATCH_SIZE = 15;
     PATCH_SIZE = 31;
@@ -36,11 +40,74 @@ ORBDetector::ORBDetector()
     pattern = InitPattern();
 }
 
-ORBDetector::~ORBDetector()
+FeatureDetector::~FeatureDetector()
 {
 }
 
-void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
+void FeatureDetector::ExtractFeatures(cv::Mat &Image, std::vector<std::vector<float>>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool)
+{
+    // thPool->reduce(boost::bind(&FeatureDetector::calcThresholds, this, boost::ref(Image), ImageBlurred, mvKeys, Descriptors,_1,_2),0,mvKeys.size(), std::ceil(mvKeys.size()/NUM_THREADS));
+}
+
+void FeatureDetector::calcThresholds(const std::vector<float> &gradMag2, int yMin, int yMax)
+{
+    for (int row = yMin; row < yMax; ++row)
+    {
+        // skip pixels without gradient information
+        const int vInit = std::max(1, row * this->blockSizeHeight);
+        const int vEnd = std::min(vInit + this->blockSizeHeight, this->maxHeight[0]);
+
+        for (int col = 0; col < this->numBlockWidth; ++col)
+        {
+            // reset histogram
+            const int uInit = std::max(1, col * this->blockSizeWidth);
+            const int uEnd = std::min(uInit + this->blockSizeWidth, this->maxWidth[0]);
+
+            // obtain all gradient magnitudes in the block
+            const int blockSize = (uEnd - uInit) * (vEnd - vInit);
+            std::vector<float> allGradientMag(blockSize);
+            int idx = 0;
+
+#if defined(ENABLE_SSE)
+
+            int gap = (uEnd - uInit) % 4;
+            int maxU = uEnd - gap;
+
+            for (int y = vInit; y < vEnd; ++y)
+            {
+                const int y_idx = y * this->width[0];
+                for (int x = uInit; x < maxU; x += 4)
+                {
+                    _mm_storeu_ps(allGradientMag.data() + idx, _mm_loadu_ps(gradMag2 + y_idx + x));
+                    idx += 4;
+                }
+
+                // compute the rest by hand
+                for (int x = maxU; x < uEnd; x++)
+                {
+                    allGradientMag[idx] = gradMag2[y_idx + x];
+                    ++idx;
+                }
+            }
+#else
+            // compute histogran for each block
+            for (int y = vInit; y < vEnd; ++y)
+            {
+                const int y_idx = y * this->width[0];
+                for (int x = uInit; x < uEnd; ++x)
+                {
+                    allGradientMag[idx] = gradMag2[y_idx + x];
+                    ++idx;
+                }
+            }
+#endif
+            // compute threshold using median value plus an additive constant
+            this->thresholdMapDuplication[row * this->numBlockWidth + col] = sqrt(dsm::median(allGradientMag)) + this->additiveThreshold;
+        }
+    }
+}
+
+void FeatureDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
 {
     for (int j = min; j < max; j++)
     {
@@ -82,7 +149,7 @@ void ORBDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, 
     }
 }
 
-int ORBDetector::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+int FeatureDetector::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
     int dist = 0;
 #ifdef __SSE2__
@@ -124,7 +191,7 @@ int ORBDetector::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 #endif
 }
 
-float ORBDetector::IC_Angle(const cv::Mat &image, cv::Point2f pt, const std::vector<int> &u_max)
+float FeatureDetector::IC_Angle(const cv::Mat &image, cv::Point2f pt, const std::vector<int> &u_max)
 {
     int m_01 = 0, m_10 = 0;
 
@@ -152,7 +219,7 @@ float ORBDetector::IC_Angle(const cv::Mat &image, cv::Point2f pt, const std::vec
     return cv::fastAtan2((float)m_01, (float)m_10);
 }
 
-std::vector<int> ORBDetector::InitUmax()
+std::vector<int> FeatureDetector::InitUmax()
 {
     std::vector<int> umax;
     umax.resize(this->HALF_PATCH_SIZE + 1);
@@ -172,7 +239,7 @@ std::vector<int> ORBDetector::InitUmax()
     }
     return umax;
 }
-void ORBDetector::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
+void FeatureDetector::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
 {
     int max1 = 0, max2 = 0, max3= 0;
 
@@ -200,7 +267,7 @@ void ORBDetector::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &
     
 }
 
-std::vector<cv::Point> ORBDetector::InitPattern()
+std::vector<cv::Point> FeatureDetector::InitPattern()
 {
     int bit_pattern_31_[256 * 4] =
         {
