@@ -27,7 +27,6 @@
 #endif
 
 using namespace std;
-using namespace boost;
 using namespace cv;
 
 namespace FSLAM
@@ -44,67 +43,9 @@ FeatureDetector::~FeatureDetector()
 {
 }
 
-void FeatureDetector::ExtractFeatures(cv::Mat &Image, std::vector<std::vector<float>>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool)
+void FeatureDetector::ExtractFeatures(Mat &Image, vector<vector<float>>& GradPyr, vector<KeyPoint> &mvKeys, Mat &Descriptors, int &nOrb, int NumFeatures, shared_ptr<IndexThreadReduce<Vec10>>thPool)
 {
     // thPool->reduce(boost::bind(&FeatureDetector::calcThresholds, this, boost::ref(Image), ImageBlurred, mvKeys, Descriptors,_1,_2),0,mvKeys.size(), std::ceil(mvKeys.size()/NUM_THREADS));
-}
-
-void FeatureDetector::calcThresholds(const std::vector<float> &gradMag2, int yMin, int yMax)
-{
-    for (int row = yMin; row < yMax; ++row)
-    {
-        // skip pixels without gradient information
-        const int vInit = std::max(1, row * this->blockSizeHeight);
-        const int vEnd = std::min(vInit + this->blockSizeHeight, this->maxHeight[0]);
-
-        for (int col = 0; col < this->numBlockWidth; ++col)
-        {
-            // reset histogram
-            const int uInit = std::max(1, col * this->blockSizeWidth);
-            const int uEnd = std::min(uInit + this->blockSizeWidth, this->maxWidth[0]);
-
-            // obtain all gradient magnitudes in the block
-            const int blockSize = (uEnd - uInit) * (vEnd - vInit);
-            std::vector<float> allGradientMag(blockSize);
-            int idx = 0;
-
-#if defined(ENABLE_SSE)
-
-            int gap = (uEnd - uInit) % 4;
-            int maxU = uEnd - gap;
-
-            for (int y = vInit; y < vEnd; ++y)
-            {
-                const int y_idx = y * this->width[0];
-                for (int x = uInit; x < maxU; x += 4)
-                {
-                    _mm_storeu_ps(allGradientMag.data() + idx, _mm_loadu_ps(gradMag2 + y_idx + x));
-                    idx += 4;
-                }
-
-                // compute the rest by hand
-                for (int x = maxU; x < uEnd; x++)
-                {
-                    allGradientMag[idx] = gradMag2[y_idx + x];
-                    ++idx;
-                }
-            }
-#else
-            // compute histogran for each block
-            for (int y = vInit; y < vEnd; ++y)
-            {
-                const int y_idx = y * this->width[0];
-                for (int x = uInit; x < uEnd; ++x)
-                {
-                    allGradientMag[idx] = gradMag2[y_idx + x];
-                    ++idx;
-                }
-            }
-#endif
-            // compute threshold using median value plus an additive constant
-            this->thresholdMapDuplication[row * this->numBlockWidth + col] = sqrt(dsm::median(allGradientMag)) + this->additiveThreshold;
-        }
-    }
 }
 
 void FeatureDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
