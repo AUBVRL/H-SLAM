@@ -79,8 +79,8 @@ enum ResState {IN=0, OOB, OUTLIER};
 struct ImageData
 {
 public:
-    cv::Mat cvImgL;
-    cv::Mat cvImgR;
+    cv::Mat cvImgL; //Photometrically Uncalibrated
+    cv::Mat cvImgR; //Photometrically Uncalibrated
     double timestamp;
     float ExposureL;
     float ExposureR;

@@ -38,9 +38,8 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
 
     //for now I'm only extracting features from highest resolution image!!
     CreateDirPyrs(Img->fImgL, DirPyr);
-
     nFeatures = 0;
-    // Detector->ExtractFeatures(LeftIndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
 
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);

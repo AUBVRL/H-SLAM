@@ -23,11 +23,16 @@ public:
 
     EIGEN_STRONG_INLINE float getBGradOnly(float color)
     {
-        boost::unique_lock<boost::mutex> lock (mlock);
+        // boost::unique_lock<boost::mutex> lock (mlock);
         int c = color + 0.5f;
         if (c < 5) c = 5;
         if (c > 250) c = 250;
         return B[c + 1] - B[c];
+    }
+
+    EIGEN_STRONG_INLINE float getB(float color)
+    {
+        return B[cv::saturate_cast<uchar>(color)];
     }
 
     EIGEN_STRONG_INLINE float getBInvGradOnly(float color)

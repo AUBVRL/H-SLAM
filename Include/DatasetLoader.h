@@ -8,7 +8,6 @@
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
 #include <boost/thread.hpp>
-
 #if HAS_ZIPLIB
 #include "zip.h"
 #endif
@@ -460,9 +459,14 @@ public:
 
             int dim = ImgData->cvImgR.cols * ImgData->cvImgR.rows;
             float *CvPtrR = ImgData->cvImgR.ptr<float>(0);
-            for (int i = 0; i < dim; ++i)
-                ImgData->fImgR[i] = CvPtrR[i];
 
+            bool RemovePhotometricUndistortion = PhoUndistMode == OnlineCalib || PhoUndistMode == HaveCalib;
+            for (int i = 0; i < dim; ++i)
+            {
+                ImgData->fImgR[i] = CvPtrR[i];
+                if (RemovePhotometricUndistortion)
+                    CvPtrR[i] = PhoUndistR->getB(CvPtrR[i]);
+            }
             ImgData->cvImgR.convertTo(ImgData->cvImgR, CV_8U);
         }
         else
@@ -488,9 +492,13 @@ public:
 
             int dim = ImgData->cvImgL.cols * ImgData->cvImgL.rows;
             float *CvPtrL = ImgData->cvImgL.ptr<float>(0);
+            bool RemovePhotometricUndistortion = PhoUndistMode == OnlineCalib || PhoUndistMode == HaveCalib;
             for (int i = 0; i < dim; ++i)
+            {
                 ImgData->fImgL[i] = CvPtrL[i];
-
+                if (RemovePhotometricUndistortion)
+                    CvPtrL[i] = PhoUndistL->getB(CvPtrL[i]);
+            }
             ImgData->cvImgL.convertTo(ImgData->cvImgL, CV_8U);
         }
 

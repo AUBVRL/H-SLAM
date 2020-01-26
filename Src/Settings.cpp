@@ -31,7 +31,7 @@ namespace FSLAM
     //Display options
     bool DisplayOn = true;
     bool ShowInitializationMatches = true;
-    bool show_gradient_image = true;
+    bool show_gradient_image = false;
     bool settings_show_InitDepth = true;
 
     //feature pattern settings
