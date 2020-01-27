@@ -13,7 +13,7 @@ namespace FSLAM
     //feature Detector params (settings here are overriden by explicitly changing the input to software)
     int IndPyrLevels = 1;
     float IndPyrScaleFactor = 1.2;
-    int IndNumFeatures = 2000;
+    int IndNumFeatures = 3000;
     int minThFAST = 8;
     float tolerance = 0.1; //SSC tolerance 
     int EnforcedMinDist = 5;
@@ -24,14 +24,14 @@ namespace FSLAM
     bool Pause = false;
 
     //Direct data dector
-    int DirPyrLevels = 4;
+    int DirPyrLevels = 6;
 
     bool SequentialOperation = false;
 
     //Display options
     bool DisplayOn = true;
     bool ShowInitializationMatches = true;
-    bool ShowInitializationMatchesSideBySide = false;
+    bool ShowInitializationMatchesSideBySide = true;
     bool show_gradient_image = false;
     bool settings_show_InitDepth = true;
 

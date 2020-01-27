@@ -234,7 +234,7 @@ public:
             if(option >= 1 && option <= 10)
             {
                 IndPyrLevels = option;
-                printf("Using %i pyramid levels\n", IndPyrLevels);
+                printf("Using %i Indirect pyramid levels\n", IndPyrLevels);
             }
             else
                 printf("IndPyrLevel chosen is invalid, using default %i levels\n", IndPyrLevels);
@@ -269,7 +269,7 @@ public:
             if(option >= 1 && option <= 10)
             {
                 DirPyrLevels = option;
-                printf("Using %i pyramid levels\n", DirPyrLevels);
+                // printf("Using %i pyramid levels\n", DirPyrLevels);
             }
             else
                 printf("DirPyrLevel chosen is invalid, using default %i levels\n", DirPyrLevels);

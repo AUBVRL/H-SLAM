@@ -24,7 +24,7 @@ FeatureDetector::~FeatureDetector()
 {
 }
 
-void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<vector<float>>& GradPyr, vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, shared_ptr<IndexThreadReduce<Vec10>>thPool)
+void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<float*>& GradPyr, vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, shared_ptr<IndexThreadReduce<Vec10>>thPool)
 {
     if (Image.empty())
         return;
@@ -34,24 +34,28 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<vector<float>>& Gra
     int height = Image.size().height;
     int width = Image.size().width;
     std::vector<cv::KeyPoint> vKpTemp;
-
-    cv::FAST(Image, vKpTemp, minThFAST, true);
+   
+    // cv::Mat Temp = cv::Mat(height, width,CV_32F, GradPyr[0]);
+    // Temp.convertTo(Temp,CV_8U);
+    // cv::GaussianBlur(Temp, Temp, cv::Size(3, 3), 0.5, 0.5, cv::BORDER_REFLECT_101);
+    // cv::imshow("absTemp",Temp);
+    // cv::waitKey(1);
+    cv::FAST(Image, vKpTemp, minThFAST, true); //extract on image complement on gradient!!
     // cv::AGAST(Image, vKpTemp, minThFAST, true,cv::AgastFeatureDetector::AGAST_7_12d);// AGAST_5_8 AGAST_7_12d AGAST_7_12s OAST_9_16
 
     std::sort(vKpTemp.begin(), vKpTemp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
     // if (vKpTemp.size() > 2200)
     //     vKpTemp.resize(2200);
+    
     mvKeys = Ssc(vKpTemp, NumFeatures, EnforcedMinDist, tolerance, width, height);
-
-    nOrb = mvKeys.size();
-
+    nOrb = mvKeys.size();    
     cv::Mat ImageBlurred;
     cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
 
     Descriptors = cv::Mat::zeros((int)mvKeys.size(), 32, CV_8UC1);
 
     thPool->reduce(boost::bind(&FeatureDetector::computeOrbDescriptor, this, Image, ImageBlurred, mvKeys, Descriptors, _1, _2), 0, mvKeys.size(), std::ceil(mvKeys.size() / NUM_THREADS));
-
+    
     if (DoSubPix)
     {
         std::vector<cv::Point2f> TempPt;
@@ -64,7 +68,6 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<vector<float>>& Gra
     }
 
     return;
-    // thPool->reduce(boost::bind(&FeatureDetector::calcThresholds, this, boost::ref(Image), ImageBlurred, mvKeys, Descriptors,_1,_2),0,mvKeys.size(), std::ceil(mvKeys.size()/NUM_THREADS));
 }
 
 void FeatureDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
@@ -156,33 +159,6 @@ std::vector<int> FeatureDetector::InitUmax()
         ++v0;
     }
     return umax;
-}
-void FeatureDetector::ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
-{
-    int max1 = 0, max2 = 0, max3= 0;
-
-    for (int i = 0; i < L; i++)
-    {
-        const int s = histo[i].size();
-        if (s > max1)
-        {
-            max3 = max2; max2 = max1; max1 = s;
-            ind3 = ind2; ind2 = ind1; ind1 = i;
-        }
-        else if (s > max2)
-        {
-            max3 = max2; max2 = s;
-            ind3 = ind2; ind2 = i;
-        }
-        else if (s > max3)
-        {max3 = s; ind3 = i;}
-    }
-
-    if (max2 < 0.1f * (float)max1)
-        {ind2 = -1; ind3 = -1;}
-    else if (max3 < 0.1f * (float)max1)
-        ind3 = -1;
-    
 }
 
 std::vector<cv::Point> FeatureDetector::InitPattern()
@@ -539,10 +515,21 @@ std::vector<cv::KeyPoint> FeatureDetector::Ssc(std::vector<cv::KeyPoint> keyPoin
         if(ptr[y*cols+ x] == 255) //Occupancy.ptr(y)[x] == 255
             continue;
         kp.push_back(keyPoints[ResultVec[i]]);
-        for (int ki = -minDist; ki <= minDist; ki++)
-            for (int kj = -minDist; kj <= minDist; kj++)
-                if( y+ki > 0 && y+ki < rows && x+kj > 0 && x+kj < cols)
-                    ptr[(y+ki)*cols+ (x+kj)] = 255;
+
+        for (int ki = -minDist; ki <= minDist; ++ki)
+        {
+            int yy = y + ki;
+            int yycols = yy * cols;
+            if (yy > 0 && yy < rows)
+            {
+                for (int kj = -minDist; kj <= minDist; ++kj)
+                {
+                    int xx = x + kj;
+                    if (xx > 0 && xx < cols)
+                        ptr[yycols + xx] = 255;
+                }
+            }
+        }
     } 
     return kp;
 }

@@ -347,12 +347,12 @@ struct AffLight
 };
 
 // EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
-EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const std::vector<Vec3f>& mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Vec3f* const mat, const float x, const float y, const int width)
 
 {
 	int ix = (int)x;
 	int iy = (int)y;
-	const Eigen::Vector3f* bp = &mat[ix+iy*width];
+	const Eigen::Vector3f* bp = mat +  ix+iy*width;
 
 	float tl = (*(bp))[0];
 	float tr = (*(bp+1))[0];
@@ -372,14 +372,14 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const std::vec
 			botInt-topInt);
 }
 
-EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const std::vector<Vec3f>& mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Vec3f* mat, const float x, const float y, const int width)
 {
 	int ix = (int)x;
 	int iy = (int)y;
 	float dx = x - ix;
 	float dy = y - iy;
 	float dxdy = dx*dy;
-	const Eigen::Vector3f* bp = &mat [ix+iy*width];
+	const Eigen::Vector3f* bp = mat +  ix+iy*width;
 
 
 	return dxdy * *(const Eigen::Vector3f*)(bp+1+width)
@@ -388,14 +388,14 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const std::vector<V
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
 
-EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const std::vector<Vec3f>& mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Vec3f* mat, const float x, const float y, const int width)
 {
 	int ix = (int)x;
 	int iy = (int)y;
 	float dx = x - ix;
 	float dy = y - iy;
 	float dxdy = dx*dy;
-	const Eigen::Vector3f* bp = &mat [ix+iy*width];
+	const Eigen::Vector3f* bp = mat + ix+iy*width;
 
 
 	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0]
@@ -472,6 +472,34 @@ inline int DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
     return dist;
 
 #endif
+}
+
+inline void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
+{
+    int max1 = 0, max2 = 0, max3= 0;
+
+    for (int i = 0; i < L; i++)
+    {
+        const int s = histo[i].size();
+        if (s > max1)
+        {
+            max3 = max2; max2 = max1; max1 = s;
+            ind3 = ind2; ind2 = ind1; ind1 = i;
+        }
+        else if (s > max2)
+        {
+            max3 = max2; max2 = s;
+            ind3 = ind2; ind2 = i;
+        }
+        else if (s > max3)
+        {max3 = s; ind3 = i;}
+    }
+
+    if (max2 < 0.1f * (float)max1)
+        {ind2 = -1; ind3 = -1;}
+    else if (max3 < 0.1f * (float)max1)
+        ind3 = -1;
+    
 }
 
 } // namespace FSLAM

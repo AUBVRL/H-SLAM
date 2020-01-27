@@ -14,8 +14,8 @@ class FeatureDetector
 public:
     FeatureDetector();
     ~FeatureDetector();
-    void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);
-    void ExtractFeatures(cv::Mat &Image, std::vector<std::vector<float>>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
+    // void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);
+    void ExtractFeatures(cv::Mat &Image, std::vector<float*>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
 
 private:
 

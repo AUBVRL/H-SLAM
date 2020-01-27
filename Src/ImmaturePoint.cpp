@@ -52,7 +52,7 @@ ImmaturePoint::~ImmaturePoint()
  * * UPDATED -> point has been updated.
  * * SKIP -> point has not been updated.
  */
-ImmaturePointStatus ImmaturePoint::traceOn(std::vector<Vec3f> &frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine,
+ImmaturePointStatus ImmaturePoint::traceOn(Vec3f* frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine,
 										   std::shared_ptr<CalibData> Calib, bool debugPrint)
 {
 	if (lastTraceStatus == ImmaturePointStatus::IPS_OOB)
@@ -405,7 +405,7 @@ EIGEN_STRONG_INLINE bool ImmaturePoint::projectPoint(const float &u_pt, const fl
 	return Ku > 1.1f && Kv > 1.1f && Ku < (Calib->wpyr[0] - 3) && Kv < (Calib->hpyr[0] - 3);
 }
 
-ImmaturePointStatus ImmaturePoint::traceStereo(std::vector<Vec3f> &frame, std::shared_ptr<CalibData> Calib){
+ImmaturePointStatus ImmaturePoint::traceStereo(Vec3f* frame, std::shared_ptr<CalibData> Calib){
 	Mat33f K = Mat33f::Identity();
 	K(0,0) = Calib->fxl();
 	K(1,1) = Calib->fyl();
@@ -724,7 +724,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 	// check OOB due to scale angle change.
 
 	float energyLeft = 0;
-	const std::vector<Vec3f> *dIl =  &tmpRes->target.lock()->DirPyr[0];
+	const Vec3f *dIl =  tmpRes->target.lock()->DirPyr[0];
 	//const Eigen::Vector3f *dIl = tmpRes->target.lock()->dI;
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
@@ -746,7 +746,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 			return tmpRes->state_energy;
 		}
 
-		Vec3f hitColor = (getInterpolatedElement33(dIl[0], Ku, Kv, Calib->wpyr[0]));
+		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, Calib->wpyr[0]));
 
 		if (!std::isfinite((float)hitColor[0]))
 		{

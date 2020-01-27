@@ -24,7 +24,7 @@ public:
     Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<FeatureDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
-    void CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr);
+    void CreateDirPyrs(std::vector<float>& Img, std::vector<Vec3f*> &DirPyr);
     void ReduceToEssential(bool KeepIndirectData);
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
@@ -32,8 +32,8 @@ public:
 
     std::shared_ptr<FeatureDetector> Detector;    
     std::vector<cv::Mat> IndPyr; //temporary CV_8U pyramids to extract features
-    std::vector<std::vector<Vec3f>> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
-    std::vector<std::vector<float>> absSquaredGrad;
+    std::vector<Vec3f*> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
+    std::vector<float*> absSquaredGrad;
 
     std::vector<std::vector<std::vector<size_t>>> mGrid;
     std::vector<cv::KeyPoint> mvKeys;

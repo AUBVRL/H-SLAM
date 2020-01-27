@@ -42,7 +42,7 @@
                 // "playbackspeed=0",
                 // "IndPyrLevels=1",
                 // "IndPyrScaleFactor=1.2",
-                // "IndNumFeatures=1500",
+                // "IndNumFeatures=3000",
                 // "DirPyrLevels=4",
 
 
@@ -78,7 +78,7 @@
                 "playbackspeed=0",
                 "IndPyrLevels=1",
                 "IndPyrScaleFactor=1.2",
-                "IndNumFeatures=1500",
+                "IndNumFeatures=3000",
                 "DirPyrLevels=4",
             ],
             "stopAtEntry": false,

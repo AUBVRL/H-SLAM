@@ -117,7 +117,6 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
             lock.unlock();
         }
     }
-        std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
 
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 
@@ -125,6 +124,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     // if(OnlinePhCalibR)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
     DrawImages(DataIn, CurrentFrame);
+    std::cout << "Feature time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+
 
 }
 

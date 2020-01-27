@@ -100,9 +100,34 @@ class CalibData
     inline float &cyli() { return value_scaledi[3]; }
 
     inline CalibData(int _Width, int _Height, Mat33f K, float baseline, std::shared_ptr<PhotometricUndistorter> _PhoUndL,
-                     std::shared_ptr<PhotometricUndistorter> _PhoUndR, int DirPyrSize, int IndPyrLevels,
+                     std::shared_ptr<PhotometricUndistorter> _PhoUndR, int& DirPyrSize, int IndPyrLevels,
                      float IndPyrScaleFactor) : Width(_Width), Height(_Height), PhotoUnDistL(_PhoUndL), PhotoUnDistR(_PhoUndL), mbf(baseline)
     {
+
+        int w_ = Width;
+        int h_ = Height;
+        int pyrLevels = 1;
+        while (w_ % 2 == 0 && h_ % 2 == 0 && w_ * h_ > 5000 && pyrLevels < DirPyrSize)
+        {
+            w_ /= 2;
+            h_ /= 2;
+            pyrLevels++;
+        }
+        printf("using pyramid levels 0 to %d. coarsest resolution: %d x %d!\n",
+               pyrLevels - 1, w_, h_);
+        if (w_ > 100 && h_ > 100)
+        {
+            printf("\n\n===============WARNING!===================\n "
+                   "using not enough pyramid levels.\n"
+                   "Consider scaling to a resolution that is a multiple of a power of 2.\n");
+        }
+        if (pyrLevels < 3)
+        {
+            printf("\n\n===============WARNING!===================\n "
+                   "I need higher resolution.\n"
+                   "I will probably segfault.\n");
+        }
+        DirPyrSize = pyrLevels;
 
         VecC initial_value = VecC::Zero();
         initial_value[0] = (double)K(0, 0);

@@ -56,6 +56,15 @@ private:
     float ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeMeanOpticalFlow(std::vector<cv::Point2f> &Prev, std::vector<cv::Point2f> &New);
     void ParallelCheckRT (std::shared_ptr<CheckRTIn> In, int min, int max);
+    
+    
+    //Indirect Matching
+    int MatchIndirect(std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize, int TH_LOW, float mfNNratio, bool CheckOrientation);
+    static const int HISTO_LENGTH = 30;
+    std::vector<cv::Point2f> mvbIndPrevMatched;
+    std::vector<int> mvIniMatches;
+
+
 
     std::shared_ptr<CalibData> Calib;
     std::shared_ptr<GUI> displayhandler;
@@ -82,7 +91,7 @@ private:
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    
+
     bool Initialize(std::shared_ptr<Frame> _Frame);
     Initializer(std::shared_ptr<CalibData> _Calib,  std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI>_DisplayHandler);
     ~Initializer(){};

@@ -39,7 +39,7 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     //for now I'm only extracting features from highest resolution image!!
     CreateDirPyrs(Img->fImgL, DirPyr);
     nFeatures = 0;
-    Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);
     mnGridRows = std::ceil(Img->cvImgL.rows / 10);
@@ -78,7 +78,7 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
     }
 }
 
-void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f>> &DirPyr)
+void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<Vec3f*> &DirPyr)
 {
 
     DirPyr.resize(DirPyrLevels);
@@ -86,8 +86,9 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
 
     for (int i = 0; i < DirPyrLevels; ++i)
     {
-        absSquaredGrad[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
-        DirPyr[i].resize(Calib->wpyr[i] * Calib->hpyr[i]);
+        size_t PyrSize = Calib->wpyr[i] * Calib->hpyr[i];
+        absSquaredGrad[i] = new float [PyrSize];
+        DirPyr[i] = new Eigen::Vector3f[PyrSize];
     }
 
     size_t imSize = Calib->wpyr[0] * Calib->hpyr[0];
@@ -97,14 +98,14 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
     for (int lvl = 0; lvl < DirPyrLevels; ++lvl)
     {
         int wl = Calib->wpyr[lvl], hl = Calib->hpyr[lvl];
-        std::vector<Vec3f> &dI_l = DirPyr[lvl];
+        Vec3f* &dI_l = DirPyr[lvl];
 
         // float* dabs_l = absSquaredGrad[lvl];
         if (lvl > 0)
         {
             int lvlm1 = lvl - 1;
             int wlm1 = Calib->wpyr[lvlm1];
-            std::vector<Vec3f> &dI_lm = DirPyr[lvlm1];
+            Vec3f* &dI_lm = DirPyr[lvlm1];
 
             for (int y = 0; y < hl; ++y)
                 for (int x = 0; x < wl; ++x)
@@ -144,10 +145,10 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
     if (show_gradient_image) //make sure this does not get called in stereo system (parallel thread- remove right image createDirPyr?)
     {
         cv::namedWindow("AbsSquaredGrad", cv::WindowFlags::WINDOW_KEEPRATIO);
-        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F);
-        float* dataptr = imGrad.ptr<float>(0);
-        for (int i = 0, iend = Calib->hpyr[0]* Calib->wpyr[0]; i < iend; ++i)
-            dataptr[i] = absSquaredGrad[0][i];
+        cv::Mat imGrad = cv::Mat(Calib->hpyr[0], Calib->wpyr[0],CV_32F, absSquaredGrad[0]);
+        // float* dataptr = imGrad.ptr<float>(0);
+        // for (int i = 0, iend = Calib->hpyr[0]* Calib->wpyr[0]; i < iend; ++i)
+        //     dataptr[i] = absSquaredGrad[0][i];
         
         imGrad.convertTo(imGrad,CV_8U);
         cv::imshow("AbsSquaredGrad", imGrad);
@@ -156,24 +157,48 @@ void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<std::vector<Vec3f
     
 }
 
-Frame::~Frame() {}
+Frame::~Frame() 
+{
+    for (int i = 0, iend = DirPyr.size(); i < iend; ++i)
+    {
+        delete[] DirPyr[i];
+        delete[] absSquaredGrad[i];
+    }
+    DirPyr.clear(); DirPyr.shrink_to_fit();
+    absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
+}
 
 void Frame::ReduceToEssential(bool KeepIndirectData)
 {
     isReduced = true;
+    
     if(!KeepIndirectData) //if true (global keyframe) keep these
     {
         mvKeys.clear(); mvKeys.shrink_to_fit();   
         Descriptors.release();
     }
+
     Detector.reset();
+
     IndPyr.clear(); IndPyr.shrink_to_fit();
-    DirPyr.clear(); DirPyr.shrink_to_fit();  
-    absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
+
+    for (int i = 1, iend = DirPyr.size(); i < iend; ++i)
+    {
+            delete[] DirPyr[i];
+            delete[]  absSquaredGrad[i];
+    }
+    DirPyr.resize(1); // resize to the highest res image only.
+    DirPyr.shrink_to_fit();
+
+    absSquaredGrad.resize(1); 
+    absSquaredGrad.shrink_to_fit();
+        
+    // DirPyr.clear(); DirPyr.shrink_to_fit();  
+    // absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
     
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
 
-    Calib.reset();
+    // Calib.reset();
     return;
 }
 
