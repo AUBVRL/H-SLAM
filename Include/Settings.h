@@ -35,6 +35,7 @@ extern bool SequentialOperation;
 //Display options
 extern bool DisplayOn;
 extern bool ShowInitializationMatches;
+extern bool ShowInitializationMatchesSideBySide;
 extern bool show_gradient_image;
 extern bool settings_show_InitDepth;
 

@@ -4,6 +4,8 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/eigen.hpp>
+#include "IndexThreadReduce.h"
+#include "boost/thread/mutex.hpp"
 #include "Display.h"
 
 using namespace std;
@@ -12,8 +14,8 @@ using namespace cv;
 namespace FSLAM
 {
 
-Initializer::Initializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<GUI> _DisplayHandler) : 
-Calib(_Calib),  displayhandler(_DisplayHandler)
+Initializer::Initializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI> _DisplayHandler) :
+                                            thPool(FrontEndThreadPoolLeft), Calib(_Calib), displayhandler(_DisplayHandler)
 {
     mSigma = 1.0;
     mSigma2 = mSigma * mSigma;
@@ -25,16 +27,25 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
 {
     if (Sensortype == Monocular)
     {
+        static int NumFails = 0;
+        if (NumFails > 40)
+        {
+            FirstFrame.reset();
+            NumFails = 0;
+        }
+
         if (!FirstFrame)
         {
             if (_Frame->nFeatures > 100)
             {
                 FirstFrame = _Frame;
                 FirstFrame->IndPyr[0].copyTo(TransitImage);
-                
-                FirstFramePts.clear(); FirstFramePts.reserve(FirstFrame->nFeatures);
-                ColorVec.clear(); ColorVec.reserve(FirstFrame->nFeatures);
-                
+
+                FirstFramePts.clear();
+                FirstFramePts.reserve(FirstFrame->nFeatures);
+                ColorVec.clear();
+                ColorVec.reserve(FirstFrame->nFeatures);
+
                 for (size_t i = 0; i < FirstFrame->nFeatures; ++i)
                 {
                     FirstFramePts.push_back(FirstFrame->mvKeys[i].pt);
@@ -42,8 +53,12 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
                 }
 
                 mvbPrevMatched = FirstFramePts;
-              
-                if(!MatchedPts.empty()) {MatchedPts.clear(); MatchedPts.shrink_to_fit();}
+
+                if (!MatchedPts.empty())
+                {
+                    MatchedPts.clear();
+                    MatchedPts.shrink_to_fit();
+                }
                 Frame::Globalid = 0;
             }
             return false;
@@ -56,19 +71,17 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
         }
         else
         {
-            std::cout<<"flow disrupted! Resetting First Frame!"<<std::endl;
+            FirstFrame.reset();
+            return false;
+        }
+        int nmatches = FindMatches(15, 7);
+
+        if (nmatches < 0.2f * ((float)FirstFrame->nFeatures))
+        {
             FirstFrame.reset();
             return false;
         }
 
-        int nmatches = FindMatches(15, 7);
-        std::cout<<nmatches<<std::endl;
-        if(nmatches < 0.2f * ((float)FirstFrame->nFeatures))
-            {
-                FirstFrame.reset();
-                return false;
-            }
-            
         if(ComputeMeanOpticalFlow(MatchedPtsBkp, MatchedPts) < 2.0f) //camera might be stationary! don't attempt to initialize. but dont reset
             return false;
 
@@ -76,25 +89,31 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
         cv::Mat tcw;
 
         std::vector<bool> vbTriangulated;
-        
+
         if (FindTransformation(Rcw, tcw, mvIniP3D, vbTriangulated))
         {
+            NumFails = 0;
+
             for (int i = 0, iend = vbTriangulated.size(); i < iend; ++i)
-                if(!vbTriangulated[i])
+                if (!vbTriangulated[i])
                     nmatches--;
-            if(nmatches < 0.1 * FirstFrame->nFeatures) //did not triangulate enough repeat the process!
+
+            if (nmatches < 0.1 * FirstFrame->nFeatures || nmatches < 150) //did not triangulate enough repeat the process!
+            {
+                FirstFrame.reset();
                 return false;
+            }
 
             cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
             Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
             tcw.copyTo(Tcw.rowRange(0, 3).col(3));
             float MedianInvDepth = 1.0f / ComputeSceneMedianDepth(2, mvIniP3D, vbTriangulated); //Initialize all untriangulated features to this inverse deph
-           
-            Tcw.col(3).rowRange(0, 3) = Tcw.col(3).rowRange(0, 3) * MedianInvDepth;             // update baseline between first and Second Keyframes so that meandepth =1
-           for (int i = 0; i < FirstFrame->nFeatures; ++i) // update points coordinates so that their inversedepth has a median of 1.
+
+            Tcw.col(3).rowRange(0, 3) = Tcw.col(3).rowRange(0, 3) * MedianInvDepth; // update baseline between first and Second Keyframes so that meandepth =1
+            for (int i = 0; i < FirstFrame->nFeatures; ++i)                         // update points coordinates so that their inversedepth has a median of 1.
                 if (vbTriangulated[i])
                     mvIniP3D[i] *= MedianInvDepth;
-           
+
             FirstFrame->camToWorld = SE3();
             Mat44f Pose;
             cv::cv2eigen(Tcw, Pose);
@@ -111,9 +130,11 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
                 }
             }
             displayhandler->UploadPoints(pts);
-            std::cout << "found Initialization with "<< nmatches << std::endl;
+            std::cout << "found Initialization with " << nmatches << std::endl;
             // return true;
         }
+        else
+            NumFails++;
     }
     else if (Sensortype == Stereo)
     {
@@ -156,24 +177,27 @@ int Initializer::FindMatches(int windowSize, int maxL1Error)
         }
     }
 
-    // SecondFrame->IndPyr[0].copyTo(TransitImage);
+    
+    SecondFrame->IndPyr[0].copyTo(TransitImage);
+    mvbPrevMatched = MatchedPts;
+
+
     // MatchedPts = mvbPrevMatched;
 
     if (ShowInitializationMatches)
     {
-        bool SideBySide = false;
 
         cv::Mat Image;
 
-        if(SideBySide)
+        if(ShowInitializationMatchesSideBySide)
             hconcat(FirstFrame->IndPyr[0], SecondFrame->IndPyr[0], Image);
         else 
             SecondFrame->IndPyr[0].copyTo(Image);
 
         cvtColor(Image, Image, CV_GRAY2RGB);
-        for (int i = 0; i < mvbPrevMatched.size(); ++i)
+        for (int i = 0; i < FirstFramePts.size(); ++i)
             if (MatchedStatus[i])
-                line(Image, mvbPrevMatched[i], cv::Point2f(SideBySide ? FirstFrame->IndPyr[0].cols : 0, 0) +  MatchedPts[i], ColorVec[i], 1);
+                line(Image, FirstFramePts[i], cv::Point2f(ShowInitializationMatchesSideBySide ? FirstFrame->IndPyr[0].cols : 0, 0) +  MatchedPts[i], ColorVec[i], 1);
 
         imshow("InitMatches", Image);
         waitKey(1);
@@ -226,7 +250,6 @@ bool Initializer::FindTransformation(cv::Mat &R21, cv::Mat &t21, vector<cv::Poin
 
     // Wait until both threads have finished
     threadH.join();
-
     // Compute ratio of scores
     float RH = SH / (SH + SF);
     cv::Mat mK = Calib->GetCvK();
@@ -829,7 +852,6 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         vector<cv::Point3f> vP3Di;
         vector<bool> vbTriangulatedi;
         int nGood = CheckRT(vR[i], vt[i], FirstFramePts, MatchedPts, vbMatchesInliers, K, vP3Di, 4.0 * mSigma2, vbTriangulatedi, parallaxi);
-
         if (nGood > bestGood)
         {
             secondBestGood = bestGood;
@@ -921,16 +943,11 @@ void Initializer::Normalize(const vector<cv::Point2f> &vKeys, vector<cv::Point2f
     T.at<float>(1, 2) = -meanY * sY;
 }
 
-int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Point2f> &vKeys1, const vector<cv::Point2f> &vKeys2,
+int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, vector<cv::Point2f> &vKeys1, vector<cv::Point2f> &vKeys2,
                                 vector<bool> &vbMatchesInliers,
                                 const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
 {
-    // Calibration parameters
-    const float fx = K.at<float>(0, 0);
-    const float fy = K.at<float>(1, 1);
-    const float cx = K.at<float>(0, 2);
-    const float cy = K.at<float>(1, 2);
-
+    // Calibration parameters    
     vbGood = vector<bool>(vKeys1.size(), false);
     vP3D.resize(vKeys1.size());
 
@@ -950,76 +967,18 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Po
     P2 = K * P2;
 
     cv::Mat O2 = -R.t() * t;
+    
+    std::shared_ptr<CheckRTIn> ChRT = std::shared_ptr<CheckRTIn>(new CheckRTIn());
+    ChRT->fx = K.at<float>(0, 0); ChRT->fy = K.at<float>(1, 1); ChRT->cx = K.at<float>(0, 2); ChRT->cy = K.at<float>(1, 2);
+    ChRT->O1 = O1; ChRT->O2 = O2; ChRT->P1 = P1; ChRT->P2 = P2; ChRT->R = R; ChRT->t = t; ChRT->th2 = th2;
+    ChRT->vbGood = &vbGood; ChRT->vbMatchesInliers = &vbMatchesInliers; ChRT->vCosParallax = &vCosParallax;
+    ChRT->vKeys1 = &vKeys1; ChRT->vKeys2 = &vKeys2; ChRT->vP3D = &vP3D; ChRT->thPoolLock = std::shared_ptr<boost::mutex>(new boost::mutex);
 
-    int nGood = 0;
+    ChRT->nGood = 0;
 
-    for (size_t i = 0, iend = MatchedPts.size(); i < iend; ++i)
-    {
-        if (!vbMatchesInliers[i])
-            continue;
+    thPool->reduce( boost::bind( &Initializer::ParallelCheckRT, this, ChRT ,_1, _2), 0, vbMatchesInliers.size(), std::ceil(vbMatchesInliers.size() / NUM_THREADS));
 
-        const cv::Point2f &kp1 = vKeys1[i];
-        const cv::Point2f &kp2 = vKeys2[i];
-        cv::Mat p3dC1;
-
-        Triangulate(kp1, kp2, P1, P2, p3dC1);
-
-        if (!isfinite(p3dC1.at<float>(0)) || !isfinite(p3dC1.at<float>(1)) || !isfinite(p3dC1.at<float>(2)))
-        {
-            vbGood[i] = false;
-            continue;
-        }
-
-        // Check parallax
-        cv::Mat normal1 = p3dC1 - O1;
-        float dist1 = cv::norm(normal1);
-
-        cv::Mat normal2 = p3dC1 - O2;
-        float dist2 = cv::norm(normal2);
-
-        float cosParallax = normal1.dot(normal2) / (dist1 * dist2);
-
-        // Check depth in front of first camera (only if enough parallax, as "infinite" points can easily go to negative depth)
-        if (p3dC1.at<float>(2) <= 0 && cosParallax < 0.99998)
-            continue;
-
-        // Check depth in front of second camera (only if enough parallax, as "infinite" points can easily go to negative depth)
-        cv::Mat p3dC2 = R * p3dC1 + t;
-
-        if (p3dC2.at<float>(2) <= 0 && cosParallax < 0.99998)
-            continue;
-
-        // Check reprojection error in first image
-        float im1x, im1y;
-        float invZ1 = 1.0 / p3dC1.at<float>(2);
-        im1x = fx * p3dC1.at<float>(0) * invZ1 + cx;
-        im1y = fy * p3dC1.at<float>(1) * invZ1 + cy;
-
-        float squareError1 = (im1x - kp1.x) * (im1x - kp1.x) + (im1y - kp1.y) * (im1y - kp1.y);
-
-        if (squareError1 > th2)
-            continue;
-
-        // Check reprojection error in second image
-        float im2x, im2y;
-        float invZ2 = 1.0 / p3dC2.at<float>(2);
-        im2x = fx * p3dC2.at<float>(0) * invZ2 + cx;
-        im2y = fy * p3dC2.at<float>(1) * invZ2 + cy;
-
-        float squareError2 = (im2x - kp2.x) * (im2x - kp2.x) + (im2y - kp2.y) * (im2y - kp2.y);
-
-        if (squareError2 > th2)
-            continue;
-
-        vCosParallax.push_back(cosParallax);
-        vP3D[i] = cv::Point3f(p3dC1.at<float>(0), p3dC1.at<float>(1), p3dC1.at<float>(2));
-        nGood++;
-
-        if (cosParallax < 0.99998)
-            vbGood[i] = true;
-    }
-
-    if (nGood > 0)
+    if (ChRT->nGood > 0)
     {
         sort(vCosParallax.begin(), vCosParallax.end());
 
@@ -1029,7 +988,82 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Po
     else
         parallax = 0;
 
-    return nGood;
+    return ChRT->nGood;
+}
+
+
+void Initializer::ParallelCheckRT(std::shared_ptr<CheckRTIn> In, int min, int max)
+{
+
+    for (int i = min; i < max; ++i)
+    {
+        if (!In->vbMatchesInliers[0][i])
+            continue;
+
+        const cv::Point2f &kp1 = In->vKeys1[0][i];
+        const cv::Point2f &kp2 = In->vKeys2[0][i];
+        cv::Mat p3dC1;
+
+        Triangulate(kp1, kp2, In->P1, In->P2, p3dC1);
+
+        if (!isfinite(p3dC1.at<float>(0)) || !isfinite(p3dC1.at<float>(1)) || !isfinite(p3dC1.at<float>(2)))
+        {
+            In->vbGood[0][i] = false;
+            continue;
+        }
+
+        // Check parallax
+        cv::Mat normal1 = p3dC1 - In->O1;
+        float dist1 = cv::norm(normal1);
+
+        cv::Mat normal2 = p3dC1 - In->O2;
+        float dist2 = cv::norm(normal2);
+
+        float cosParallax = normal1.dot(normal2) / (dist1 * dist2);
+
+        // Check depth in front of first camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        if (p3dC1.at<float>(2) <= 0 && cosParallax < 0.99998)
+            continue;
+
+        // Check depth in front of second camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        cv::Mat p3dC2 = In->R * p3dC1 + In->t;
+
+        if (p3dC2.at<float>(2) <= 0 && cosParallax < 0.99998)
+            continue;
+
+        // Check reprojection error in first image
+        float im1x, im1y;
+        float invZ1 = 1.0 / p3dC1.at<float>(2);
+        im1x = In->fx * p3dC1.at<float>(0) * invZ1 + In->cx;
+        im1y = In->fy * p3dC1.at<float>(1) * invZ1 + In->cy;
+
+        float squareError1 = (im1x - kp1.x) * (im1x - kp1.x) + (im1y - kp1.y) * (im1y - kp1.y);
+
+        if (squareError1 > In->th2)
+            continue;
+
+        // Check reprojection error in second image
+        float im2x, im2y;
+        float invZ2 = 1.0 / p3dC2.at<float>(2);
+        im2x = In->fx * p3dC2.at<float>(0) * invZ2 + In->cx;
+        im2y = In->fy * p3dC2.at<float>(1) * invZ2 + In->cy;
+
+        float squareError2 = (im2x - kp2.x) * (im2x - kp2.x) + (im2y - kp2.y) * (im2y - kp2.y);
+
+        if (squareError2 > In->th2)
+            continue;
+
+        In->vP3D[0][i] = cv::Point3f(p3dC1.at<float>(0), p3dC1.at<float>(1), p3dC1.at<float>(2));
+
+        {
+            boost::unique_lock<boost::mutex> lock(*In->thPoolLock);
+            In->vCosParallax[0].push_back(cosParallax);
+             In->nGood++;
+        }
+
+        if (cosParallax < 0.99998)
+            In->vbGood[0][i] = true;
+    }
 }
 
 void Initializer::DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t)

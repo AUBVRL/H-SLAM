@@ -3,11 +3,33 @@
 
 #include "Settings.h"
 
+namespace boost
+{
+    class mutex;
+}
+
 namespace FSLAM
 {
 class Frame;
 class CalibData;
 class GUI;
+template<typename Type> class IndexThreadReduce;
+
+struct CheckRTIn
+{
+public:
+    float fx, fy, cx, cy;
+    cv::Mat R, t, P1, P2, O1, O2;
+    std::vector<bool> *vbMatchesInliers, *vbGood;
+    std::vector<cv::Point2f> *vKeys1, *vKeys2;
+    std::vector<cv::Point3f> *vP3D;
+    std::vector<float> *vCosParallax;
+    float th2;
+    int nGood;
+    CheckRTIn(){};
+    ~CheckRTIn(){};
+    std::shared_ptr<boost::mutex> thPoolLock;
+};
 
 class Initializer
 {
@@ -25,7 +47,7 @@ private:
                       cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated, float minParallax, int minTriangulated);
     void Triangulate(const cv::Point2f &kp1, const cv::Point2f &kp2, const cv::Mat &P1, const cv::Mat &P2, cv::Mat &x3D);
     void Normalize(const std::vector<cv::Point2f> &vKeys, std::vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T);
-    int CheckRT(const cv::Mat &R, const cv::Mat &t, const std::vector<cv::Point2f> &vKeys1, const std::vector<cv::Point2f> &vKeys2,
+    int CheckRT(const cv::Mat &R, const cv::Mat &t, std::vector<cv::Point2f> &vKeys1, std::vector<cv::Point2f> &vKeys2,
                 std::vector<bool> &vbInliers,
                 const cv::Mat &K, std::vector<cv::Point3f> &vP3D, float th2, std::vector<bool> &vbGood, float &parallax);
     void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t);
@@ -33,6 +55,7 @@ private:
     bool FindTransformation(cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeMeanOpticalFlow(std::vector<cv::Point2f> &Prev, std::vector<cv::Point2f> &New);
+    void ParallelCheckRT (std::shared_ptr<CheckRTIn> In, int min, int max);
 
     std::shared_ptr<CalibData> Calib;
     std::shared_ptr<GUI> displayhandler;
@@ -55,12 +78,13 @@ private:
     //structures containing extracted features
     std::shared_ptr<Frame> FirstFrame;
     std::shared_ptr<Frame> SecondFrame;
+    std::shared_ptr<IndexThreadReduce<Vec10>> thPool;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     
     bool Initialize(std::shared_ptr<Frame> _Frame);
-    Initializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<GUI>_DisplayHandler);
+    Initializer(std::shared_ptr<CalibData> _Calib,  std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI>_DisplayHandler);
     ~Initializer(){};
 
 };
