@@ -40,7 +40,6 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     CreateDirPyrs(Img->fImgL, DirPyr);
     nFeatures = 0;
     Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? 2*IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
-
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);
     mnGridRows = std::ceil(Img->cvImgL.rows / 10);
@@ -56,7 +55,6 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
         if (PosInGrid(mvKeys[i], nGridPosX, nGridPosY))
             mGrid[nGridPosX][nGridPosY].push_back(i);
     }
-    
     isReduced = false;
     isKeyFrame = false;
 }

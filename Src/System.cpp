@@ -9,7 +9,7 @@
 #include "Display.h"
 #include "Map.h"
 #include "ImmaturePoint.h"
-// #include "IndirectInitializer.h"
+#include "Initializer.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -77,9 +77,9 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 
     if(!Initialized)
     {   //Initialize..
-        // if(!Initializer)
-        //     Initializer = std::shared_ptr<IndirectInitializer>(new IndirectInitializer(Calib,Detector,DisplayHandler));
-        // Initialized = Initializer->Initialize(CurrentFrame);
+        if(!cInitializer)
+            cInitializer = std::shared_ptr<Initializer>(new Initializer(Calib,DisplayHandler));
+        Initialized = cInitializer->Initialize(CurrentFrame);
         
     }
     else
@@ -117,8 +117,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
             lock.unlock();
         }
     }
-    
-    std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+        std::cout << "time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
+
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgL);

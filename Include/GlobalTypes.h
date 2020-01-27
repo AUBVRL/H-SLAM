@@ -12,6 +12,24 @@
 #include "sophus/se3.hpp"
 #include "sophus/sim3.hpp"
 
+// Check windows
+#if _WIN32 || _WIN64
+#if _WIN64
+#define Env64
+#else
+#define Env32
+#endif
+#endif
+
+// Check GCC
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define Env64
+#else
+#define Env32
+#endif
+#endif
+
 #define SCALE_IDEPTH 1.0f // scales internal value to idepth.
 #define SCALE_XI_ROT 1.0f
 #define SCALE_XI_TRANS 0.5f
@@ -412,6 +430,48 @@ inline void setPixel9(cv::Mat& Img, const int &u, const int &v, Vec3b& val)
 	Img.at<cv::Vec3b>(u-1,v) = cv::Vec3b(val[0], val[1], val[2]);
 	Img.at<cv::Vec3b>(u-1,v+1) = cv::Vec3b(val[0], val[1], val[2]);
 
+}
+
+inline int DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+{
+    int dist = 0;
+#ifdef __SSE2__
+
+#ifdef Env64
+    const unsigned long long int *pa = a.ptr<unsigned long long int>();
+    const unsigned long long int *pb = b.ptr<unsigned long long int>();
+
+    for (int i = 0; i < 4; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb; //can't do this
+        dist += _mm_popcnt_u64(v);
+    }
+    return dist;
+#else
+    const int *pa = a.ptr<int32_t>();
+    const int *pb = b.ptr<int32_t>();
+    for (int i = 0; i < 8; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb; //can't do this
+        dist += _mm_popcnt_u32(v);
+    }
+    return dist;
+#endif
+
+#else
+    const int *pa = a.ptr<int32_t>();
+    const int *pb = b.ptr<int32_t>();
+
+    for (int i = 0; i < 8; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb;
+        v = v - ((v >> 1) & 0x55555555);
+        v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+        dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
+    }
+    return dist;
+
+#endif
 }
 
 } // namespace FSLAM

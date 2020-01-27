@@ -72,7 +72,8 @@
         "future": "cpp",
         "cfenv": "cpp",
         "valarray": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "matrixfunctions": "cpp"
     },
     "zenMode.hideTabs": false,
     "cmake.buildBeforeRun": false
