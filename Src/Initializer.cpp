@@ -164,22 +164,26 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             shared_ptr<DirectRefinement> DirOpti = shared_ptr<DirectRefinement> (new DirectRefinement(Calib, mvIniP3D, vbTriangulated, FirstFrame, SecondFrame, Pose, videpth));
 
             // //Direct Refinement statistics!!
-            // std::vector<float> pts;
+            std::vector<float> pts;
             // std::vector<float> RepErrorAft;
             // int finalCount = 0 ; 
-            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
-            // {
-            //     if(!DirOpti->points[i].isGood)
-            //         continue;
+            for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            {
+                if(vbTriangulated[i])
+                    continue;
+                if(!DirOpti->points[i].isGood)
+                    continue;
+               
+
             //     finalCount++;
-            //     float im1z = 1.0f/DirOpti->points[i].idepth;
-            //     float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
-            //     float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
+                float im1z = 1.0f/DirOpti->points[i].idepth;
+                float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
+                float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
                 
-            //     pts.push_back(im1x);
-            //     pts.push_back(im1y);
-            //     pts.push_back(im1z);
-            //     pts.push_back(1);
+                pts.push_back(im1x);
+                pts.push_back(im1y);
+                pts.push_back(im1z);
+                pts.push_back(1);
 
             //     float zz = 1.0 / im1z;
             //     float xx = Calib->fxl() * im1x * zz + Calib->cxl();
@@ -187,29 +191,29 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
 
             //     if(vbTriangulated[i])
             //         RepErrorAft.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(xx, yy)));
-            // }
+            }
 
             // // std::vector<float> pts;
             // std::vector<float> RepErrorBef;
-            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
-            // {
-            //     if (vbTriangulated[i])
-            //     {
-            //         pts.push_back(mvIniP3D[i].x);
-            //         pts.push_back(mvIniP3D[i].y);
-            //         pts.push_back(mvIniP3D[i].z);
-            //         pts.push_back(0);
+            for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            {
+                if (vbTriangulated[i])
+                {
+                    pts.push_back(mvIniP3D[i].x);
+                    pts.push_back(mvIniP3D[i].y);
+                    pts.push_back(mvIniP3D[i].z);
+                    pts.push_back(0);
 
 
             //         float invZ1 = 1.0 / mvIniP3D[i].z;
             //         float im1x = Calib->fxl() * mvIniP3D[i].x * invZ1 + Calib->cxl();
             //         float im1y = Calib->fyl() * mvIniP3D[i].y * invZ1 + Calib->cyl();
             //         RepErrorBef.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(im1x, im1y)));
-            //     }
-            // }
+                }
+            }
             // // std::cout<<"Mean Rep Error Befor: "<< std::accumulate(RepErrorBef.begin(), RepErrorBef.end(), 0.0)/RepErrorBef.size();
             // // std::cout<<"  Mean Rep Error After: "<<std::accumulate(RepErrorAft.begin(), RepErrorAft.end(), 0.0)/RepErrorAft.size() <<std::endl;
-            // displayhandler->UploadPoints(pts);
+            displayhandler->UploadPoints(pts);
             // std::cout << "found Initialization with " << nmatches <<" points and triangulated: "<<finalCount<< std::endl;
             return true;
         }
@@ -1373,6 +1377,7 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
     numPoints = FirstFrame->nFeatures;
     snapped = false;
 
+    trace(pl);
     Refine();
     //Update optimized data!!
     _Pose = thisToNext;
@@ -1381,9 +1386,9 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
         if (!points[i].isGood)
             continue;
         _videpth[i] = points[i].idepth;
-        _Triangulated[i] = true;
+        // _Triangulated[i] = true;
     }
-    // debugPlot(points);
+    debugPlot(points);
 }
 
 DirectRefinement::~DirectRefinement()
@@ -1546,6 +1551,314 @@ void DirectRefinement::Refine()
 
     // debugPlot(0,wraps);
 
+}
+
+void DirectRefinement::trace(Pnt* _pl)
+{
+	float maxPixSearch = (Calib->Width + Calib->Height) * setting_maxPixSearch ; // 640*480 * 0.027
+    SE3 Temp = thisToNext;
+    Mat33f KRKi = (Calib->pyrK[0].cast<double>() * Temp.rotationMatrix() * Calib->pyrKi[0].cast<double>()).cast<float>();
+	Vec3f Kt = Calib->pyrK[0] * Temp.translation().cast<float>();
+
+    Eigen::Vector3f* colorRef = FirstFrame->DirPyr[0];
+	Eigen::Vector3f* colorNew = SecondFrame->DirPyr[0];
+    float d_min = 0.0f;
+    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    {
+        if(Triangulated[0][i])
+            continue;
+
+        float u = FirstFrame->mvKeys[i].pt.x;
+        float v = (float)FirstFrame->mvKeys[i].pt.y;
+
+        Vec3f pr = KRKi * Vec3f(u, v, 1.0f);
+        Vec3f ptpMin = pr + Kt*d_min;
+        float uMin = ptpMin[0] / ptpMin[2];
+        float vMin = ptpMin[1] / ptpMin[2];
+
+        Vec2f lastTraceUV;
+        float lastTracePixelInterval;
+        if (!(uMin > 4 && vMin > 4 && uMin < Calib->Width - 5 && vMin < Calib->Height - 5))
+        {
+            lastTraceUV = Vec2f(-1, -1);
+            lastTracePixelInterval = 0;
+            continue;
+        }
+
+        Mat22f gradH;
+        float color[8];
+        float weights[8];
+        float energyTH = patternNum*setting_outlierTH;
+	    energyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
+        float quality = 10000.0f;
+        float idepth_min = d_min;
+        float idepth_max = NAN;
+        for (int idx = 0; idx < patternNum; idx++)
+        {
+            int dx = patternP[idx][0];
+            int dy = patternP[idx][1];
+            Vec3f ptc = getInterpolatedElement33BiLin(colorRef, u + dx, v + dy, Calib->Width);
+            
+            color[idx] = ptc[0];
+            if (!std::isfinite(color[idx]))
+            {
+                energyTH = NAN;
+                continue;
+            }
+            gradH += ptc.tail<2>() * ptc.tail<2>().transpose();
+            weights[idx] = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + ptc.tail<2>().squaredNorm()));
+        }
+        float dist;
+        float uMax;
+        float vMax;
+        Vec3f ptpMax;
+        dist = maxPixSearch;
+
+        // project to arbitrary depth to get direction.
+        ptpMax = pr + Kt * 0.01; //0.01
+        uMax = ptpMax[0] / ptpMax[2];
+        vMax = ptpMax[1] / ptpMax[2];
+        
+        // direction.
+        float _dx = uMax - uMin;
+        float _dy = vMax - vMin;
+        float _d = 1.0f / sqrtf(_dx * _dx + _dy * _dy);
+
+        // set to [setting_maxPixSearch].
+        uMax = uMin + dist * _dx * _d;
+        vMax = vMin + dist * _dy * _d;
+
+        // may still be out!
+        if (!(uMax > 4 && vMax > 4 && uMax < Calib->Width - 5 && vMax < Calib->Height - 5))
+        {
+            lastTraceUV = Vec2f(-1, -1);
+            lastTracePixelInterval = 0;
+            continue;
+        }
+        assert(dist > 0);
+        if (!(d_min < 0 || (ptpMin[2] > 0.75 && ptpMin[2] < 1.5)))
+        {
+            lastTraceUV = Vec2f(-1, -1);
+            lastTracePixelInterval = 0;
+            continue;
+        }
+
+        float dx = setting_trace_stepsize * (uMax - uMin);
+        float dy = setting_trace_stepsize * (vMax - vMin);
+
+        float a = (Vec2f(dx, dy).transpose() * gradH * Vec2f(dx, dy));
+        float b = (Vec2f(dy, -dx).transpose() * gradH * Vec2f(dy, -dx));
+        float errorInPixel = 0.2f + 0.2f * (a + b) / a;
+
+        if (errorInPixel > 10)
+            errorInPixel = 10;
+
+        // ============== do the discrete search ===================
+        dx /= dist;
+        dy /= dist;
+
+        // if (debugPrint)
+        //     printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
+        //            u, v,
+        //            host->shell->id, frame->shell->id,
+        //            idepth_min, uMin, vMin,
+        //            idepth_max, uMax, vMax,
+        //            errorInPixel);
+
+        if (dist > maxPixSearch)
+        {
+            uMax = uMin + maxPixSearch * dx;
+            vMax = vMin + maxPixSearch * dy;
+            dist = maxPixSearch;
+        }
+
+        int numSteps = 1.9999f + dist / setting_trace_stepsize;
+        Mat22f Rplane = KRKi.topLeftCorner<2, 2>();
+
+        float randShift = uMin * 1000 - floorf(uMin * 1000);
+        float ptx = uMin - randShift * dx;
+        float pty = vMin - randShift * dy;
+
+        Vec2f rotatetPattern[MAX_RES_PER_POINT];
+        for (int idx = 0; idx < patternNum; idx++)
+            rotatetPattern[idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
+
+        if (!std::isfinite(dx) || !std::isfinite(dy))
+        {
+            lastTracePixelInterval = 0;
+            lastTraceUV = Vec2f(-1, -1);
+            continue;
+        }
+
+        float errors[100];
+	    float bestU=0, bestV=0, bestEnergy=1e10;
+	    int bestIdx=-1;
+	    if(numSteps >= 100) numSteps = 99;
+
+        for (int i = 0; i < numSteps; i++)
+        {
+            float energy = 0;
+            for (int idx = 0; idx < patternNum; idx++)
+            {
+                float hitColor = getInterpolatedElement31(colorNew, (float)(ptx + rotatetPattern[idx][0]), (float)(pty + rotatetPattern[idx][1]), Calib->Width);
+
+                if (!std::isfinite(hitColor))
+                {
+                    energy += 1e5;
+                    continue;
+                }
+                float residual = hitColor - (float)( color[idx]); //removed affine model here
+                float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+                energy += hw * residual * residual * (2 - hw);
+            }
+
+            // if (debugPrint)
+                // printf("step %.1f %.1f (id %f): energy = %f!\n",
+                //        ptx, pty, 0.0f, energy);
+
+            errors[i] = energy;
+            if (energy < bestEnergy)
+            {
+                bestU = ptx;
+                bestV = pty;
+                bestEnergy = energy;
+                bestIdx = i;
+            }
+
+            ptx += dx;
+            pty += dy;
+        }
+
+        // find best score outside a +-2px radius.
+        float secondBest = 1e10;
+        for (int i = 0; i < numSteps; i++)
+        {
+            if ((i < bestIdx - setting_minTraceTestRadius || i > bestIdx + setting_minTraceTestRadius) && errors[i] < secondBest)
+                secondBest = errors[i];
+        }
+        float newQuality = secondBest / bestEnergy;
+        if (newQuality < quality || numSteps > 10)
+            quality = newQuality;
+
+        // ============== do GN optimization ===================
+        float uBak = bestU, vBak = bestV, gnstepsize = 1, stepBack = 0;
+        if (setting_trace_GNIterations > 0)
+            bestEnergy = 1e5;
+        int gnStepsGood = 0, gnStepsBad = 0;
+        for (int it = 0; it < setting_trace_GNIterations; it++)
+        {
+            float H = 1, b = 0, energy = 0;
+            for (int idx = 0; idx < patternNum; idx++)
+            {
+                Vec3f hitColor = getInterpolatedElement33(colorNew,
+                                                          (float)(bestU + rotatetPattern[idx][0]),
+                                                          (float)(bestV + rotatetPattern[idx][1]), Calib->Width);
+
+                if (!std::isfinite((float)hitColor[0]))
+                {
+                    energy += 1e5;
+                    continue;
+                }
+                float residual = hitColor[0] - (color[idx]); //removed affine model here!!
+                float dResdDist = dx * hitColor[1] + dy * hitColor[2];
+                float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+
+                H += hw * dResdDist * dResdDist;
+                b += hw * residual * dResdDist;
+                energy += weights[idx] * weights[idx] * hw * residual * residual * (2 - hw);
+            }
+
+            if (energy > bestEnergy)
+            {
+                gnStepsBad++;
+
+                // do a smaller step from old point.
+                stepBack *= 0.5;
+                bestU = uBak + stepBack * dx;
+                bestV = vBak + stepBack * dy;
+                // if (debugPrint)
+                //     printf("GN BACK %d: E %f, H %f, b %f. id-step %f. UV %f %f -> %f %f.\n",
+                //            it, energy, H, b, stepBack,
+                //            uBak, vBak, bestU, bestV);
+            }
+            else
+            {
+                gnStepsGood++;
+
+                float step = -gnstepsize * b / H;
+                if (step < -0.5)
+                    step = -0.5;
+                else if (step > 0.5)
+                    step = 0.5;
+
+                if (!std::isfinite(step))
+                    step = 0;
+
+                uBak = bestU;
+                vBak = bestV;
+                stepBack = step;
+
+                bestU += step * dx;
+                bestV += step * dy;
+                bestEnergy = energy;
+
+                // if (debugPrint)
+                //     printf("GN step %d: E %f, H %f, b %f. id-step %f. UV %f %f -> %f %f.\n",
+                //            it, energy, H, b, step,
+                //            uBak, vBak, bestU, bestV);
+            }
+
+            if (fabsf(stepBack) < setting_trace_GNThreshold)
+                break;
+        }
+
+        // ============== detect energy-based outlier. ===================
+        //	float absGrad0 = getInterpolatedElement(frame->absSquaredGrad[0],bestU, bestV, wG[0]);
+        //	float absGrad1 = getInterpolatedElement(frame->absSquaredGrad[1],bestU*0.5-0.25, bestV*0.5-0.25, wG[1]);
+        //	float absGrad2 = getInterpolatedElement(frame->absSquaredGrad[2],bestU*0.25-0.375, bestV*0.25-0.375, wG[2]);
+        if (!(bestEnergy < energyTH * setting_trace_extraSlackOnTH))
+        //			|| (absGrad0*areaGradientSlackFactor < host->frameGradTH
+        //		     && absGrad1*areaGradientSlackFactor < host->frameGradTH*0.75f
+        //			 && absGrad2*areaGradientSlackFactor < host->frameGradTH*0.50f))
+        {
+            // if (debugPrint)
+            //     printf("OUTLIER!\n");
+
+            lastTracePixelInterval = 0;
+            lastTraceUV = Vec2f(-1, -1);
+            continue;
+        }
+
+        // ============== set new interval ===================
+        if (dx * dx > dy * dy)
+        {
+            idepth_min = (pr[2] * (bestU - errorInPixel * dx) - pr[0]) / (Kt[0] - Kt[2] * (bestU - errorInPixel * dx));
+            idepth_max = (pr[2] * (bestU + errorInPixel * dx) - pr[0]) / (Kt[0] - Kt[2] * (bestU + errorInPixel * dx));
+        }
+        else
+        {
+            idepth_min = (pr[2] * (bestV - errorInPixel * dy) - pr[1]) / (Kt[1] - Kt[2] * (bestV - errorInPixel * dy));
+            idepth_max = (pr[2] * (bestV + errorInPixel * dy) - pr[1]) / (Kt[1] - Kt[2] * (bestV + errorInPixel * dy));
+        }
+        if (idepth_min > idepth_max)
+            std::swap<float>(idepth_min, idepth_max);
+
+        if (!std::isfinite(idepth_min) || !std::isfinite(idepth_max) || (idepth_max < 0))
+        {
+            //printf("COUGHT INF / NAN minmax depth (%f %f)!\n", idepth_min, idepth_max);
+
+            lastTracePixelInterval = 0;
+            lastTraceUV = Vec2f(-1, -1);
+            continue;
+        }
+
+        lastTracePixelInterval = 2 * errorInPixel;
+        lastTraceUV = Vec2f(bestU, bestV);
+            
+        _pl[i].idepth = (idepth_min + idepth_max) /2.0f;
+        _pl[i].iR = _pl[i].idepth;
+        // return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
+    }
 }
 
 void DirectRefinement::resetPoints(int lvl)
@@ -1892,7 +2205,7 @@ void DirectRefinement::optReg(int lvl)
             if(Triangulated[0][i])
                 ptsl[i].iR = 1.0 / Pts3D[0][i].z;
             else
-                ptsl[i].iR = 1;
+                ptsl[i].iR = ptsl[i].idepth; //changed this from 1.0f
         }
 			
 		return;

@@ -97,7 +97,7 @@ public:
     std::shared_ptr<Frame> FirstFrame;
     std::shared_ptr<Frame> SecondFrame;
     SE3 Pose;
-    
+
     bool Initialize(std::shared_ptr<Frame> _Frame);
     Initializer(std::shared_ptr<CalibData> _Calib,  std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI>_DisplayHandler);
     ~Initializer(){};
@@ -139,7 +139,7 @@ private:
 	// void makeNN();
     void Refine();
     void debugPlot(Pnt* Points);
-
+    void trace(Pnt* _pl);
 
 public:
     Pnt* points;
