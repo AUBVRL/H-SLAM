@@ -17,11 +17,11 @@
                 "vocabulary=pathtovocab",
 
                 // "path=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",//Euroc 
-                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_35/images.zip", //TumMono 
+                "path=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/images.zip", //TumMono 
                 // "path=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/", //Kitti      
 
                 // "timestampsL=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_35/times.txt", //TumMono
+                "timestampsL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_40/times.txt", //TumMono
                 // "timestampsL=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/times.txt", //Kitti
 
                 "gammaL=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",

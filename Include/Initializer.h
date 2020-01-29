@@ -2,6 +2,7 @@
 #define __INITIALIZER__
 
 #include "Settings.h"
+#include "MatrixAccumulators.h"
 
 namespace boost
 {
@@ -10,10 +11,14 @@ namespace boost
 
 namespace FSLAM
 {
+
 class Frame;
 class CalibData;
 class GUI;
 template<typename Type> class IndexThreadReduce;
+struct Pnt;
+class DirectRefinement;
+
 
 struct CheckRTIn
 {
@@ -56,8 +61,8 @@ private:
     float ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeMeanOpticalFlow(std::vector<cv::Point2f> &Prev, std::vector<cv::Point2f> &New);
     void ParallelCheckRT (std::shared_ptr<CheckRTIn> In, int min, int max);
-    
-    
+    void Deliver();
+
     //Indirect Matching
     int MatchIndirect(std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize, int TH_LOW, float mfNNratio, bool CheckOrientation);
     static const int HISTO_LENGTH = 30;
@@ -83,19 +88,125 @@ private:
     std::vector<bool> MatchedStatus;
     std::vector<cv::Scalar> ColorVec; 
     std::vector<cv::Point3f> mvIniP3D;
-
-    //structures containing extracted features
-    std::shared_ptr<Frame> FirstFrame;
-    std::shared_ptr<Frame> SecondFrame;
+    
     std::shared_ptr<IndexThreadReduce<Vec10>> thPool;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-
+    std::vector<float> videpth;
+    std::shared_ptr<Frame> FirstFrame;
+    std::shared_ptr<Frame> SecondFrame;
+    SE3 Pose;
+    
     bool Initialize(std::shared_ptr<Frame> _Frame);
     Initializer(std::shared_ptr<CalibData> _Calib,  std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI>_DisplayHandler);
     ~Initializer(){};
 
+};
+
+class DirectRefinement
+{
+private:
+    float alphaK;
+	float alphaW;
+	float regWeight;
+	float couplingWeight;
+    bool fixAffine;
+
+    Eigen::DiagonalMatrix<float, 8> wM;
+    Vec10f* JbBuffer;			// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
+	Vec10f* JbBuffer_new;
+    Accumulator9 acc9;
+	Accumulator9 acc9SC;
+
+    std::shared_ptr<Frame> FirstFrame;
+    std::shared_ptr<Frame> SecondFrame;
+    std::shared_ptr<CalibData> Calib;
+
+	int numPoints;
+    bool snapped;
+
+    std::vector<cv::Point3f>* Pts3D;
+    std::vector<bool>* Triangulated;
+
+
+    Vec3f calcResAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew, AffLight refToNew_aff, bool plot);
+	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
+    void optReg(int lvl);
+    void resetPoints(int lvl);
+	void doStep(int lvl, float lambda, Vec8f inc);
+	void applyStep(int lvl);
+	// void makeNN();
+    void Refine();
+    void debugPlot(Pnt* Points);
+
+
+public:
+    Pnt* points;
+    SE3 thisToNext;
+    AffLight thisToNext_aff;
+
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    DirectRefinement(std::shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &Pts3D, std::vector<bool> &Triangulated, std::shared_ptr<Frame> _FirstFrame,
+                     std::shared_ptr<Frame> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth);
+    ~DirectRefinement();
+    
+};
+
+struct Pnt
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	float u,v;
+	float idepth;
+	bool isGood;
+	Vec2f energy;
+	bool isGood_new;
+	float idepth_new;
+	Vec2f energy_new;
+
+	float iR;
+	float iRSumNum;
+
+	float lastHessian;
+	float lastHessian_new;
+
+	// max stepsize for idepth (corresponding to max. movement in pixel-space).
+	float maxstep;
+
+	// idx (x+y*w) of closest point one pyramid level above.
+	int parent;
+	float parentDist;
+
+	// idx (x+y*w) of up to 10 nearest points in pixel space.
+	int neighbours[10];
+	float neighboursDist[10];
+
+	float my_type;
+	float outlierTH;
+};
+
+struct FLANNPointcloud
+{
+    inline FLANNPointcloud() {num=0; points=0;}
+    inline FLANNPointcloud(int n, Pnt* p) :  num(n), points(p) {}
+	int num;
+	Pnt* points;
+	inline size_t kdtree_get_point_count() const { return num; }
+	inline float kdtree_distance(const float *p1, const size_t idx_p2,size_t /*size*/) const
+	{
+		const float d0=p1[0]-points[idx_p2].u;
+		const float d1=p1[1]-points[idx_p2].v;
+		return d0*d0+d1*d1;
+	}
+
+	inline float kdtree_get_pt(const size_t idx, int dim) const
+	{
+		if (dim==0) return points[idx].u;
+		else return points[idx].v;
+	}
+	template <class BBOX>
+		bool kdtree_get_bbox(BBOX& /* bb */) const { return false; }
 };
 
 } // namespace FSLAM

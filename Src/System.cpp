@@ -79,8 +79,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     {   //Initialize..
         if(!cInitializer)
             cInitializer = std::shared_ptr<Initializer>(new Initializer(Calib, FrontEndThreadPoolLeft ,DisplayHandler));
-        Initialized = cInitializer->Initialize(CurrentFrame);
-        
+        if(cInitializer->Initialize(CurrentFrame))
+            InitFromInitializer(cInitializer);
     }
     else
     {
@@ -117,6 +117,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
             lock.unlock();
         }
     }
+    
+    std::cout << "Feature time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
 
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 
@@ -124,7 +126,6 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     // if(OnlinePhCalibR)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
     DrawImages(DataIn, CurrentFrame);
-    std::cout << "Feature time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
 
 
 }
@@ -168,6 +169,78 @@ void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<Frame
 void System::ProcessNonKeyframe(std::shared_ptr<Frame> Frame)
 {
     return;
+}
+
+void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
+{
+    std::shared_ptr<Frame> firstFrame = _cInit->FirstFrame;
+    std::shared_ptr<Frame> secondFrame = _cInit->SecondFrame;
+    firstFrame->idx = 0;
+    // frameHessians.push_back(_cInit->FirstFrame);
+    firstFrame->id = 0;
+
+    // allKeyFramesHistory.push_back(firstFrame->shell);
+    // ef->insertFrame(firstFrame, &Hcalib);
+    // setPrecalcValues();
+
+    
+    // firstFrame->pointHessians.reserve(FirstFrame->nFeatures);
+    // firstFrame->pointHessiansMarginalized.reserve(FirstFrame->nFeatures);
+    // firstFrame->pointHessiansOut.reserve(FirstFrame->nFeatures);
+
+    for (int i = 0; i < firstFrame->nFeatures; ++i)
+    {
+        if(_cInit->videpth[i] <= 0.0f)
+            continue;
+
+        // Pnt *point = coarseInitializer->points[0] + i;
+        // ImmaturePoint *pt = new ImmaturePoint(firstFrame->mvKeys[i].pt.x + 0.5f, firstFrame->mvKeys[i].pt.y + 0.5f, firstFrame, 1, &Hcalib);
+
+        // if (!std::isfinite(pt->energyTH))
+        // {
+        //     delete pt;
+        //     continue;
+        // }
+
+        // pt->idepth_max = pt->idepth_min = 1;
+        // PointHessian *ph = new PointHessian(pt, &Hcalib);
+        // delete pt;
+        // if (!std::isfinite(ph->energyTH))
+        // {
+        //     delete ph;
+        //     continue;
+        // }
+
+        // ph->setIdepthScaled(videpth[i]);
+        // ph->setIdepthZero(videpth[i]);
+        // ph->hasDepthPrior = true;
+        // ph->setPointStatus(PointHessian::ACTIVE);
+
+        // firstFrame->pointHessians.push_back(ph);
+        // ef->insertPoint(ph);
+    }
+
+    SE3 firstToNew = _cInit->Pose;
+    // firstToNew.translation() /= rescaleFactor;
+
+    // really no lock required, as we are initializing.
+    {
+        boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+        firstFrame->camToWorld = SE3();
+        firstFrame->aff_g2l_internal = AffLight(0, 0);
+        firstFrame->setEvalPT_scaled(firstFrame->camToWorld.inverse(), firstFrame->aff_g2l_internal);
+        firstFrame->trackingRef.reset();
+        firstFrame->camToTrackingRef = SE3();
+
+        secondFrame->camToWorld = firstToNew.inverse();
+        secondFrame->aff_g2l_internal = AffLight(0, 0);
+        secondFrame->setEvalPT_scaled(secondFrame->camToWorld.inverse(), secondFrame->aff_g2l_internal);
+        secondFrame->trackingRef = firstFrame;
+        secondFrame->camToTrackingRef =  secondFrame->camToWorld;
+    }
+
+    // Initialized = true;
+    // printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
 }
 
 } // namespace FSLAM

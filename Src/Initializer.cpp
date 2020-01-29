@@ -8,7 +8,7 @@
 #include "boost/thread/mutex.hpp"
 #include "Display.h"
 
-#include <opencv2/xfeatures2d.hpp>
+// #include <opencv2/xfeatures2d.hpp>
 
 using namespace std;
 using namespace cv;
@@ -144,29 +144,74 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             float MedianInvDepth = 1.0f / ComputeSceneMedianDepth(2, mvIniP3D, vbTriangulated); //Initialize all untriangulated features to this inverse deph
 
             Tcw.col(3).rowRange(0, 3) = Tcw.col(3).rowRange(0, 3) * MedianInvDepth; // update baseline between first and Second Keyframes so that meandepth =1
+            
             for (int i = 0; i < FirstFrame->nFeatures; ++i)                         // update points coordinates so that their inversedepth has a median of 1.
                 if (vbTriangulated[i])
                     mvIniP3D[i] *= MedianInvDepth;
 
-            FirstFrame->Globalid = 0;
+            FirstFrame->id = 0;
             FirstFrame->camToWorld = SE3();
-            Mat44f Pose;
-            cv::cv2eigen(Tcw, Pose);
-            SecondFrame->camToWorld = SE3(Pose.cast<double>());
-            SecondFrame->camToWorld = SecondFrame->camToWorld.inverse();
-            std::vector<float> pts;
+
+            Mat44 _Pose; cv::cv2eigen(Tcw, _Pose);
+            Pose = SE3(_Pose);
+
+            videpth.reserve(FirstFrame->nFeatures);
             for (int i = 0; i < FirstFrame->nFeatures; ++i)
-            {
-                if (vbTriangulated[i])
-                {
-                    pts.push_back(mvIniP3D[i].x);
-                    pts.push_back(mvIniP3D[i].y);
-                    pts.push_back(mvIniP3D[i].z);
-                }
-            }
-            displayhandler->UploadPoints(pts);
-            std::cout << "found Initialization with " << nmatches <<" points"<< std::endl;
-            // return true;
+                if(vbTriangulated[i])
+                    videpth.push_back(1.0 / mvIniP3D[i].z);
+                else videpth.push_back(-1.0);
+
+            shared_ptr<DirectRefinement> DirOpti = shared_ptr<DirectRefinement> (new DirectRefinement(Calib, mvIniP3D, vbTriangulated, FirstFrame, SecondFrame, Pose, videpth));
+
+            // //Direct Refinement statistics!!
+            // std::vector<float> pts;
+            // std::vector<float> RepErrorAft;
+            // int finalCount = 0 ; 
+            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            // {
+            //     if(!DirOpti->points[i].isGood)
+            //         continue;
+            //     finalCount++;
+            //     float im1z = 1.0f/DirOpti->points[i].idepth;
+            //     float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
+            //     float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
+                
+            //     pts.push_back(im1x);
+            //     pts.push_back(im1y);
+            //     pts.push_back(im1z);
+            //     pts.push_back(1);
+
+            //     float zz = 1.0 / im1z;
+            //     float xx = Calib->fxl() * im1x * zz + Calib->cxl();
+            //     float yy = Calib->fyl() * im1y * zz + Calib->cyl();
+
+            //     if(vbTriangulated[i])
+            //         RepErrorAft.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(xx, yy)));
+            // }
+
+            // // std::vector<float> pts;
+            // std::vector<float> RepErrorBef;
+            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            // {
+            //     if (vbTriangulated[i])
+            //     {
+            //         pts.push_back(mvIniP3D[i].x);
+            //         pts.push_back(mvIniP3D[i].y);
+            //         pts.push_back(mvIniP3D[i].z);
+            //         pts.push_back(0);
+
+
+            //         float invZ1 = 1.0 / mvIniP3D[i].z;
+            //         float im1x = Calib->fxl() * mvIniP3D[i].x * invZ1 + Calib->cxl();
+            //         float im1y = Calib->fyl() * mvIniP3D[i].y * invZ1 + Calib->cyl();
+            //         RepErrorBef.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(im1x, im1y)));
+            //     }
+            // }
+            // // std::cout<<"Mean Rep Error Befor: "<< std::accumulate(RepErrorBef.begin(), RepErrorBef.end(), 0.0)/RepErrorBef.size();
+            // // std::cout<<"  Mean Rep Error After: "<<std::accumulate(RepErrorAft.begin(), RepErrorAft.end(), 0.0)/RepErrorAft.size() <<std::endl;
+            // displayhandler->UploadPoints(pts);
+            // std::cout << "found Initialization with " << nmatches <<" points and triangulated: "<<finalCount<< std::endl;
+            return true;
         }
         else
             NumFails++;
@@ -1268,6 +1313,658 @@ float Initializer::ComputeMeanOpticalFlow(vector<Point2f> &Prev, vector<Point2f>
 
     return accumulate(Median.begin(), Median.end(),0)/(float)Median.size();
 
+}
+
+DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &_Pts3D, std::vector<bool> &_Triangulated, std::shared_ptr<Frame> _FirstFrame,
+                                   std::shared_ptr<Frame> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth)
+{
+    Calib = _Calib;
+    thisToNext_aff = AffLight(0, 0);
+    thisToNext = _Pose;
+    FirstFrame = _FirstFrame;
+    SecondFrame = _SecondFrame;
+    alphaK = 2.5 * 2.5;
+    alphaW = 150 * 150;
+    regWeight = 0.8;
+    couplingWeight = 1;
+    points = 0;
+    numPoints = 0;
+    JbBuffer = new Vec10f[Calib->Width * Calib->Height];
+    JbBuffer_new = new Vec10f[Calib->Width * Calib->Height];
+    fixAffine = true;
+
+    Triangulated = &_Triangulated;
+    Pts3D = &_Pts3D;
+
+    wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
+    wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
+    wM.diagonal()[6] = SCALE_A;
+    wM.diagonal()[7] = SCALE_B;
+
+    if (points != 0)
+        delete[] points;
+
+    points = new Pnt[FirstFrame->nFeatures];
+    Pnt* pl = points;
+
+    for (int i = 0; i < FirstFrame->nFeatures; i++)
+    {
+        pl[i].u = FirstFrame-> mvKeys[i].pt.x;
+		pl[i].v = FirstFrame-> mvKeys[i].pt.y;
+
+        if(Triangulated[0][i])
+        {
+            pl[i].idepth = 1.0 / Pts3D[0][i].z;
+            pl[i].iR = pl[i].idepth;
+        }
+        else
+        {
+            pl[i].idepth = 1.0f;
+            pl[i].iR = 1.0f;
+        }
+            
+        pl[i].isGood=true;
+		pl[i].energy.setZero();
+		pl[i].lastHessian=0;
+		pl[i].lastHessian_new=0;
+		pl[i].my_type= 1;
+        pl[i].outlierTH = patternNum*setting_outlierTH;
+    }
+    numPoints = FirstFrame->nFeatures;
+    snapped = false;
+
+    Refine();
+    //Update optimized data!!
+    _Pose = thisToNext;
+    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    {
+        if (!points[i].isGood)
+            continue;
+        _videpth[i] = points[i].idepth;
+        _Triangulated[i] = true;
+    }
+    // debugPlot(points);
+}
+
+DirectRefinement::~DirectRefinement()
+{
+    if (points != 0)
+        delete[] points;
+    delete[] JbBuffer;
+    delete[] JbBuffer_new;
+}
+
+void DirectRefinement::Refine()
+{
+    bool printDebug = false;
+	int maxIterations[] = {1000,5,10,30,50};
+
+	SE3 refToNew_current = thisToNext;
+	AffLight refToNew_aff_current = thisToNext_aff;
+
+	if(FirstFrame->ab_exposure>0 && SecondFrame->ab_exposure>0)
+		refToNew_aff_current = AffLight(logf(SecondFrame->ab_exposure /  FirstFrame->ab_exposure),0); // coarse approximation.
+
+	Vec3f latestRes = Vec3f::Zero();
+
+	// if(lvl<pyrLevelsUsed-1)
+	// 	propagateDown(lvl+1);
+
+	Mat88f H,Hsc; Vec8f b,bsc;
+	resetPoints(0);
+	Vec3f resOld = calcResAndGS(0, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
+	applyStep(0);
+
+		float lambda = 0.1;
+		float eps = 1e-4;
+		int fails=0;
+
+		if(printDebug)
+		{
+			printf("lvl %d, it %d (l=%f) %s: %.3f+%.5f -> %.3f+%.5f (%.3f->%.3f) (|inc| = %f)! \t",
+					0, 0, lambda,
+					"INITIA",
+					sqrtf((float)(resOld[0] / resOld[2])),
+					sqrtf((float)(resOld[1] / resOld[2])),
+					sqrtf((float)(resOld[0] / resOld[2])),
+					sqrtf((float)(resOld[1] / resOld[2])),
+					(resOld[0]+resOld[1]) / resOld[2],
+					(resOld[0]+resOld[1]) / resOld[2],
+					0.0f);
+			std::cout << refToNew_current.log().transpose() << " AFF " << refToNew_aff_current.vec().transpose() <<"\n";
+		}
+
+		int iteration=0;
+        int lvl = 0;
+		while(true)
+		{
+			Mat88f Hl = H;
+			for(int i=0;i<8;i++) Hl(i,i) *= (1+lambda);
+			Hl -= Hsc*(1/(1+lambda));
+			Vec8f bl = b - bsc*(1/(1+lambda));
+
+			Hl = wM * Hl * wM * (0.01f/(Calib->Width*Calib->Height));
+			bl = wM * bl * (0.01f/(Calib->Width*Calib->Height));
+
+			Vec8f inc;
+			if(fixAffine)
+			{
+				inc.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (Hl.topLeftCorner<6,6>().ldlt().solve(bl.head<6>())));
+				inc.tail<2>().setZero();
+			}
+			else
+				inc = - (wM * (Hl.ldlt().solve(bl)));	//=-H^-1 * b.
+
+			SE3 refToNew_new = SE3::exp(inc.head<6>().cast<double>()) * refToNew_current;
+			AffLight refToNew_aff_new = refToNew_aff_current;
+			refToNew_aff_new.a += inc[6];
+			refToNew_aff_new.b += inc[7];
+			doStep(lvl, lambda, inc);
+
+
+			Mat88f H_new, Hsc_new; Vec8f b_new, bsc_new;
+			Vec3f resNew = calcResAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new, false);
+			Vec3f regEnergy = calcEC(lvl);
+
+			float eTotalNew = (resNew[0]+resNew[1]+regEnergy[1]);
+			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]);
+
+
+			bool accept = eTotalOld > eTotalNew;
+
+			if(printDebug)
+			{
+				printf("lvl %d, it %d (l=%f) %s: %.5f + %.5f + %.5f -> %.5f + %.5f + %.5f (%.2f->%.2f) (|inc| = %f)! \t",
+						lvl, iteration, lambda,
+						(accept ? "ACCEPT" : "REJECT"),
+						sqrtf((float)(resOld[0] / resOld[2])),
+						sqrtf((float)(regEnergy[0] / regEnergy[2])),
+						sqrtf((float)(resOld[1] / resOld[2])),
+						sqrtf((float)(resNew[0] / resNew[2])),
+						sqrtf((float)(regEnergy[1] / regEnergy[2])),
+						sqrtf((float)(resNew[1] / resNew[2])),
+						eTotalOld / resNew[2],
+						eTotalNew / resNew[2],
+						inc.norm());
+				std::cout << refToNew_new.log().transpose() << " AFF " << refToNew_aff_new.vec().transpose() <<"\n";
+			}
+
+			if(accept)
+			{
+
+				if(resNew[1] == alphaK*numPoints) //numPoints[lvl]
+					snapped = true;
+				H = H_new;
+				b = b_new;
+				Hsc = Hsc_new;
+				bsc = bsc_new;
+				resOld = resNew;
+				refToNew_aff_current = refToNew_aff_new;
+				refToNew_current = refToNew_new;
+				applyStep(0); //lvl
+				optReg(0); //lvl
+				lambda *= 0.5;
+				fails=0;
+				if(lambda < 0.0001) lambda = 0.0001;
+			}
+			else
+			{
+				fails++;
+				lambda *= 4;
+				if(lambda > 10000) lambda = 10000;
+			}
+
+			bool quitOpt = false;
+
+			if(!(inc.norm() > eps) || iteration >= maxIterations[lvl] || fails >= 2)
+			{
+				Mat88f H,Hsc; Vec8f b,bsc;
+
+				quitOpt = true;
+			}
+
+
+			if(quitOpt) break;
+			iteration++;
+		}
+		latestRes = resOld;
+
+	
+
+
+	thisToNext = refToNew_current;
+	thisToNext_aff = refToNew_aff_current;
+
+	// for(int i=0;i<pyrLevelsUsed-1;i++)
+	// 	propagateUp(i);
+
+	// frameID++;
+	// if(!snapped) snappedAt=0;
+
+	// if(snapped && snappedAt==0)
+	// 	snappedAt = frameID;
+
+    // debugPlot(0,wraps);
+
+}
+
+void DirectRefinement::resetPoints(int lvl)
+{
+	Pnt* pts = points;
+	int npts = numPoints;
+	for(int i=0;i<npts;i++)
+	{
+		pts[i].energy.setZero();
+		pts[i].idepth_new = pts[i].idepth;
+
+
+		// if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)
+		// {
+		// 	float snd=0, sn=0;
+		// 	for(int n = 0;n<10;n++)
+		// 	{
+		// 		if(pts[i].neighbours[n] == -1 || !pts[pts[i].neighbours[n]].isGood) continue;
+		// 		snd += pts[pts[i].neighbours[n]].iR;
+		// 		sn += 1;
+		// 	}
+
+		// 	if(sn > 0)
+		// 	{
+		// 		pts[i].isGood=true;
+		// 		pts[i].iR = pts[i].idepth = pts[i].idepth_new = snd/sn;
+		// 	}
+		// }
+	}
+}
+
+Vec3f DirectRefinement::calcResAndGS( int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew, AffLight refToNew_aff, bool plot)
+{
+	int wl = Calib->Width;
+    int hl = Calib->Height;
+	Eigen::Vector3f* colorRef = FirstFrame->DirPyr[lvl];
+	Eigen::Vector3f* colorNew = SecondFrame->DirPyr[lvl];
+
+	Mat33f RKi = (refToNew.rotationMatrix() * Calib->pyrKi[lvl].cast<double>()).cast<float>();
+	Vec3f t = refToNew.translation().cast<float>();
+	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
+    
+	float fxl = Calib->pyrfx[lvl];
+	float fyl = Calib->pyrfy[lvl];
+	float cxl = Calib->pyrcx[lvl];
+	float cyl = Calib->pyrcy[lvl];
+
+	Accumulator11 E;
+	acc9.initialize();
+	E.initialize();
+
+	int npts = numPoints;
+	Pnt* ptsl = points;
+	for(int i=0;i<npts;i++)
+	{
+		Pnt* point = ptsl+i;
+		point->maxstep = 1e10;
+		if(!point->isGood)
+		{
+			E.updateSingle((float)(point->energy[0]));
+			point->energy_new = point->energy;
+			point->isGood_new = false;
+			continue;
+		}
+
+        VecNRf dp0;
+        VecNRf dp1;
+        VecNRf dp2;
+        VecNRf dp3;
+        VecNRf dp4;
+        VecNRf dp5;
+        VecNRf dp6;
+        VecNRf dp7;
+        VecNRf dd;
+        VecNRf r;
+		JbBuffer_new[i].setZero();
+
+		// sum over all residuals.
+		bool isGood = true;
+		float energy=0;
+		for(int idx=0;idx<patternNum;idx++)
+		{
+			int dx = patternP[idx][0];
+			int dy = patternP[idx][1];
+
+			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
+			float u = pt[0] / pt[2];
+			float v = pt[1] / pt[2];
+			float Ku = fxl * u + cxl;
+			float Kv = fyl * v + cyl;
+			float new_idepth = point->idepth_new/pt[2];
+
+			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
+			{
+				isGood = false;
+				break;
+			}
+
+			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
+			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
+
+			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
+			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
+
+			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
+			{
+				isGood = false;
+				break;
+			}
+
+			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
+			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+            if(!Triangulated[0][i])
+                hw *= 0.1;
+			energy += hw *residual*residual*(2-hw);
+
+			float dxdd = (t[0]-t[2]*u)/pt[2];
+			float dydd = (t[1]-t[2]*v)/pt[2];
+
+			if(hw < 1) hw = sqrtf(hw);
+			float dxInterp = hw*hitColor[1]*fxl;
+			float dyInterp = hw*hitColor[2]*fyl;
+			dp0[idx] = new_idepth*dxInterp;
+			dp1[idx] = new_idepth*dyInterp;
+			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
+			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
+			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
+			dp5[idx] = -v*dxInterp + u*dyInterp;
+			dp6[idx] = - hw*r2new_aff[0] * rlR;
+			dp7[idx] = - hw*1;
+			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
+			r[idx] = hw*residual;
+
+			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
+			if(maxstep < point->maxstep) point->maxstep = maxstep;
+
+			// immediately compute dp*dd' and dd*dd' in JbBuffer1.
+			JbBuffer_new[i][0] += dp0[idx]*dd[idx];
+			JbBuffer_new[i][1] += dp1[idx]*dd[idx];
+			JbBuffer_new[i][2] += dp2[idx]*dd[idx];
+			JbBuffer_new[i][3] += dp3[idx]*dd[idx];
+			JbBuffer_new[i][4] += dp4[idx]*dd[idx];
+			JbBuffer_new[i][5] += dp5[idx]*dd[idx];
+			JbBuffer_new[i][6] += dp6[idx]*dd[idx];
+			JbBuffer_new[i][7] += dp7[idx]*dd[idx];
+			JbBuffer_new[i][8] += r[idx]*dd[idx];
+			JbBuffer_new[i][9] += dd[idx]*dd[idx];
+		}
+
+		if(!isGood || energy > point->outlierTH*20)
+		{
+			E.updateSingle((float)(point->energy[0]));
+			point->isGood_new = false;
+			point->energy_new = point->energy;
+			continue;
+		}
+
+		// add into energy.
+		E.updateSingle(energy);
+		point->isGood_new = true;
+		point->energy_new[0] = energy;
+
+		// update Hessian matrix.
+		for(int i=0;i+3<patternNum;i+=4)
+			acc9.updateSSE(
+					_mm_load_ps(((float*)(&dp0))+i),
+					_mm_load_ps(((float*)(&dp1))+i),
+					_mm_load_ps(((float*)(&dp2))+i),
+					_mm_load_ps(((float*)(&dp3))+i),
+					_mm_load_ps(((float*)(&dp4))+i),
+					_mm_load_ps(((float*)(&dp5))+i),
+					_mm_load_ps(((float*)(&dp6))+i),
+					_mm_load_ps(((float*)(&dp7))+i),
+					_mm_load_ps(((float*)(&r))+i));
+
+
+		for(int i=((patternNum>>2)<<2); i < patternNum; i++)
+			acc9.updateSingle(
+					(float)dp0[i],(float)dp1[i],(float)dp2[i],(float)dp3[i],
+					(float)dp4[i],(float)dp5[i],(float)dp6[i],(float)dp7[i],
+					(float)r[i]);
+	}
+
+	E.finish();
+	acc9.finish();
+
+	// calculate alpha energy, and decide if we cap it.
+	Accumulator11 EAlpha;
+	EAlpha.initialize();
+	for(int i=0;i<npts;i++)
+	{
+		Pnt* point = ptsl+i;
+		if(!point->isGood_new)
+		{
+			E.updateSingle((float)(point->energy[1]));
+		}
+		else
+		{
+			point->energy_new[1] = (point->idepth_new-1)*(point->idepth_new-1);
+			E.updateSingle((float)(point->energy_new[1]));
+		}
+	}
+	EAlpha.finish();
+	float alphaEnergy = alphaW*(EAlpha.A + refToNew.translation().squaredNorm() * npts);
+
+	// compute alpha opt.
+	float alphaOpt;
+	if(alphaEnergy > alphaK*npts)
+	{
+		alphaOpt = 0;
+		alphaEnergy = alphaK*npts;
+	}
+	else
+	{
+		alphaOpt = alphaW;
+	}
+
+	acc9SC.initialize();
+	for(int i=0;i<npts;i++)
+	{
+		Pnt* point = ptsl+i;
+		if(!point->isGood_new)
+			continue;
+
+		point->lastHessian_new = JbBuffer_new[i][9];
+
+		JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
+		JbBuffer_new[i][9] += alphaOpt;
+
+		if(alphaOpt==0)
+		{
+			JbBuffer_new[i][8] += couplingWeight*(point->idepth_new - point->iR);
+			JbBuffer_new[i][9] += couplingWeight;
+		}
+
+		JbBuffer_new[i][9] = 1/(1+JbBuffer_new[i][9]);
+		acc9SC.updateSingleWeighted(
+				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2],(float)JbBuffer_new[i][3],
+				(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],
+				(float)JbBuffer_new[i][8],(float)JbBuffer_new[i][9]);
+	}
+	acc9SC.finish();
+
+	//printf("nelements in H: %d, in E: %d, in Hsc: %d / 9!\n", (int)acc9.num, (int)E.num, (int)acc9SC.num*9);
+	H_out = acc9.H.topLeftCorner<8,8>();// / acc9.num;
+	b_out = acc9.H.topRightCorner<8,1>();// / acc9.num;
+	H_out_sc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
+	b_out_sc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
+
+	H_out(0,0) += alphaOpt*npts;
+	H_out(1,1) += alphaOpt*npts;
+	H_out(2,2) += alphaOpt*npts;
+
+	Vec3f tlog = refToNew.log().head<3>().cast<float>();
+	b_out[0] += tlog[0]*alphaOpt*npts;
+	b_out[1] += tlog[1]*alphaOpt*npts;
+	b_out[2] += tlog[2]*alphaOpt*npts;
+
+	return Vec3f(E.A, alphaEnergy ,E.num);
+}
+
+void DirectRefinement::doStep(int lvl, float lambda, Vec8f inc)
+{
+
+	const float maxPixelStep = 0.25;
+	const float idMaxStep = 1e10;
+	Pnt* pts = points; //[lvl]
+	int npts = numPoints; //[lvl]
+	for(int i=0;i<npts;i++)
+	{
+		if(!pts[i].isGood) continue;
+		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
+		float step = - b * JbBuffer[i][9] / (1+lambda);
+        
+        // if(!Triangulated[0][i])
+        // {
+        //     pts[i].maxstep *= 10;
+        //     // step *= 10;
+        // }
+		
+        float maxstep = maxPixelStep*pts[i].maxstep;
+		if(maxstep > idMaxStep) maxstep=idMaxStep;
+
+		if(step >  maxstep) step = maxstep;
+		if(step < -maxstep) step = -maxstep;
+        
+
+		float newIdepth = pts[i].idepth + step;
+		if(newIdepth < 1e-3 ) newIdepth = 1e-3;
+		if(newIdepth > 50) newIdepth = 50;
+		pts[i].idepth_new = newIdepth;
+	}
+
+}
+void DirectRefinement::applyStep(int lvl)
+{
+	Pnt* pts = points; //[lvl]
+	int npts = numPoints;//[lvl];
+	for(int i=0;i<npts;i++)
+	{
+		if(!pts[i].isGood)
+		{
+			pts[i].idepth = pts[i].idepth_new = pts[i].iR;
+			continue;
+		}
+		pts[i].energy = pts[i].energy_new;
+		pts[i].isGood = pts[i].isGood_new;
+		pts[i].idepth = pts[i].idepth_new;
+		pts[i].lastHessian = pts[i].lastHessian_new;
+	}
+	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
+}
+
+Vec3f DirectRefinement::calcEC(int lvl)
+{
+	if(!snapped) return Vec3f(0,0,numPoints); //[lvl]
+	AccumulatorX<2> E;
+	E.initialize();
+	int npts = numPoints;//[lvl];
+	for(int i=0;i<npts;i++)
+	{
+		Pnt* point = points+i; //points[lvl]
+		if(!point->isGood_new) continue;
+		float rOld = (point->idepth-point->iR);
+		float rNew = (point->idepth_new-point->iR);
+		E.updateNoWeight(Vec2f(rOld*rOld,rNew*rNew));
+
+		//printf("%f %f %f!\n", point->idepth, point->idepth_new, point->iR);
+	}
+	E.finish();
+
+	//printf("ER: %f %f %f!\n", couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], (float)E.num.numIn1m);
+	return Vec3f(couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], E.num);
+}
+
+void DirectRefinement::optReg(int lvl)
+{
+	int npts = numPoints;//[lvl];
+	Pnt* ptsl = points;//[lvl];
+	if(!snapped)
+	{
+		for(int i=0;i<npts;i++)
+        {
+            if(Triangulated[0][i])
+                ptsl[i].iR = 1.0 / Pts3D[0][i].z;
+            else
+                ptsl[i].iR = 1;
+        }
+			
+		return;
+	}
+
+
+	for(int i=0;i<npts;i++)
+	{
+		Pnt* point = ptsl+i;
+		if(!point->isGood) continue;
+
+		// float idnn[10];
+		// int nnn=0;
+		// for(int j=0;j<10;j++)
+		// {
+		// 	if(point->neighbours[j] == -1) continue;
+		// 	Pnt* other = ptsl+point->neighbours[j];
+		// 	if(!other->isGood) continue;
+		// 	idnn[nnn] = other->iR;
+		// 	nnn++;
+		// }
+
+		// if(nnn > 2)
+		// {
+		// 	std::nth_element(idnn,idnn+nnn/2,idnn+nnn);
+		// 	point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2];
+		// }
+        point->iR = point->idepth;
+	}
+}
+
+void DirectRefinement::debugPlot(Pnt* Points)
+{
+	int wl = Calib->wpyr[0], hl = Calib->hpyr[0];
+	// Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
+    // FirstFrame->LeftDirPyr[0];
+	// MinimalImageB3 iRImg(wl,hl);
+    cv::Mat Depth; 
+    cv::cvtColor(FirstFrame->IndPyr[0], Depth, CV_GRAY2RGB);
+
+	int npts = FirstFrame->nFeatures;
+
+	float nid = 0, sid=0;
+	for(int i=0;i<npts;i++)
+	{
+            if(!Triangulated[0][i])
+            continue;
+		// Pnt* point = points[lvl]+i;
+		if(Points[i].isGood)
+		{
+			nid++;
+			sid += (Points[i].idepth); //iR
+		}
+	}
+	float fac = nid / sid;
+
+	for(int i=0;i<npts;i++)
+	{
+		// Pnt* point = points[lvl]+i;
+        if(!Triangulated[0][i])
+            continue;
+        Vec3b Color = Vec3b(0,0,0);
+        if(Points[i].isGood)
+        {
+            Color = makeRainbow3B(Points[i].idepth *fac);
+        }
+        setPixel9(Depth, std::floor(Points[i].v + 0.5f), std::floor(Points[i].u + 0.5f), Color);
+    }
+
+    cv::namedWindow("InitDepthTest", cv::WINDOW_KEEPRATIO);
+    cv::imshow("InitDepthTest", Depth);
+    cv::waitKey(1);
 }
 
 } // namespace FSLAM

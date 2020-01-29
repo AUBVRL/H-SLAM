@@ -35,6 +35,7 @@ private:
     void ProcessNonKeyframe(std::shared_ptr<Frame> Frame);
     void BlockUntilMappingIsFinished();
     void MappingThread();
+    void InitFromInitializer(std::shared_ptr<Initializer> _cInit);
 
     bool Initialized;
     std::shared_ptr<CalibData> Calib; //Calibration data that is used for projection and optimization

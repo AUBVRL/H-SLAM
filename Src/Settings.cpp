@@ -30,7 +30,7 @@ namespace FSLAM
 
     //Display options
     bool DisplayOn = true;
-    bool ShowInitializationMatches = true;
+    bool ShowInitializationMatches = false;
     bool ShowInitializationMatchesSideBySide = true;
     bool show_gradient_image = false;
     bool settings_show_InitDepth = true;

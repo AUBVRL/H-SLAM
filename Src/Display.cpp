@@ -64,10 +64,14 @@ void GUI::run()
             boost::unique_lock<boost::mutex> lock(mSLAMThread);
             glPointSize(5);
             glBegin(GL_POINTS);
-            glColor3f(255.0, 0.0, 0.0);
+            
             size_t sz = Pts.size();
-            for (size_t i = 0; i < sz; i = i + 3)
+            for (size_t i = 0; i < sz; i = i + 4)
             {
+                if(Pts[i+3]==1)
+                    glColor3f(255.0, 0.0, 0.0);
+                else 
+                    glColor3f(0.0, 255.0, 0.0);
                 glVertex3f(Pts[i], Pts[i + 1], Pts[i + 2]);
             }
             glEnd();

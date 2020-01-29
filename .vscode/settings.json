@@ -73,7 +73,8 @@
         "cfenv": "cpp",
         "valarray": "cpp",
         "variant": "cpp",
-        "matrixfunctions": "cpp"
+        "matrixfunctions": "cpp",
+        "*.inc": "cpp"
     },
     "zenMode.hideTabs": false,
     "cmake.buildBeforeRun": false
