@@ -53,7 +53,7 @@ include(ProcessorCount)
 ProcessorCount(NUMTHREADS)
 add_definitions("-DThreadCount=${NUMTHREADS}")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -O0 -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations") #-fno-omit-frame-pointer"
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -Og -g -march=native -fopenmp -Wno-deprecated -Wno-deprecated-declarations") #-fno-omit-frame-pointer"
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")

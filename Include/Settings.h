@@ -24,6 +24,7 @@ extern int EnforcedMinDist;
 extern bool DoSubPix;
 extern bool DrawDetected;
 extern bool DrawDepthKf;
+extern bool DrawEpipolarMatching;
 
 //Direct data dector
 extern int DirPyrLevels;
@@ -39,9 +40,6 @@ extern bool ShowInitializationMatchesSideBySide;
 extern bool show_gradient_image;
 extern bool settings_show_InitDepth;
 
-extern int patternNum;
-extern std::vector<std::vector<int>> patternP;
-extern int patternPadding;
 
 extern float setting_outlierTHSumComponent; // higher -> less strong gradient-based reweighting .
 extern float setting_outlierTH; // higher -> less strict

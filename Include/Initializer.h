@@ -122,6 +122,8 @@ private:
     std::shared_ptr<Frame> FirstFrame;
     std::shared_ptr<Frame> SecondFrame;
     std::shared_ptr<CalibData> Calib;
+    std::shared_ptr<cv::RNG> randomGen;
+
 
 	int numPoints;
     bool snapped;

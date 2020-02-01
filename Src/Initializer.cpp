@@ -166,7 +166,6 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             // //Direct Refinement statistics!!
             std::vector<float> pts;
             // std::vector<float> RepErrorAft;
-            // int finalCount = 0 ; 
             for (int i = 0; i < FirstFrame->nFeatures; ++i)
             {
                 if(vbTriangulated[i])
@@ -174,8 +173,7 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
                 if(!DirOpti->points[i].isGood)
                     continue;
                
-
-            //     finalCount++;
+                //red points were not triangulated by Init algorithm
                 float im1z = 1.0f/DirOpti->points[i].idepth;
                 float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
                 float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
@@ -214,7 +212,6 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             // // std::cout<<"Mean Rep Error Befor: "<< std::accumulate(RepErrorBef.begin(), RepErrorBef.end(), 0.0)/RepErrorBef.size();
             // // std::cout<<"  Mean Rep Error After: "<<std::accumulate(RepErrorAft.begin(), RepErrorAft.end(), 0.0)/RepErrorAft.size() <<std::endl;
             displayhandler->UploadPoints(pts);
-            // std::cout << "found Initialization with " << nmatches <<" points and triangulated: "<<finalCount<< std::endl;
             return true;
         }
         else
@@ -1336,6 +1333,7 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
     JbBuffer = new Vec10f[Calib->Width * Calib->Height];
     JbBuffer_new = new Vec10f[Calib->Width * Calib->Height];
     fixAffine = true;
+    randomGen = std::shared_ptr<cv::RNG>(new cv::RNG(0));
 
     Triangulated = &_Triangulated;
     Pts3D = &_Pts3D;
@@ -1377,7 +1375,7 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
     numPoints = FirstFrame->nFeatures;
     snapped = false;
 
-    trace(pl);
+    // trace(pl);
     Refine();
     //Update optimized data!!
     _Pose = thisToNext;
@@ -1561,7 +1559,16 @@ void DirectRefinement::trace(Pnt* _pl)
 	Vec3f Kt = Calib->pyrK[0] * Temp.translation().cast<float>();
 
     Eigen::Vector3f* colorRef = FirstFrame->DirPyr[0];
-	Eigen::Vector3f* colorNew = SecondFrame->DirPyr[0];
+    Eigen::Vector3f *colorNew = SecondFrame->DirPyr[0];
+
+    cv::Mat Image;
+    if (DrawEpipolarMatching)
+    {
+        cv::hconcat(FirstFrame->IndPyr[0], SecondFrame->IndPyr[0], Image);
+        cvtColor(Image, Image, CV_GRAY2RGB);
+        cv::namedWindow("epi trace", cv::WindowFlags::WINDOW_KEEPRATIO);
+    }
+
     float d_min = 0.0f;
     for (int i = 0; i < FirstFrame->nFeatures; ++i)
     {
@@ -1586,8 +1593,8 @@ void DirectRefinement::trace(Pnt* _pl)
         }
 
         Mat22f gradH;
-        float color[8];
-        float weights[8];
+        float color[patternNum];
+        float weights[patternNum];
         float energyTH = patternNum*setting_outlierTH;
 	    energyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
         float quality = 10000.0f;
@@ -1857,8 +1864,22 @@ void DirectRefinement::trace(Pnt* _pl)
             
         _pl[i].idepth = (idepth_min + idepth_max) /2.0f;
         _pl[i].iR = _pl[i].idepth;
+
+        if (DrawEpipolarMatching)
+        {
+            cv::Scalar COlor = cv::Scalar(randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255));
+            cv::circle(Image, FirstFrame->mvKeys[i].pt, 3, COlor);
+            cv::line(Image, cv::Point2f(Calib->Width, 0) + cv::Point2f(uMax, vMax), cv::Point2f(Calib->Width, 0) + cv::Point2f(uMin, vMin), COlor);
+            cv::circle(Image, cv::Point2f(Calib->Width, 0) + cv::Point2f(bestU, bestV), 3, COlor);
+        }
         // return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
     }
+    if(DrawEpipolarMatching)
+    {
+        cv::imshow("epi trace", Image);
+        cv::waitKey(1);
+    }
+
 }
 
 void DirectRefinement::resetPoints(int lvl)
@@ -1943,7 +1964,6 @@ Vec3f DirectRefinement::calcResAndGS( int lvl, Mat88f &H_out, Vec8f &b_out, Mat8
 		{
 			int dx = patternP[idx][0];
 			int dy = patternP[idx][1];
-
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];

@@ -21,6 +21,7 @@ namespace FSLAM
     bool DoSubPix = false;
     bool DrawDetected = true;
     bool DrawDepthKf = true;
+    bool DrawEpipolarMatching = true;
     bool Pause = false;
 
     //Direct data dector
@@ -35,10 +36,6 @@ namespace FSLAM
     bool show_gradient_image = false;
     bool settings_show_InitDepth = true;
 
-    //feature pattern settings
-    int patternNum = 8;
-    std::vector<std::vector<int>> patternP = staticPattern[8];
-    int patternPadding = 2;
 
     float setting_outlierTHSumComponent = 50*50; // higher -> less strong gradient-based reweighting .
     float setting_outlierTH = 12*12; // higher -> less strict
@@ -47,7 +44,7 @@ namespace FSLAM
     float setting_huberTH = 9; //Huber Threshold!
 
     //Immatureure point tracking
-    float setting_maxPixSearch = 0.027f;
+    float setting_maxPixSearch = 0.027f; 
     float setting_trace_slackInterval = 1.5f;
     float setting_trace_stepsize = 1.0f;
     float setting_trace_minImprovementFactor = 2;
