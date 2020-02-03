@@ -18,7 +18,7 @@ public:
 	double state_energy;
 	ResState state_NewState;
 	double state_NewEnergy;
-	std::weak_ptr<Frame> target;
+	Frame* target;
 };
 
 
@@ -44,7 +44,7 @@ public:
 	Mat22f gradH_eig;
 	float energyTH;
 	float u,v;
-	std::weak_ptr<Frame> host;
+	Frame* host;
 	std::shared_ptr<CalibData> Calib;
 	int idxInImmaturePoints;
 
@@ -67,13 +67,13 @@ public:
 
 	double linearizeResidual(
 			const float outlierTHSlack,
-			std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes,
+			ImmaturePointTemporaryResidual* tmpRes,
 			float &Hdd, float &bd,
 			float idepth);
 
 	float calcResidual(
 			const float outlierTHSlack,
-			std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes,
+			ImmaturePointTemporaryResidual* tmpRes,
 			float idepth);
 
 private:

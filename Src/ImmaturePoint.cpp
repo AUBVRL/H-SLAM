@@ -1,11 +1,11 @@
 #include "ImmaturePoint.h"
 #include "Frame.h"
-#include "DirectResiduals.h"
+#include "DirectProjection.h"
 
 namespace FSLAM
 {
 ImmaturePoint::ImmaturePoint(float u_, float v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> HCalib)
-: u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED), Calib(HCalib)
+: u(u_), v(v_), host(host_.get()), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED), Calib(HCalib)
 {
 
 	gradH.setZero();
@@ -54,7 +54,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 	if(debugPrint)
 		printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f -> %f. t %f %f %f!\n",
 				u,v,
-				host.lock()->id, frame->id,
+				host->id, frame->id,
 				idepth_min, idepth_max,
 				hostToFrame_Kt[0],hostToFrame_Kt[1],hostToFrame_Kt[2]);
 
@@ -178,7 +178,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 	if(debugPrint)
 		printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
 				u,v,
-				host.lock()->id, frame->id,
+				host->id, frame->id,
 				idepth_min, uMin, vMin,
 				idepth_max, uMax, vMax,
 				errorInPixel
@@ -376,12 +376,12 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 }
 
 
-float ImmaturePoint::calcResidual( const float outlierTHSlack, std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float idepth)
+float ImmaturePoint::calcResidual( const float outlierTHSlack, ImmaturePointTemporaryResidual* tmpRes, float idepth)
 {
-	FrameFramePrecalc* precalc = &(host.lock()->targetPrecalc[tmpRes->target.lock()->idx]);
+	FrameFramePrecalc* precalc = &(host->targetPrecalc[tmpRes->target->idx]);
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target.lock()->DirPyr[0];
+	const Eigen::Vector3f* dIl = tmpRes->target->DirPyr[0];
 	const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
 	const Vec3f &PRE_KtTll = precalc->PRE_KtTll;
 	Vec2f affLL = precalc->PRE_aff_mode;
@@ -412,17 +412,17 @@ float ImmaturePoint::calcResidual( const float outlierTHSlack, std::shared_ptr<I
 
 
 
-double ImmaturePoint::linearizeResidual(const float outlierTHSlack, std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float &Hdd, float &bd, float idepth)
+double ImmaturePoint::linearizeResidual(const float outlierTHSlack, ImmaturePointTemporaryResidual* tmpRes, float &Hdd, float &bd, float idepth)
 {
 	if(tmpRes->state_state == ResState::OOB)
 		{ tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy; }
 
-	FrameFramePrecalc* precalc = &(host.lock()->targetPrecalc[tmpRes->target.lock()->idx]);
+	FrameFramePrecalc* precalc = &(host->targetPrecalc[tmpRes->target->idx]);
 
 	// check OOB due to scale angle change.
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target.lock()->DirPyr[0];
+	const Eigen::Vector3f* dIl = tmpRes->target->DirPyr[0];
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 	//const float * const Il = tmpRes->target->I;

@@ -93,7 +93,7 @@ enum PhotoUnDistMode
     Emptyp
 };
 
-enum ResState {IN=0, OOB, OUTLIER};
+enum ResState {IN=0, OOB=1, OUTLIER=2};
 
 struct ImageData
 {
@@ -493,6 +493,44 @@ inline void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, 
     else if (max3 < 0.1f * (float)max1)
         ind3 = -1;
     
+}
+
+template<typename T> inline void deleteOut(std::vector<T*> &v, const int i)
+{
+	delete v[i];
+	v[i] = v.back();
+	v.pop_back();
+}
+template<typename T> inline void deleteOutPt(std::vector<T*> &v, const T* i)
+{
+	delete i;
+
+	for(unsigned int k=0;k<v.size();k++)
+		if(v[k] == i)
+		{
+			v[k] = v.back();
+			v.pop_back();
+		}
+}
+
+template<typename T> inline void deleteOutOrder(std::vector<std::shared_ptr<T>> &v, std::shared_ptr<T> element)
+{
+	int i=-1;
+	for(unsigned int k=0, kend = v.size(); k < kend; ++k)
+	{
+		if(v[k] == element)
+		{
+			i=k;
+			break;
+		}
+	}
+	assert(i!=-1);
+
+	for(unsigned int k=i+1; k<v.size();k++)
+		v[k-1] = v[k];
+	v.pop_back();
+
+	element.reset();
 }
 
 } // namespace FSLAM

@@ -6,13 +6,15 @@
 #include "ImmaturePoint.h"
 #include "photometricUndistorter.h"
 
+#include "EnergyFunctionalStructs.h"
+
 #include <chrono>
 #include <opencv2/highgui.hpp>
 
 namespace FSLAM
 {
-size_t Frame::Globalid = 0;
-size_t Frame::GlobalIncoming_id = 0;
+unsigned int Frame::Globalid = 0;
+unsigned int Frame::GlobalIncoming_id = 0;
 
 
 Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<FeatureDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):

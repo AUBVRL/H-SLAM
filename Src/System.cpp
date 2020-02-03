@@ -3,13 +3,19 @@
 #include "Detector.h"
 #include "Settings.h"
 #include "Frame.h"
+#include "ImmaturePoint.h"
+#include "MapPoint.h"
 #include "CalibData.h"
 #include "GeometricUndistorter.h"
 #include "photometricUndistorter.h"
 #include "Display.h"
 #include "Map.h"
-#include "ImmaturePoint.h"
 #include "Initializer.h"
+
+
+#include "CoarseTracker.h"
+#include "EnergyFunctional.h"
+
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -31,17 +37,24 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
                                         DirPyrLevels, IndPyrLevels, IndPyrScaleFactor));
     SlamMap = std::shared_ptr<Map>(new Map());
 
-    // selectionMap = new float[wG[0]*hG[0]];
-	// coarseDistanceMap = new CoarseDistanceMap(wG[0], hG[0]);
-	// coarseTracker = new CoarseTracker(wG[0], hG[0]);
-	// coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
+
+    //----------------begin dso------------------
+    selectionMap = new float[Calib->Width* Calib->Height];
+	coarseDistanceMap = new CoarseDistanceMap(Calib->Width, Calib->Height);
+	coarseTracker = new CoarseTracker(Calib->Width, Calib->Height);
+	coarseTracker_forNewKF = new CoarseTracker(Calib->Width, Calib->Height);
 	// coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
 	// pixelSelector = new PixelSelector(wG[0], hG[0]);
-    // lastCoarseRMSE.setConstant(100);
-	// currentMinActDist=2;
+    lastCoarseRMSE.setConstant(100);
+	currentMinActDist=2;
 
-    // ef = new EnergyFunctional();
-	// ef->red = &this->treadReduce;
+    ef = new EnergyFunctional();
+	ef->red = &this->treadReduce;
+
+
+    //----------------end dso------------------
+
+
 	// isLost=false;
 	// initFailed=false;
 
@@ -67,6 +80,25 @@ System::~System()
         PhoUndistL->Reset(); 
     if(PhoUndistR)
         PhoUndistR->Reset();
+
+    //----------------begin dso------------------
+    delete[] selectionMap;
+
+    // for (FrameShell *s : allFrameHistory)
+    //     delete s;
+    // for (Frame *fh : unmappedTrackedFrames)
+    //     delete fh;
+
+    delete coarseDistanceMap;
+    delete coarseTracker;
+    delete coarseTracker_forNewKF;
+    // delete coarseInitializer;
+    // delete pixelSelector;
+    delete ef;
+    
+    //----------------end dso------------------
+    
+    
 }
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)

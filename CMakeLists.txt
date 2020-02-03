@@ -74,11 +74,15 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/Map.cpp
   ${PROJECT_SOURCE_DIR}/Src/Mapping.cpp
   ${PROJECT_SOURCE_DIR}/Src/Initializer.cpp
+  ${PROJECT_SOURCE_DIR}/Src/CoarseTracker.cpp
+  ${PROJECT_SOURCE_DIR}/Src/AccumulatedSCHessian.cpp
+  ${PROJECT_SOURCE_DIR}/Src/AccumulatedTopHessian.cpp
+  ${PROJECT_SOURCE_DIR}/Src/EnergyFunctional.cpp
+  ${PROJECT_SOURCE_DIR}/Src/EnergyFunctionalStructs.cpp
   ${PROJECT_SOURCE_DIR}/Src/MapPoint.cpp
-
-  # ${PROJECT_SOURCE_DIR}/Src/CoarseInitializer.cpp
-  # ${PROJECT_SOURCE_DIR}/Src/IndirectInitializer.cpp
-
+  ${PROJECT_SOURCE_DIR}/Src/FullSystemOptimize.cpp
+  ${PROJECT_SOURCE_DIR}/Src/FullSystemMarginalize.cpp
+  ${PROJECT_SOURCE_DIR}/Src/FullSystemOptPoint.cpp
 )
 
 include_directories(

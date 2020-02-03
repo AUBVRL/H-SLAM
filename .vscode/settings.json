@@ -74,7 +74,9 @@
         "valarray": "cpp",
         "variant": "cpp",
         "matrixfunctions": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "svd": "cpp",
+        "eigenvalues": "cpp"
     },
     "zenMode.hideTabs": false,
     "cmake.buildBeforeRun": false
