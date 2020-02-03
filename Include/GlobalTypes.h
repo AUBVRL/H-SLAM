@@ -368,10 +368,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Vec3f* c
 	float leftInt = dy * bl + (1-dy) * tl;
 	float rightInt = dy * br + (1-dy) * tr;
 
-	return Eigen::Vector3f(
-			dx * rightInt + (1-dx) * leftInt,
-			rightInt-leftInt,
-			botInt-topInt);
+	return Eigen::Vector3f( dx * rightInt + (1-dx) * leftInt, rightInt-leftInt, botInt-topInt);
 }
 
 EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Vec3f* mat, const float x, const float y, const int width)
@@ -384,10 +381,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Vec3f* mat, c
 	const Eigen::Vector3f* bp = mat +  ix+iy*width;
 
 
-	return dxdy * *(const Eigen::Vector3f*)(bp+1+width)
-	        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+width)
-	        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
-			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
+	return dxdy * *(const Eigen::Vector3f*)(bp+1+width) + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+width) + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1) + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
 
 EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Vec3f* mat, const float x, const float y, const int width)
@@ -400,10 +394,7 @@ EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Vec3f* mat, const float
 	const Eigen::Vector3f* bp = mat + ix+iy*width;
 
 
-	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0]
-	        + (dy-dxdy) * (*(const Eigen::Vector3f*)(bp+width))[0]
-	        + (dx-dxdy) * (*(const Eigen::Vector3f*)(bp+1))[0]
-			+ (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
+	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0] + (dy-dxdy) * (*(const Eigen::Vector3f*)(bp+width))[0] + (dx-dxdy) * (*(const Eigen::Vector3f*)(bp+1))[0] + (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
 }
 
 inline Vec3b makeRainbow3B(float id)
