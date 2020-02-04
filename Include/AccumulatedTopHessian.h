@@ -13,7 +13,7 @@
 namespace FSLAM
 {
 
-class EFPoint;
+class MapPoint;
 class EnergyFunctional;
 
 
@@ -62,7 +62,7 @@ public:
 	}
 	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool useDelta, int tid=0);
 
-	template<int mode> void addPoint(EFPoint* p, EnergyFunctional const * const ef, int tid=0);
+	template<int mode> void addPoint(std::shared_ptr<MapPoint> p, EnergyFunctional const * const ef, int tid=0);
 
 
 
@@ -128,7 +128,7 @@ public:
 
 
 	template<int mode> void addPointsInternal(
-			std::vector<EFPoint*>* points, EnergyFunctional const * const ef,
+			std::vector<std::shared_ptr<MapPoint>>* points, EnergyFunctional const * const ef,
 			int min=0, int max=1, Vec10* stats=0, int tid=0)
 	{
 		for(int i=min;i<max;i++) addPoint<mode>((*points)[i],ef,tid);

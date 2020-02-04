@@ -1386,7 +1386,8 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
         _videpth[i] = points[i].idepth;
         // _Triangulated[i] = true;
     }
-    debugPlot(points);
+    if(DrawDepthKfTest)
+        debugPlot(points);
 }
 
 DirectRefinement::~DirectRefinement()

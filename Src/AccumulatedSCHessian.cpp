@@ -1,29 +1,29 @@
 #include "AccumulatedSCHessian.h"
 #include "EnergyFunctional.h"
-#include "EnergyFunctionalStructs.h"
+// #include "EnergyFunctionalStructs.h"
 #include "MapPoint.h"
-// #include "FullSystem/HessianBlocks.h"
+#include "OptimizationClasses.h"
 
 namespace FSLAM
 {
 
-void AccumulatedSCHessianSSE::addPoint(EFPoint* p, bool shiftPriorToZero, int tid)
+void AccumulatedSCHessianSSE::addPoint(std::shared_ptr<MapPoint> p, bool shiftPriorToZero, int tid)
 {
 	int ngoodres = 0;
-	for(EFResidual* r : p->residualsAll) if(r->isActive()) ngoodres++;
+	for(auto r : p->residuals) if(r->isActive()) ngoodres++;
 	if(ngoodres==0)
 	{
 		p->HdiF=0;
 		p->bdSumF=0;
-		p->data->idepth_hessian=0;
-		p->data->maxRelBaseline=0;
+		p->idepth_hessian=0;
+		p->maxRelBaseline=0;
 		return;
 	}
 
 	float H = p->Hdd_accAF+p->Hdd_accLF+p->priorF;
 	if(H < 1e-10) H = 1e-10;
 
-	p->data->idepth_hessian=H;
+	p->idepth_hessian=H;
 
 	p->HdiF = 1.0 / H;
 	p->bdSumF = p->bd_accAF + p->bd_accLF;
@@ -35,12 +35,12 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint* p, bool shiftPriorToZero, int ti
 	assert(std::isfinite((float)(p->HdiF)));
 
 	int nFrames2 = nframes[tid]*nframes[tid];
-	for(EFResidual* r1 : p->residualsAll)
+	for(auto r1 : p->residuals)
 	{
 		if(!r1->isActive()) continue;
 		int r1ht = r1->hostIDX + r1->targetIDX*nframes[tid];
 
-		for(EFResidual* r2 : p->residualsAll)
+		for(auto r2 : p->residuals)
 		{
 			if(!r2->isActive()) continue;
 

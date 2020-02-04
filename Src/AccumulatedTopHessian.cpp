@@ -1,9 +1,12 @@
 
 #include "AccumulatedTopHessian.h"
 #include "EnergyFunctional.h"
-#include "EnergyFunctionalStructs.h"
-#include <iostream>
-#include "IndexThreadReduce.h"
+#include "MapPoint.h"
+#include "Frame.h"
+
+// #include "EnergyFunctionalStructs.h"
+// #include <iostream>
+// #include "IndexThreadReduce.h"
 
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
@@ -16,7 +19,7 @@ namespace FSLAM
 
 
 template<int mode>
-void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * const ef, int tid)	// 0 = active, 1 = linearized, 2=marginalize
+void AccumulatedTopHessianSSE::addPoint(std::shared_ptr<MapPoint> p, EnergyFunctional const * const ef, int tid)	// 0 = active, 1 = linearized, 2=marginalize
 {
 
 
@@ -29,7 +32,7 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 	float Hdd_acc=0;
 	VecCf  Hcd_acc = VecCf::Zero();
 
-	for(EFResidual* r : p->residualsAll)
+	for(auto r : p->residuals)
 	{
 		if(mode==0)
 		{
@@ -46,7 +49,7 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 		}
 
 
-		RawResidualJacobian* rJ = r->J;
+		std::shared_ptr<RawResidualJacobian> rJ = r->J;
 		int htIDX = r->hostIDX + r->targetIDX*nframes[tid];
 		Mat18f dp = ef->adHTdeltaF[htIDX];
 
@@ -136,15 +139,10 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 	}
 
 }
-template void AccumulatedTopHessianSSE::addPoint<0>(EFPoint* p, EnergyFunctional const * const ef, int tid);
-template void AccumulatedTopHessianSSE::addPoint<1>(EFPoint* p, EnergyFunctional const * const ef, int tid);
-template void AccumulatedTopHessianSSE::addPoint<2>(EFPoint* p, EnergyFunctional const * const ef, int tid);
 
-
-
-
-
-
+template void AccumulatedTopHessianSSE::addPoint<0>(std::shared_ptr<MapPoint> p, EnergyFunctional const * const ef, int tid);
+template void AccumulatedTopHessianSSE::addPoint<1>(std::shared_ptr<MapPoint> p, EnergyFunctional const * const ef, int tid);
+template void AccumulatedTopHessianSSE::addPoint<2>(std::shared_ptr<MapPoint> p, EnergyFunctional const * const ef, int tid);
 
 
 void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool useDelta, int tid)

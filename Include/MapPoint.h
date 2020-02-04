@@ -1,30 +1,30 @@
 #ifndef __MAPPOINT_H__
 #define __MAPPOINT_H__
 
-#include "GlobalTypes.h"
+#include "Settings.h"
 
 namespace FSLAM
 {
 class CalibData;
 class Frame;
 class ImmaturePoint;
-class EFPoint;
+// class EFPoint;
 class PointFrameResidual;
 
 struct MapPoint
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    static int instanceCounter;
-    EFPoint* efPoint;
+    // static int instanceCounter;
+    // EFPoint* efPoint;
 
     // static values
     float color[MAX_RES_PER_POINT];   // colors in host frame
     float weights[MAX_RES_PER_POINT]; // host-weights for respective residuals.
 
     float u, v;
-    int idx;
+    // int idx;
     float energyTH;
-    Frame* host;
+    std::weak_ptr<Frame> host;
     std::shared_ptr<CalibData> Calib;
     bool hasDepthPrior;
 
@@ -52,6 +52,7 @@ struct MapPoint
     {
         this->idepth = idepth;
         this->idepth_scaled = SCALE_IDEPTH * idepth;
+
     }
 
     inline void setIdepthScaled(float idepth_scaled)
@@ -67,24 +68,38 @@ struct MapPoint
         nullspaces_scale = -(idepth * 1.001 - idepth / 1.001) * 500;
     }
 
-    std::vector<PointFrameResidual*> residuals;                // only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
-    std::pair<PointFrameResidual*, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
+    std::vector<std::shared_ptr<PointFrameResidual>> residuals;                // only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+    std::pair<std::shared_ptr<PointFrameResidual>, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
-    void release();
-
-    MapPoint(const ImmaturePoint* const rawPoint, std::shared_ptr<CalibData> Hcalib);
+    MapPoint(std::shared_ptr<ImmaturePoint> rawPoint, std::shared_ptr<CalibData> Hcalib);
    
-    inline ~MapPoint()
-    {
-        // assert(efPoint == 0);
-        release();
-        instanceCounter--;
-    }
+    inline ~MapPoint() {}
 
-    bool isOOB(const std::vector<Frame*> &toMarg) const;
+    bool isOOB(const std::vector<std::shared_ptr<Frame>> &toMarg) const;
     bool isInlierNew();
 
+    void takeData()
+    {
+        priorF = hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
+        if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
+            priorF = 0;
+        deltaF = idepth - idepth_zero;
+    }
+
+    float priorF = 0;
+    float deltaF = 0;
+
+    // H and b blocks
+    float bdSumF = 0;
+    float HdiF = 0;
+    float Hdd_accLF = 0;
+    VecCf Hcd_accLF = VecCf::Zero();
+    float bd_accLF = 0;
+    float Hdd_accAF = 0;
+    VecCf Hcd_accAF = VecCf::Zero();
+    float bd_accAF = 0;
 };
+
 
 } // namespace FSLAM
 

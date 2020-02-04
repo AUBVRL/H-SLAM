@@ -19,9 +19,9 @@ class Frame;
 class MapPoint;
 
 
-class EFResidual;
-class EFPoint;
-class EFFrame;
+// class EFResidual;
+// class EFPoint;
+// class EFFrame;
 class EnergyFunctional;
 class AccumulatedTopHessian;
 class AccumulatedTopHessianSSE;
@@ -38,9 +38,9 @@ extern bool EFDeltaValid;
 class EnergyFunctional {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	friend class EFFrame;
-	friend class EFPoint;
-	friend class EFResidual;
+	// friend class EFFrame;
+	// friend class EFPoint;
+	// friend class EFResidual;
 	friend class AccumulatedTopHessian;
 	friend class AccumulatedTopHessianSSE;
 	friend class AccumulatedSCHessian;
@@ -50,13 +50,13 @@ public:
 	~EnergyFunctional();
 
 
-	EFResidual* insertResidual(PointFrameResidual* r);
-	EFFrame* insertFrame(Frame* fh, std::shared_ptr<CalibData> Hcalib);
-	EFPoint* insertPoint(MapPoint* ph);
+	void insertResidual(std::shared_ptr<PointFrameResidual> r);
+	void insertFrame(std::shared_ptr<Frame> fh, std::shared_ptr<CalibData> Hcalib);
+	void insertPoint(std::shared_ptr<MapPoint> ph);
 
-	void dropResidual(EFResidual* r);
-	void marginalizeFrame(EFFrame* fh);
-	void removePoint(EFPoint* ph);
+	void dropResidual(std::shared_ptr<PointFrameResidual> r);
+	void marginalizeFrame(std::shared_ptr<Frame> fh);
+	void removePoint(std::shared_ptr<MapPoint> ph);
 
 
 
@@ -73,7 +73,7 @@ public:
 
 	void setAdjointsF(std::shared_ptr<CalibData> Hcalib);
 
-	std::vector<EFFrame*> frames;
+	std::vector<std::shared_ptr<Frame>> frames;
 	int nPoints, nFrames, nResiduals;
 
 	MatXX HM;
@@ -97,6 +97,9 @@ public:
 	  std::less<uint64_t>,
 	  Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>
 	  > connectivityMap;
+	
+	Mat18f* adHTdeltaF;
+	VecCf cDeltaF;
 
 private:
 
@@ -112,7 +115,7 @@ private:
 	void calcLEnergyPt(int min, int max, Vec10* stats, int tid);
 
 	void orthogonalize(VecX* b, MatXX* H);
-	Mat18f* adHTdeltaF;
+
 
 	Mat88* adHost;
 	Mat88* adTarget;
@@ -122,17 +125,14 @@ private:
 
 
 	VecC cPrior;
-	VecCf cDeltaF;
 	VecCf cPriorF;
 
 	AccumulatedTopHessianSSE* accSSE_top_L;
 	AccumulatedTopHessianSSE* accSSE_top_A;
-
-
 	AccumulatedSCHessianSSE* accSSE_bot;
 
-	std::vector<EFPoint*> allPoints;
-	std::vector<EFPoint*> allPointsToMarg;
+	std::vector<std::shared_ptr<MapPoint>> allPoints;
+	std::vector<std::shared_ptr<MapPoint>> allPointsToMarg;
 
 	float currentLambda;
 };

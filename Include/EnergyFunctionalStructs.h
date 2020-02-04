@@ -24,53 +24,53 @@ class EnergyFunctional;
 
 
 
-class EFResidual
-{
-public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+// class EFResidual
+// {
+// public:
+// 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-	inline EFResidual(PointFrameResidual* org, EFPoint* point_, EFFrame* host_, EFFrame* target_) :
-		data(org), point(point_), host(host_), target(target_)
-	{
-		isLinearized=false;
-		isActiveAndIsGoodNEW=false;
-		J = new RawResidualJacobian();
-		assert(((long)this)%16==0);
-		assert(((long)J)%16==0);
-	}
-	inline ~EFResidual()
-	{
-		delete J;
-	}
-
-
-	void takeDataF();
+// 	inline EFResidual(PointFrameResidual* org, EFPoint* point_, EFFrame* host_, EFFrame* target_) :
+// 		data(org), point(point_), host(host_), target(target_)
+// 	{
+// 		isLinearized=false;
+// 		isActiveAndIsGoodNEW=false;
+// 		J = new RawResidualJacobian();
+// 		assert(((long)this)%16==0);
+// 		assert(((long)J)%16==0);
+// 	}
+// 	inline ~EFResidual()
+// 	{
+// 		delete J;
+// 	}
 
 
-	void fixLinearizationF(EnergyFunctional* ef);
+// 	void takeDataF();
 
 
-	// structural pointers
-	PointFrameResidual* data;
-	int hostIDX, targetIDX;
-	EFPoint* point;
-	EFFrame* host;
-	EFFrame* target;
-	int idxInAll;
-
-	RawResidualJacobian* J;
-
-	VecNRf res_toZeroF;
-	Vec8f JpJdF;
+// 	void fixLinearizationF(EnergyFunctional* ef);
 
 
-	// status.
-	bool isLinearized;
+// 	// structural pointers
+// 	PointFrameResidual* data;
+// 	int hostIDX, targetIDX;
+// 	EFPoint* point;
+// 	EFFrame* host;
+// 	EFFrame* target;
+// 	int idxInAll;
 
-	// if residual is not OOB & not OUTLIER & should be used during accumulations
-	bool isActiveAndIsGoodNEW;
-	inline const bool &isActive() const {return isActiveAndIsGoodNEW;}
-};
+// 	RawResidualJacobian* J;
+
+// 	VecNRf res_toZeroF;
+// 	Vec8f JpJdF;
+
+
+// 	// status.
+// 	bool isLinearized;
+
+// 	// if residual is not OOB & not OUTLIER & should be used during accumulations
+// 	bool isActiveAndIsGoodNEW;
+// 	inline const bool &isActive() const {return isActiveAndIsGoodNEW;}
+// };
 
 
 enum EFPointStatus {PS_GOOD=0, PS_MARGINALIZE, PS_DROP};
@@ -116,29 +116,29 @@ public:
 
 
 
-class EFFrame
-{
-public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	EFFrame(Frame* d) : data(d)
-	{
-		takeData();
-	}
-	void takeData();
+// class EFFrame
+// {
+// public:
+//     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+// 	EFFrame(Frame* d) : data(d)
+// 	{
+// 		takeData();
+// 	}
+// 	void takeData();
 
 
-	Vec8 prior;				// prior hessian (diagonal)
-	Vec8 delta_prior;		// = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
-	Vec8 delta;				// state - state_zero.
+// 	Vec8 prior;				// prior hessian (diagonal)
+// 	Vec8 delta_prior;		// = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
+// 	Vec8 delta;				// state - state_zero.
 
 
 
-	std::vector<EFPoint*> points;
-	Frame* data;
-	int idx;	// idx in frames.
+// 	std::vector<EFPoint*> points;
+// 	Frame* data;
+// 	int idx;	// idx in frames.
 
-	int frameID;
-};
+// 	int frameID;
+// };
 
 }
 

@@ -10,7 +10,7 @@
 namespace FSLAM
 {
 
-  void FrameFramePrecalc::set(Frame* host, Frame* target, std::shared_ptr<CalibData> HCalib)
+  void FrameFramePrecalc::set(std::shared_ptr<Frame> host, std::shared_ptr<Frame> target, std::shared_ptr<CalibData> HCalib)
     {
         this->host = host;
         this->target = target;
@@ -38,30 +38,7 @@ namespace FSLAM
         PRE_b0_mode = host->aff_g2l_0().b;
     }
 
-    PointFrameResidual::PointFrameResidual()
-    {
-      assert(false);
-      instanceCounter++;
-    }
 
-    PointFrameResidual::~PointFrameResidual()
-    {
-      assert(efResidual == 0);
-      instanceCounter--;
-      delete J;
-    }
-
-    PointFrameResidual::PointFrameResidual(MapPoint *point_, Frame *host_, Frame *target_) :
-     point(point_), host(host_), target(target_)
-    {
-      efResidual = 0;
-      instanceCounter++;
-      resetOOB();
-      J = new RawResidualJacobian();
-      assert(((long)J) % 16 == 0);
-
-      isNew = true;
-    }
 
     double PointFrameResidual::linearize(std::shared_ptr<CalibData> HCalib)
     {
@@ -73,16 +50,20 @@ namespace FSLAM
         return state_energy;
       }
 
-      FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
+      std::shared_ptr<Frame> lHost = host.lock();
+      std::shared_ptr<Frame> lTarget = target.lock();
+      std::shared_ptr<MapPoint> lpoint = point.lock();
+
+      FrameFramePrecalc *precalc = &(lHost->targetPrecalc[lTarget->idx]);
       float energyLeft = 0;
-      const Eigen::Vector3f *dIl = target->DirPyr[0];
+      const Eigen::Vector3f *dIl = lTarget->DirPyr[0];
       //const float* const Il = target->I;
       const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
       const Vec3f &PRE_KtTll = precalc->PRE_KtTll;
       const Mat33f &PRE_RTll_0 = precalc->PRE_RTll_0;
       const Vec3f &PRE_tTll_0 = precalc->PRE_tTll_0;
-      const float *const color = point->color;
-      const float *const weights = point->weights;
+      const float *const color = lpoint->color;
+      const float *const weights = lpoint->weights;
 
       Vec2f affLL = precalc->PRE_aff_mode;
       float b0 = precalc->PRE_b0_mode;
@@ -95,7 +76,7 @@ namespace FSLAM
         float Ku, Kv;
         Vec3f KliP;
 
-        if (!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0, HCalib,
+        if (!projectPoint(lpoint->u, lpoint->v, lpoint->idepth_zero_scaled, 0, 0, HCalib,
                           PRE_RTll_0, PRE_tTll_0, drescale, u, v, Ku, Kv, KliP, new_idepth))
         {
           state_NewState = ResState::OOB;
@@ -164,7 +145,7 @@ namespace FSLAM
       for (int idx = 0; idx < patternNum; idx++)
       {
         float Ku, Kv;
-        if (!projectPoint(point->u + patternP[idx][0], point->v + patternP[idx][1], point->idepth_scaled, PRE_KRKiTll, PRE_KtTll, Ku, Kv, HCalib))
+        if (!projectPoint(lpoint->u + patternP[idx][0], lpoint->v + patternP[idx][1], lpoint->idepth_scaled, PRE_KRKiTll, PRE_KtTll, Ku, Kv, HCalib))
         {
           state_NewState = ResState::OOB;
           return state_energy;
@@ -241,9 +222,9 @@ namespace FSLAM
 
       state_NewEnergyWithOutlier = energyLeft;
 
-      if (energyLeft > std::max<float>(host->frameEnergyTH, target->frameEnergyTH) || wJI2_sum < 2)
+      if (energyLeft > std::max<float>(lHost->frameEnergyTH, lTarget->frameEnergyTH) || wJI2_sum < 2)
       {
-        energyLeft = std::max<float>(host->frameEnergyTH, target->frameEnergyTH);
+        energyLeft = std::max<float>(lHost->frameEnergyTH, lTarget->frameEnergyTH);
         state_NewState = ResState::OUTLIER;
       }
       else
@@ -261,22 +242,49 @@ namespace FSLAM
       {
         if (state_state == ResState::OOB)
         {
-          assert(!efResidual->isActiveAndIsGoodNEW);
           return; // can never go back from OOB
         }
         if (state_NewState == ResState::IN) // && )
         {
-          efResidual->isActiveAndIsGoodNEW = true;
-          efResidual->takeDataF();
+          isActiveAndIsGoodNEW = true;
+          takeData();
         }
         else
         {
-          efResidual->isActiveAndIsGoodNEW = false;
+          isActiveAndIsGoodNEW = false;
         }
       }
 
       setState(state_NewState);
       state_energy = state_NewEnergy;
     }
+
+    void PointFrameResidual::fixLinearizationF(std::shared_ptr<EnergyFunctional> ef) {
+
+            Vec8f dp = ef->adHTdeltaF[hostIDX + ef->nFrames * targetIDX];
+
+            // compute Jp*delta
+            __m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>())
+                                            + J->Jpdc[0].dot(ef->cDeltaF)
+                                            + J->Jpdd[0] * point.lock()->deltaF);
+            __m128 Jp_delta_y = _mm_set1_ps(J->Jpdxi[1].dot(dp.head<6>())
+                                            + J->Jpdc[1].dot(ef->cDeltaF)
+                                            + J->Jpdd[1] * point.lock()->deltaF);
+
+            __m128 delta_a = _mm_set1_ps((float) (dp[6]));
+            __m128 delta_b = _mm_set1_ps((float) (dp[7]));
+
+            for (int i = 0; i < patternNum; i += 4) {
+                // PATTERN: rtz = resF - [JI*Jp Ja]*delta.
+                __m128 rtz = _mm_load_ps(((float *) &J->resF) + i);
+                rtz = _mm_sub_ps(rtz, _mm_mul_ps(_mm_load_ps(((float *) (J->JIdx)) + i), Jp_delta_x));
+                rtz = _mm_sub_ps(rtz, _mm_mul_ps(_mm_load_ps(((float *) (J->JIdx + 1)) + i), Jp_delta_y));
+                rtz = _mm_sub_ps(rtz, _mm_mul_ps(_mm_load_ps(((float *) (J->JabF)) + i), delta_a));
+                rtz = _mm_sub_ps(rtz, _mm_mul_ps(_mm_load_ps(((float *) (J->JabF + 1)) + i), delta_b));
+                _mm_store_ps(((float *) &res_toZeroF) + i, rtz);
+            }
+
+            isLinearized = true;
+        }
 
     } // namespace FSLAM

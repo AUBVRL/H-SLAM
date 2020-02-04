@@ -6,22 +6,28 @@
 namespace FSLAM
 {
 
-MapPoint::MapPoint(const ImmaturePoint* const rawPoint, std::shared_ptr<CalibData> Hcalib)
+MapPoint::MapPoint(std::shared_ptr<ImmaturePoint> rawPoint, std::shared_ptr<CalibData> Hcalib)
 {
-	instanceCounter++;
+	// instanceCounter++;
     Calib = Hcalib;
-	host = rawPoint->host;
+	host = rawPoint->host.lock();
 	hasDepthPrior=false;
+
+	// set static values & initialization.
+	u = rawPoint->u;
+	v = rawPoint->v;
 
 	idepth_hessian=0;
 	maxRelBaseline=0;
 	numGoodResiduals=0;
 
-	// set static values & initialization.
-	u = rawPoint->u;
-	v = rawPoint->v;
+    // std::weak_ptr<Frame> host;
+    std::shared_ptr<CalibData> Calib;
+    bool hasDepthPrior;
+
+    float my_type;
+
 	assert(std::isfinite(rawPoint->idepth_max));
-	//idepth_init = rawPoint->idepth_GT;
 
 	my_type = rawPoint->my_type;
 
@@ -37,24 +43,15 @@ MapPoint::MapPoint(const ImmaturePoint* const rawPoint, std::shared_ptr<CalibDat
 
 }
 
-void MapPoint::release()
+bool MapPoint::isOOB(const std::vector<std::shared_ptr<Frame>> &toMarg) const
 {
-	for (unsigned int i = 0; i < residuals.size(); i++)
-		delete residuals[i];
-	residuals.clear();
-}
-
-bool MapPoint::isOOB(const std::vector<Frame*> &toMarg) const
-{
-
 	int visInToMarg = 0;
 	for (auto r : residuals)
 	{
-
 		if (r->state_state != ResState::IN)
 			continue;
 		for (auto k : toMarg)
-			if (r->target == k)
+			if (r->target.lock() == k)
 				visInToMarg++;
 	}
 	if ((int)residuals.size() >= setting_minGoodActiveResForMarg &&

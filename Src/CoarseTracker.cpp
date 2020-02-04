@@ -106,24 +106,29 @@ void CoarseTracker::makeK(std::shared_ptr<CalibData> HCalib)
 
 
 
-void CoarseTracker::makeCoarseDepthL0(std::vector<Frame*> frameHessians)
+void CoarseTracker::makeCoarseDepthL0(std::vector<std::shared_ptr<Frame>> frameHessians)
 {
 	// make coarse tracking templates for latstRef.
 	memset(idepth[0], 0, sizeof(float)*w[0]*h[0]);
 	memset(weightSums[0], 0, sizeof(float)*w[0]*h[0]);
 
-	for(Frame* fh : frameHessians)
+	for(auto fh : frameHessians)
 	{
-		for(MapPoint* ph : fh->pointHessians)
+		for(auto ph : fh->pointHessians)
 		{
+			if(!ph)
+				continue;
+			if(ph->status != MapPoint::ACTIVE)
+				continue;
+
 			if(ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN)
 			{
-				PointFrameResidual* r = ph->lastResiduals[0].first;
-				assert(r->efResidual->isActive() && r->target == lastRef);
+				std::shared_ptr<PointFrameResidual> r = ph->lastResiduals[0].first;
+				assert(r->isActive() && r->target.lock() == lastRef);
 				int u = r->centerProjectedTo[0] + 0.5f;
 				int v = r->centerProjectedTo[1] + 0.5f;
 				float new_idepth = r->centerProjectedTo[2];
-				float weight = sqrtf(1e-3 / (ph->efPoint->HdiF+1e-12));
+				float weight = sqrtf(1e-3 / (ph->HdiF+1e-12));
 
 				idepth[0][u+w[0]*v] += new_idepth *weight;
 				weightSums[0][u+w[0]*v] += weight;
@@ -493,7 +498,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 
 
 void CoarseTracker::setCoarseTrackingRef(
-		std::vector<Frame*> frameHessians)
+		std::vector<std::shared_ptr<Frame>> frameHessians)
 {
 	assert(frameHessians.size()>0);
 	lastRef = frameHessians.back();
@@ -508,7 +513,7 @@ void CoarseTracker::setCoarseTrackingRef(
 
 }
 bool CoarseTracker::trackNewestCoarse(
-		Frame* newFrameHessian,
+		std::shared_ptr<Frame> newFrameHessian,
 		SE3 &lastToNew_out, AffLight &aff_g2l_out,
 		int coarsestLvl,
 		Vec5 minResForAbort)
@@ -732,8 +737,8 @@ CoarseDistanceMap::~CoarseDistanceMap()
 
 
 void CoarseDistanceMap::makeDistanceMap(
-		std::vector<Frame*> frameHessians,
-		Frame* frame)
+		std::vector<std::shared_ptr<Frame>> frameHessians,
+		std::shared_ptr<Frame> frame)
 {
 	int w1 = w[1];
 	int h1 = h[1];
@@ -745,7 +750,7 @@ void CoarseDistanceMap::makeDistanceMap(
 	// make coarse tracking templates for latstRef.
 	int numItems = 0;
 
-	for(Frame* fh : frameHessians)
+	for(auto fh : frameHessians)
 	{
 		if(frame == fh) continue;
 
@@ -753,7 +758,7 @@ void CoarseDistanceMap::makeDistanceMap(
 		Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
 		Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
 
-		for(MapPoint* ph : fh->pointHessians)
+		for(auto ph : fh->pointHessians)
 		{
 			assert(ph->status == MapPoint::ACTIVE);
 			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;

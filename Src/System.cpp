@@ -103,8 +103,6 @@ System::~System()
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    
     std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight
 
     if(!Initialized)
@@ -150,7 +148,6 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
         }
     }
     
-    std::cout << "Feature time: " << (float)(((std::chrono::duration<double>)(std::chrono::high_resolution_clock::now() - start)).count() * 1e3) << std::endl;
 
     //only called if online photometric calibration is required (keep this here and not in the photometric undistorter to have access to slam data)
     // if(OnlinePhCalibL) 

@@ -15,7 +15,7 @@ class CalibData;
 class Frame;
 class ImmaturePoint;
 class MapPoint;
-class EFFrame;
+// class EFFrame;
 template<typename Type> class IndexThreadReduce;
 
 class Frame
@@ -41,17 +41,17 @@ public:
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
     
-    std::vector<MapPoint*> pointHessians;				// contains all ACTIVE points.
-	std::vector<MapPoint*> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
-	std::vector<MapPoint*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
-    std::vector<ImmaturePoint*> ImmaturePoints;
+    std::vector<std::shared_ptr<MapPoint>> pointHessians;				// contains all ACTIVE points.
+	std::vector<std::shared_ptr<MapPoint>> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
+	std::vector<std::shared_ptr<MapPoint>> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
+    std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
 
     cv::Mat Descriptors;
 
-    unsigned int id; //frame id number
-    unsigned int frameNumb;
-    static unsigned int Globalid;
-    static unsigned int GlobalIncoming_id; //frame id number
+    size_t id; //frame id number
+    size_t frameNumb;
+    static size_t Globalid;
+    static size_t GlobalIncoming_id; //frame id number
     unsigned int idx; // frame number in the moving optimization window
     
     int nFeatures; // number of extracted keypoints
@@ -73,7 +73,7 @@ public:
     bool FlaggedForMarginalization;
 
     AffLight aff_g2l_internal;
-    EFFrame* efFrame;
+    // EFFrame* efFrame;
 
 
     SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
@@ -222,6 +222,11 @@ public:
     {
         return Vec10::Zero();
     }
+
+    void takeData();                 // take data from frame hessian
+    Vec8 prior = Vec8::Zero();       // prior hessian (diagonal)
+    Vec8 delta_prior = Vec8::Zero(); // = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
+    Vec8 delta = Vec8::Zero();       // state - state_zero.
 };
 
 

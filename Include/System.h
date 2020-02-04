@@ -49,8 +49,9 @@ public:
     EnergyFunctional* ef;
 	float* selectionMap;
 	CoarseDistanceMap* coarseDistanceMap;
+
     std::vector<std::shared_ptr<Frame>> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
-	std::vector<PointFrameResidual*> activeResiduals;
+	std::vector<std::shared_ptr<PointFrameResidual>> activeResiduals;
 	float currentMinActDist;
     
     boost::mutex trackMutex;
@@ -74,8 +75,8 @@ public:
 	void marginalizeFrame(std::shared_ptr<Frame> frame);
     float optimize(int mnumOptIts);
     // opt single point
-	int optimizePoint(MapPoint* point, int minObs, bool flagOOB);
-	MapPoint* optimizeImmaturePoint(ImmaturePoint* point, int minObs, ImmaturePointTemporaryResidual* residuals);
+	int optimizePoint(std::shared_ptr<MapPoint> point, int minObs, bool flagOOB);
+	std::shared_ptr<MapPoint> optimizeImmaturePoint(std::shared_ptr<ImmaturePoint> point, int minObs, std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>>& residuals);
     Vec4 trackNewCoarse(std::shared_ptr<Frame> fh);
 	void traceNewCoarse(std::shared_ptr<Frame> fh);
 	void activatePoints();
@@ -93,8 +94,8 @@ public:
 	void loadSateBackup();
 	double calcLEnergy();
 	double calcMEnergy();
-	void linearizeAll_Reductor(bool fixLinearization, std::vector<PointFrameResidual*>* toRemove, int min, int max, Vec10* stats, int tid);
-	void activatePointsMT_Reductor(std::vector<MapPoint*>* optimized, std::vector<ImmaturePoint*>* toOptimize,int min, int max, Vec10* stats, int tid);
+	void linearizeAll_Reductor(bool fixLinearization, std::vector<std::shared_ptr<PointFrameResidual>>* toRemove, int min, int max, Vec10* stats, int tid);
+	void activatePointsMT_Reductor(std::vector<std::shared_ptr<MapPoint>>* optimized, std::vector<std::shared_ptr<ImmaturePoint>>* toOptimize,int min, int max, Vec10* stats, int tid);
 	void applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid);
    	void printOptRes(const Vec3 &res, double resL, double resM, double resPrior, double LExact, float a, float b);
 

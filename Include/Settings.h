@@ -23,7 +23,7 @@ extern float tolerance; //Ssc telerance ratio
 extern int EnforcedMinDist;
 extern bool DoSubPix;
 extern bool DrawDetected;
-extern bool DrawDepthKf;
+extern bool DrawDepthKfTest;
 extern bool DrawEpipolarMatching;
 
 //Direct data dector

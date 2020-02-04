@@ -26,12 +26,12 @@ public:
 	~CoarseTracker();
 
 	bool trackNewestCoarse(
-			Frame* newFrameHessian,
+			std::shared_ptr<Frame> newFrameHessian,
 			SE3 &lastToNew_out, AffLight &aff_g2l_out,
 			int coarsestLvl, Vec5 minResForAbort);
 
 	void setCoarseTrackingRef(
-			std::vector<Frame*> frameHessians);
+			std::vector<std::shared_ptr<Frame>> frameHessians);
 
 	void makeK(
 			std::shared_ptr<CalibData> HCalib);
@@ -54,9 +54,9 @@ public:
     // void debugPlotIDepthMap(float* minID, float* maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
     // void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);
 
-	Frame* lastRef;
+	std::shared_ptr<Frame> lastRef;
 	AffLight lastRef_aff_g2l;
-	Frame* newFrame;
+	std::shared_ptr<Frame> newFrame;
 	int refFrameID;
 
 	// act as pure ouptut
@@ -66,7 +66,7 @@ public:
 private:
 
 
-	void makeCoarseDepthL0(std::vector<Frame*> frameHessians);
+	void makeCoarseDepthL0(std::vector<std::shared_ptr<Frame>> frameHessians);
 	float* idepth[PYR_LEVELS];
 	float* weightSums[PYR_LEVELS];
 	float* weightSums_bak[PYR_LEVELS];
@@ -111,11 +111,11 @@ public:
 	~CoarseDistanceMap();
 
 	void makeDistanceMap(
-			std::vector<Frame*> frameHessians,
-			Frame* frame);
+			std::vector<std::shared_ptr<Frame>> frameHessians,
+			std::shared_ptr<Frame> frame);
 
 	void makeInlierVotes(
-			std::vector<Frame*> frameHessians);
+			std::vector<std::shared_ptr<Frame>> frameHessians);
 
 	void makeK( std::shared_ptr<CalibData> HCalib);
 

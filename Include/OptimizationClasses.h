@@ -9,15 +9,16 @@ namespace FSLAM
 class Frame;
 class CalibData;
 class MapPoint;
-class EFResidual;
+class EnergyFunctional;
+// class EFResidual;
 
 struct FrameFramePrecalc
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     // static values
     // static int instanceCounter;
-    Frame* host;   // defines row
-    Frame* target; // defines column
+    std::weak_ptr<Frame> host;   // defines row
+    std::weak_ptr<Frame> target; // defines column
 
     // precalc values
     Mat33f PRE_RTll;
@@ -36,7 +37,7 @@ struct FrameFramePrecalc
 
     inline ~FrameFramePrecalc() {}
     inline FrameFramePrecalc() { }
-    void set(Frame* host, Frame* target, std::shared_ptr<CalibData> HCalib);
+    void set(std::shared_ptr<Frame> host, std::shared_ptr<Frame> target, std::shared_ptr<CalibData> HCalib);
 
 };
 
@@ -76,11 +77,8 @@ class PointFrameResidual
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-	EFResidual* efResidual;
-
-	static int instanceCounter;
-
-
+	// EFResidual* efResidual;
+	// static int instanceCounter;
 	ResState state_state;
 	double state_energy;
 	ResState state_NewState;
@@ -90,12 +88,10 @@ public:
 
 	void setState(ResState s) {state_state = s;}
 
-
-	MapPoint* point;
-	Frame* host;
-	Frame* target;
-	RawResidualJacobian* J;
-
+	std::weak_ptr<MapPoint> point;
+	std::weak_ptr<Frame> host;
+	std::weak_ptr<Frame> target;
+	std::shared_ptr<RawResidualJacobian> J;
 
 	bool isNew;
 
@@ -104,8 +100,17 @@ public:
 	Vec3f centerProjectedTo;
 
 	~PointFrameResidual();
-	PointFrameResidual();
-	PointFrameResidual(MapPoint* point_, Frame* host_, Frame* target_);
+	PointFrameResidual()
+	{
+		J = std::shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
+	}
+	PointFrameResidual(std::shared_ptr<MapPoint> point_, std::shared_ptr<Frame> host_, std::shared_ptr<Frame> target_): point(point_), host(host_), target(target_)
+	{
+		J = std::shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
+		resetOOB();
+		isNew = true;
+
+	}
 	double linearize(std::shared_ptr<CalibData> HCalib);
 
 
@@ -118,9 +123,24 @@ public:
 	};
 	void applyRes( bool copyJacobians);
 
-	void debugPlot();
+	
+    inline bool isActive() const { return isActiveAndIsGoodNEW; }
+    void fixLinearizationF(std::shared_ptr<EnergyFunctional> ef); 	// fix the jacobians
+	int hostIDX = 0;
+	int targetIDX = 0;
+	VecNRf res_toZeroF;
+	Vec8f JpJdF = Vec8f::Zero();
+	bool isLinearized = false; // if linearization is fixed.
+	bool isActiveAndIsGoodNEW = false;
 
-	void printRows(std::vector<VecX> &v, VecX &r, int nFrames, int nPoints, int M, int res);
+	void takeData()
+	{
+		Vec2f JI_JI_Jd = J->JIdx2 * J->Jpdd;
+		for (int i = 0; i < 6; i++)
+			JpJdF[i] = J->Jpdxi[0][i] * JI_JI_Jd[0] + J->Jpdxi[1][i] * JI_JI_Jd[1];
+		JpJdF.segment<2>(6) = J->JabJIdx * J->Jpdd;
+	}
+
 };
 
 } // namespace FSLAM

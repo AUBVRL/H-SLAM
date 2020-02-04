@@ -20,19 +20,18 @@ namespace FSLAM
 
 
 
-MapPoint* System::optimizeImmaturePoint(
-		ImmaturePoint* point, int minObs,
-		ImmaturePointTemporaryResidual* residuals)
+std::shared_ptr<MapPoint> System::optimizeImmaturePoint(std::shared_ptr<ImmaturePoint> point, int minObs, std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>>& residuals)
 {
 	int nres = 0;
+
 	for(auto fh : frameHessians)
 	{
-		if(fh.get() != point->host)
+		if(fh != point->host.lock())
 		{
-			residuals[nres].state_NewEnergy = residuals[nres].state_energy = 0;
-			residuals[nres].state_NewState = ResState::OUTLIER;
-			residuals[nres].state_state = ResState::IN;
-			residuals[nres].target = fh.get();
+			residuals[nres]->state_NewEnergy = residuals[nres]->state_energy = 0;
+			residuals[nres]->state_NewState = ResState::OUTLIER;
+			residuals[nres]->state_state = ResState::IN;
+			residuals[nres]->target = fh;
 			nres++;
 		}
 	}
@@ -45,16 +44,11 @@ MapPoint* System::optimizeImmaturePoint(
 	float lastbd=0;
 	float currentIdepth=(point->idepth_max+point->idepth_min)*0.5f;
 
-
-
-
-
-
 	for(int i=0;i<nres;i++)
 	{
-		lastEnergy += point->linearizeResidual( 1000, residuals+i,lastHdd, lastbd, currentIdepth);
-		residuals[i].state_state = residuals[i].state_NewState;
-		residuals[i].state_energy = residuals[i].state_NewEnergy;
+		lastEnergy += point->linearizeResidual( 1000, residuals[i],lastHdd, lastbd, currentIdepth);
+		residuals[i]->state_state = residuals[i]->state_NewState;
+		residuals[i]->state_energy = residuals[i]->state_NewEnergy;
 	}
 
 	if(!std::isfinite(lastEnergy) || lastHdd < setting_minIdepthH_act)
@@ -78,7 +72,7 @@ MapPoint* System::optimizeImmaturePoint(
 
 		float newHdd=0; float newbd=0; float newEnergy=0;
 		for(int i=0;i<nres;i++)
-			newEnergy += point->linearizeResidual(1, residuals+i,newHdd, newbd, newIdepth);
+			newEnergy += point->linearizeResidual(1, residuals[i],newHdd, newbd, newIdepth);
 
 		if(!std::isfinite(lastEnergy) || newHdd < setting_minIdepthH_act)
 		{
@@ -104,8 +98,8 @@ MapPoint* System::optimizeImmaturePoint(
 			lastEnergy = newEnergy;
 			for(int i=0;i<nres;i++)
 			{
-				residuals[i].state_state = residuals[i].state_NewState;
-				residuals[i].state_energy = residuals[i].state_NewEnergy;
+				residuals[i]->state_state = residuals[i]->state_NewState;
+				residuals[i]->state_energy = residuals[i]->state_NewEnergy;
 			}
 
 			lambda *= 0.5;
@@ -122,48 +116,52 @@ MapPoint* System::optimizeImmaturePoint(
 	if(!std::isfinite(currentIdepth))
 	{
 		printf("MAJOR ERROR! point idepth is nan after initialization (%f).\n", currentIdepth);
-		return (MapPoint*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
+		return nullptr;		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
 
 	int numGoodRes=0;
 	for(int i=0;i<nres;i++)
-		if(residuals[i].state_state == ResState::IN) numGoodRes++;
+		if(residuals[i]->state_state == ResState::IN) numGoodRes++;
 
 	if(numGoodRes < minObs)
 	{
 		if(print) printf("OptPoint: OUTLIER!\n");
-		return (MapPoint*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
+		return nullptr;		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
 
 
-	MapPoint* p = new MapPoint(point, Calib);
-	if(!std::isfinite(p->energyTH)) {delete p; return (MapPoint*)((long)(-1));}
+	std::shared_ptr<MapPoint> p = std::shared_ptr<MapPoint>(new MapPoint(point, Calib));
 
-	p->lastResiduals[0].first = 0;
+	if(!std::isfinite(p->energyTH))
+	{
+		return nullptr;
+	}
+
+	p->lastResiduals[0].first = nullptr;
 	p->lastResiduals[0].second = ResState::OOB;
-	p->lastResiduals[1].first = 0;
+	p->lastResiduals[1].first = nullptr;
 	p->lastResiduals[1].second = ResState::OOB;
 	p->setIdepthZero(currentIdepth);
 	p->setIdepth(currentIdepth);
 	p->setPointStatus(MapPoint::ACTIVE);
 
 	for(int i=0;i<nres;i++)
-		if(residuals[i].state_state == ResState::IN)
+		if(residuals[i]->state_state == ResState::IN)
 		{
-			PointFrameResidual* r = new PointFrameResidual(p, p->host, residuals[i].target);
+			std::shared_ptr<PointFrameResidual> r = std::shared_ptr<PointFrameResidual>(new PointFrameResidual(p, p->host.lock(), residuals[i]->target.lock()));
 			r->state_NewEnergy = r->state_energy = 0;
 			r->state_NewState = ResState::OUTLIER;
 			r->setState(ResState::IN);
 			p->residuals.push_back(r);
 
-			if(r->target == frameHessians.back().get())
+			if(r->target.lock() == frameHessians.back())
 			{
 				p->lastResiduals[0].first = r;
 				p->lastResiduals[0].second = ResState::IN;
 			}
-			else if(r->target == (frameHessians.size()<2 ? 0 : frameHessians[frameHessians.size()-2].get()))
+			else if(r->target.lock() == (frameHessians.size()<2 ? nullptr : frameHessians[frameHessians.size()-2]))
 			{
 				p->lastResiduals[1].first = r;
 				p->lastResiduals[1].second = ResState::IN;

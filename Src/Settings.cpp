@@ -20,8 +20,8 @@ namespace FSLAM
 
     bool DoSubPix = false;
     bool DrawDetected = true;
-    bool DrawDepthKf = true;
-    bool DrawEpipolarMatching = true;
+    bool DrawDepthKfTest = false;
+    bool DrawEpipolarMatching = false;
     bool Pause = false;
 
     //Direct data dector

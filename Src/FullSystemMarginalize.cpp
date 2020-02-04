@@ -92,7 +92,7 @@ void System::flagFramesForMarginalization(std::shared_ptr<Frame> newFH)
 			double distScore = 0;
 			for(FrameFramePrecalc &ffh : fh->targetPrecalc)
 			{
-				if(ffh.target->id > latest->id-setting_minFrameAge+1 || ffh.target == ffh.host) continue;
+				if(ffh.target.lock()->id > latest->id-setting_minFrameAge+1 || ffh.target.lock() == ffh.host.lock()) continue;
 				distScore += 1/(1e-5+ffh.distanceLL);
 
 			}
@@ -128,43 +128,51 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 	assert((int)frame->pointHessians.size()==0);
 
 
-	ef->marginalizeFrame(frame->efFrame);
+	ef->marginalizeFrame(frame);
 
 	// drop all observations of existing points in that frame.
 
-	for(auto fh : frameHessians)
+	for (auto fh : frameHessians)
 	{
-		if(fh==frame) continue;
+		if (fh == frame)
+			continue;
 
-		for(auto ph : fh->pointHessians)
+		for (auto ph : fh->pointHessians)
 		{
-			for(unsigned int i=0;i<ph->residuals.size();i++)
+			if (ph)
 			{
-				PointFrameResidual* r = ph->residuals[i];
-				if(r->target->id == frame->id)
+				if (ph->status == MapPoint::ACTIVE)
 				{
-					if(ph->lastResiduals[0].first == r)
-						ph->lastResiduals[0].first=0;
-					else if(ph->lastResiduals[1].first == r)
-						ph->lastResiduals[1].first=0;
+					size_t n = ph->residuals.size();
+					for (unsigned int i = 0; i < n; i++)
+					{
+						std::shared_ptr<PointFrameResidual> r = ph->residuals[i];
+						
+						if (r->target.lock() == frame)
+						{
+							if (ph->lastResiduals[0].first == r)
+								ph->lastResiduals[0].first.reset();
+							else if (ph->lastResiduals[1].first == r)
+								ph->lastResiduals[1].first.reset();
 
+							// if(r->host->frameID < r->target->frameID)
+							// 	statistics_numForceDroppedResFwd++;
+							// else
+							// 	statistics_numForceDroppedResBwd++;
 
-					// if(r->host->frameID < r->target->frameID)
-					// 	statistics_numForceDroppedResFwd++;
-					// else
-					// 	statistics_numForceDroppedResBwd++;
-
-					ef->dropResidual(r->efResidual);
-					deleteOut<PointFrameResidual>(ph->residuals,i);
-					break;
+							ef->dropResidual(r);
+							i--;
+							n--;
+							// deleteOut<PointFrameResidual>(ph->residuals, i);
+							break;
+						}
+					}
 				}
 			}
 		}
 	}
 
-
-
-    {
+	{
         // std::vector<Frame*> v;
         // v.push_back(frame);
         // for(IOWrap::Output3DWrapper* ow : outputWrapper)
