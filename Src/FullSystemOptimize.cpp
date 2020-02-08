@@ -212,6 +212,8 @@ bool System::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float
 
 			for(auto ph : fh->pointHessians)
 			{
+				if(!ph)
+					continue;
 				float step = ph->step+0.5f*(ph->step_backup);
 				ph->setIdepth(ph->idepth_backup + step);
 				sumID += step*step;
@@ -235,6 +237,8 @@ bool System::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float
 
 			for(auto ph : fh->pointHessians)
 			{
+				if(!ph)
+					continue;
 				ph->setIdepth(ph->idepth_backup + stepfacD*ph->step);
 				sumID += ph->step*ph->step;
 				sumNID += fabsf(ph->idepth_backup);
@@ -293,6 +297,8 @@ void System::backupState(bool backupLastStep)
 				fh->state_backup = fh->get_state();
 				for(auto ph : fh->pointHessians)
 				{
+					if(!ph)
+						continue;
 					ph->idepth_backup = ph->idepth;
 					ph->step_backup = ph->step;
 				}
@@ -308,6 +314,8 @@ void System::backupState(bool backupLastStep)
 				fh->state_backup = fh->get_state();
 				for(auto ph : fh->pointHessians)
 				{
+					if(!ph)
+						continue;
 					ph->idepth_backup = ph->idepth;
 					ph->step_backup=0;
 				}
@@ -321,7 +329,8 @@ void System::backupState(bool backupLastStep)
 		{
 			fh->state_backup = fh->get_state();
 			for(auto ph : fh->pointHessians)
-				ph->idepth_backup = ph->idepth;
+				if(ph)
+					ph->idepth_backup = ph->idepth;
 		}
 	}
 }
@@ -335,6 +344,8 @@ void System::loadSateBackup()
 		fh->setState(fh->state_backup);
 		for(auto ph : fh->pointHessians)
 		{
+			if(!ph)
+				continue;
 			ph->setIdepth(ph->idepth_backup);
 
             ph->setIdepthZero(ph->idepth_backup);

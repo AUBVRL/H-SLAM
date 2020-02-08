@@ -46,8 +46,8 @@ public:
 
     //----------------begin dso------------------
 
-    EnergyFunctional* ef;
-	float* selectionMap;
+    std::shared_ptr<EnergyFunctional> ef;
+	// float* selectionMap;
 	CoarseDistanceMap* coarseDistanceMap;
 
     std::vector<std::shared_ptr<Frame>> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
@@ -82,7 +82,7 @@ public:
 	void activatePoints();
 	void activatePointsMT();
     void flagPointsForRemoval();
-	void makeNewTraces(std::shared_ptr<Frame> newFrame, float* gtDepth);
+	void makeNewTraces(std::shared_ptr<Frame> newFrame);
     void flagFramesForMarginalization(std::shared_ptr<Frame> newFH);
     void removeOutliers();
 
@@ -112,7 +112,7 @@ public:
 
 private:
     void DrawImages(std::shared_ptr<ImageData> DataIn,std::shared_ptr<Frame> CurrentFrame);
-    void AddKeyframe(std::shared_ptr<Frame> Frame);
+    void AddKeyframe(std::shared_ptr<Frame> fh);
     void ProcessNonKeyframe(std::shared_ptr<Frame> Frame);
     void BlockUntilMappingIsFinished();
     void MappingThread();

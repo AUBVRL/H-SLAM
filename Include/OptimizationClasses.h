@@ -99,7 +99,6 @@ public:
 	Eigen::Vector2f projectedTo[MAX_RES_PER_POINT];
 	Vec3f centerProjectedTo;
 
-	~PointFrameResidual();
 	PointFrameResidual()
 	{
 		J = std::shared_ptr<RawResidualJacobian>(new RawResidualJacobian);

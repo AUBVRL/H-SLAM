@@ -760,6 +760,8 @@ void CoarseDistanceMap::makeDistanceMap(
 
 		for(auto ph : fh->pointHessians)
 		{
+			if(!ph)
+				continue;
 			assert(ph->status == MapPoint::ACTIVE);
 			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
 			int u = ptp[0] / ptp[2] + 0.5f;

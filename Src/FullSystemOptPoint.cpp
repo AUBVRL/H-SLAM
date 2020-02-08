@@ -23,9 +23,10 @@ namespace FSLAM
 std::shared_ptr<MapPoint> System::optimizeImmaturePoint(std::shared_ptr<ImmaturePoint> point, int minObs, std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>>& residuals)
 {
 	int nres = 0;
-
+	
 	for(auto fh : frameHessians)
 	{
+		residuals.push_back(std::shared_ptr<ImmaturePointTemporaryResidual>(new ImmaturePointTemporaryResidual()));
 		if(fh != point->host.lock())
 		{
 			residuals[nres]->state_NewEnergy = residuals[nres]->state_energy = 0;

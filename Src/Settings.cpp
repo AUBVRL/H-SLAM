@@ -54,6 +54,8 @@ namespace FSLAM
     float setting_overallEnergyTHWeight = 1;
 
     float setting_huberTH = 9; //Huber Threshold!
+    float benchmark_initializerSlackFactor = 1;
+
     
     // parameters controlling adaptive energy threshold computation.
     float setting_frameEnergyTHN = 0.7f;
@@ -68,6 +70,7 @@ namespace FSLAM
 
     //Immatureure point tracking
     float setting_maxPixSearch = 0.027f; 
+    float setting_minTraceQuality = 3;
     float setting_trace_slackInterval = 1.5f;
     float setting_trace_stepsize = 1.0f;
     float setting_trace_minImprovementFactor = 2;
@@ -101,6 +104,9 @@ namespace FSLAM
 
     float setting_minIdepthH_act = 100;
     float setting_minIdepthH_marg = 50;
+
+    float setting_desiredPointDensity = 2000; // aimed total points in the active window.
+
 
 
     bool multiThreading = true;

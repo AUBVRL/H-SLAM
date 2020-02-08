@@ -37,7 +37,7 @@ public:
     std::vector<Vec3f*> DirPyr; //float representation of image pyramid with computation of dIx ad dIy
     std::vector<float*> absSquaredGrad;
 
-    std::vector<std::vector<std::vector<size_t>>> mGrid;
+    std::vector<std::vector<std::vector<unsigned short int>>> mGrid;
     std::vector<cv::KeyPoint> mvKeys;
     std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
     

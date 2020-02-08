@@ -52,7 +52,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 	float maxPixSearch = (Calib->Width+Calib->Height)*setting_maxPixSearch;
 
 	if(debugPrint)
-		printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f -> %f. t %f %f %f!\n",
+		printf("trace pt (%.1f %.1f) from frame %zu to %zu. Range %f -> %f. t %f %f %f!\n",
 				u,v,
 				host.lock()->id, frame->id,
 				idepth_min, idepth_max,
@@ -176,7 +176,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 	dy /= dist;
 
 	if(debugPrint)
-		printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
+		printf("trace pt (%.1f %.1f) from frame %zu to %zu. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
 				u,v,
 				host.lock()->id, frame->id,
 				idepth_min, uMin, vMin,

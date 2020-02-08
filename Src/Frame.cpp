@@ -48,15 +48,27 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
     mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
     mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
+        
     mGrid.resize(mnGridCols);
     for (int i = 0; i < mnGridCols; ++i)
+    {
         mGrid[i].resize(mnGridRows);
+        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
+            mGrid[i][j].reserve(5);
+    }
     for (unsigned short int i = 0; i < nFeatures; ++i)
     {
         int nGridPosX, nGridPosY;
         if (PosInGrid(mvKeys[i], nGridPosX, nGridPosY))
             mGrid[nGridPosX][nGridPosY].push_back(i);
     }
+    
+    for (int i = 0, iend = mGrid.size(); i < iend; ++i)
+        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
+            mGrid[i][j].shrink_to_fit();
+    
+
+   
     isReduced = false;
     isKeyFrame = false;
 }
@@ -170,37 +182,41 @@ Frame::~Frame()
     absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
 }
 
-void Frame::ReduceToEssential(bool KeepIndirectData)
+void Frame::ReduceToEssential(bool isKeyFrame)
 {
+    if(isReduced)
+        return;
     isReduced = true;
     
-    if(!KeepIndirectData) //if true (global keyframe) keep these
+    if(!isKeyFrame) //if true (global keyframe) keep these
     {
-        mvKeys.clear(); mvKeys.shrink_to_fit();   
+        mvKeys.resize(0); mvKeys.shrink_to_fit();   
+        mGrid.clear(); mGrid.shrink_to_fit();
         Descriptors.release();
+        ImmaturePoints.resize(0); ImmaturePoints.shrink_to_fit();
+        pointHessians.resize(0); pointHessians.shrink_to_fit();
+        pointHessiansMarginalized.resize(0); pointHessiansMarginalized.shrink_to_fit();
+        Calib.reset();
     }
-
+    
     Detector.reset();
 
     IndPyr.clear(); IndPyr.shrink_to_fit();
 
-    for (int i = 1, iend = DirPyr.size(); i < iend; ++i)
+    for (int i = 0, iend = DirPyr.size(); i < iend; ++i)
     {
             delete[] DirPyr[i];
             delete[]  absSquaredGrad[i];
     }
-    DirPyr.resize(1); // resize to the highest res image only.
+    DirPyr.resize(0); // resize to the highest res image only.
     DirPyr.shrink_to_fit();
 
-    absSquaredGrad.resize(1); 
+    absSquaredGrad.resize(0); 
     absSquaredGrad.shrink_to_fit();
-        
-    // DirPyr.clear(); DirPyr.shrink_to_fit();  
-    // absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
     
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
-
-    // Calib.reset();
+    pointHessiansOut.resize(0); pointHessiansOut.shrink_to_fit();
+    
     return;
 }
 
@@ -229,8 +245,8 @@ std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float &y, con
     {
         for(int iy = nMinCellY; iy<=nMaxCellY; iy++)
         {
-            const std::vector<size_t> vCell = mGrid[ix][iy];
-            for(size_t j=0, jend=vCell.size(); j<jend; j++)
+            const std::vector<unsigned short int> vCell = mGrid[ix][iy];
+            for(size_t j=0, jend=vCell.size(); j<jend; ++j)
             {
                 const cv::KeyPoint &kpUn = mvKeys[vCell[j]];
                 const float distx = kpUn.pt.x-x;

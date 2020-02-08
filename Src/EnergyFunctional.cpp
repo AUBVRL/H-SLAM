@@ -410,6 +410,7 @@ void EnergyFunctional::insertFrame(std::shared_ptr<Frame> fh, std::shared_ptr<Ca
 
 void EnergyFunctional::insertPoint(std::shared_ptr<MapPoint> ph)
 {
+	ph->takeData();
 	nPoints++;
 	EFIndicesValid = false;
 	return;

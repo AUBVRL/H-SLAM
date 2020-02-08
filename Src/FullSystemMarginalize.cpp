@@ -45,7 +45,8 @@ void System::flagFramesForMarginalization(std::shared_ptr<Frame> newFH)
 	for(int i=0;i<(int)frameHessians.size();i++)
 	{
 		auto fh = frameHessians[i];
-		int in = fh->pointHessians.size() + fh->ImmaturePoints.size();
+		int in =  fh->pointHessians.size() - std::count(fh->pointHessians.begin(), fh->pointHessians.end(), nullptr) + fh->ImmaturePoints.size() - std::count(fh->ImmaturePoints.begin(), fh->ImmaturePoints.end(), nullptr);
+		// int in = fh->pointHessians.size() + fh->ImmaturePoints.size();
 		int out = fh->pointHessiansMarginalized.size() + fh->pointHessiansOut.size();
 
 

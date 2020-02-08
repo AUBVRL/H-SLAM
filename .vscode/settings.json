@@ -76,7 +76,8 @@
         "matrixfunctions": "cpp",
         "*.inc": "cpp",
         "svd": "cpp",
-        "eigenvalues": "cpp"
+        "eigenvalues": "cpp",
+        "tensor": "cpp"
     },
     "zenMode.hideTabs": false,
     "cmake.buildBeforeRun": false

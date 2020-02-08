@@ -50,11 +50,15 @@ extern int setting_maxOptIterations;  // max GN iterations.
 extern int setting_minOptIterations;  // min GN iterations.
 extern float setting_thOptIterations; // factor on break threshold for GN iteration (larger = break earlier)
 
+extern float setting_desiredPointDensity;
 extern float setting_outlierTHSumComponent; // higher -> less strong gradient-based reweighting .
 extern float setting_outlierTH; // higher -> less strict
 extern float setting_overallEnergyTHWeight;
 
 extern float setting_huberTH; //Huber Threshold!
+
+extern float benchmark_initializerSlackFactor;
+
 
 // parameters controlling adaptive energy threshold computation.
 extern float setting_frameEnergyTHN;
@@ -77,6 +81,9 @@ extern float setting_trace_extraSlackOnTH;
 
 extern float setting_margWeightFac; // factor on hessian when marginalizing, to account for inaccurate linearization points.
 extern int setting_GNItsOnPointActivation;
+
+extern float setting_minTraceQuality;
+
 
 //MapPoint settings
 extern int   setting_minGoodActiveResForMarg;
