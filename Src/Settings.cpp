@@ -27,6 +27,14 @@ namespace FSLAM
     //Direct data dector
     int DirPyrLevels = 6;
 
+    float setting_keyframesPerSecond = 0; // if !=0, takes a fixed number of KF per second.
+    bool setting_realTimeMaxKF = false;   // if true, takes as many KF's as possible (will break the system if the camera stays stationary)
+    float setting_maxShiftWeightT = 0.04f * (640 + 480);
+    float setting_maxShiftWeightR = 0.0f * (640 + 480);
+    float setting_maxShiftWeightRT = 0.02f * (640 + 480);
+    float setting_kfGlobalWeight = 1; // general weight on threshold, the larger the more KF's are taken (e.g., 2 = double the amount of KF's).
+    float setting_maxAffineWeight = 2;
+
     bool SequentialOperation = false;
 
     //Display options
@@ -67,6 +75,7 @@ namespace FSLAM
 
     float setting_margWeightFac = 0.5*0.5;          // factor on hessian when marginalizing, to account for inaccurate linearization points.
 
+    float setting_reTrackThreshold = 1.5; // (larger = re-track more often)
 
     //Immatureure point tracking
     float setting_maxPixSearch = 0.027f; 

@@ -49,7 +49,6 @@ void System::flagFramesForMarginalization(std::shared_ptr<Frame> newFH)
 		// int in = fh->pointHessians.size() + fh->ImmaturePoints.size();
 		int out = fh->pointHessiansMarginalized.size() + fh->pointHessiansOut.size();
 
-
 		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure,
 				frameHessians.back()->aff_g2l(), fh->aff_g2l());
 
@@ -126,7 +125,7 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 {
 	// marginalize or remove all this frames points.
 
-	assert((int)frame->pointHessians.size()==0);
+	// assert((int)frame->pointHessians.size()==0);
 
 
 	ef->marginalizeFrame(frame);

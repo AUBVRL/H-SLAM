@@ -5,6 +5,7 @@
 #include "EnergyFunctional.h"
 #include "ImmaturePoint.h"
 #include "CalibData.h"
+#include "CoarseTracker.h"
 namespace FSLAM
 {
 void System::AddKeyframe(std::shared_ptr<Frame> fh)
@@ -16,7 +17,7 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
         fh->setEvalPT_scaled(fh->camToWorld.inverse(), fh->aff_g2l_internal);
     }
 
-    // traceNewCoarse(fh);
+    traceNewCoarse(fh);
     boost::unique_lock<boost::mutex> lock(mapMutex);
 
     // =========================== Flag Frames to be Marginalized. =========================
@@ -84,14 +85,14 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
     // =========================== REMOVE OUTLIER =========================
     removeOutliers();
 
-    // {
-    // 	boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
-    // 	coarseTracker_forNewKF->makeK(&Hcalib);
-    // 	coarseTracker_forNewKF->setCoarseTrackingRef(frameHessians);
+    {
+    	boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
+    	coarseTracker_forNewKF->makeK(Calib);
+    	coarseTracker_forNewKF->setCoarseTrackingRef(frameHessians);
 
     //     coarseTracker_forNewKF->debugPlotIDepthMap(&minIdJetVisTracker, &maxIdJetVisTracker, outputWrapper);
     //     coarseTracker_forNewKF->debugPlotIDepthMapFloat(outputWrapper);
-    // }
+    }
 
     // =========================== (Activate-)Marginalize Points =========================
     flagPointsForRemoval();
@@ -142,7 +143,7 @@ void System::MappingThread()
         UnmappedTrackedFrames.pop_front();
 
         // guaranteed to make a KF for the very first two tracked frames.
-        if (allKeyFramesHistory.size() < 2)
+        if (allKeyFramesHistory.size() <= 2)
         {
             lock.unlock();
             AddKeyframe(frame);
@@ -175,7 +176,7 @@ void System::MappingThread()
         }
         else
         {
-            if (NeedNewKFAfter >= frameHessians.back()->id)
+            if (setting_realTimeMaxKF || NeedNewKFAfter >= frameHessians.back()->id)
             {
                 lock.unlock();
                 AddKeyframe(frame);
@@ -211,14 +212,17 @@ void System::makeNewTraces(std::shared_ptr<Frame> newFrame)
     // int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
 
     // newFrame->pointHessians.reserve(numPointsTotal*1.2f);
-    // //fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
-    // newFrame->pointHessiansMarginalized.reserve(numPointsTotal*1.2f);
-    // newFrame->pointHessiansOut.reserve(numPointsTotal*1.2f);
+    newFrame->pointHessians.resize(newFrame->nFeatures);
+    newFrame->ImmaturePoints.resize(newFrame->nFeatures);
+
+    //fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
+    newFrame->pointHessiansMarginalized.reserve(newFrame->nFeatures);
+    newFrame->pointHessiansOut.reserve(newFrame->nFeatures);
 
     for (int i = 0; i < newFrame->nFeatures; ++i)
     {
-        if (newFrame->pointHessians[i])
-            continue;
+        // if (newFrame->pointHessians[i])
+        //     continue;
         std::shared_ptr<ImmaturePoint> impt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(newFrame->mvKeys[i].pt.x, newFrame->mvKeys[i].pt.y, newFrame, 1, Calib));
         if (!std::isfinite(impt->energyTH))
             continue;
@@ -336,8 +340,8 @@ void System::activatePointsMT()
 	std::shared_ptr<Frame> newestHs = frameHessians.back();
 
 	// // make dist map.
-	// coarseDistanceMap->makeK(&Hcalib);
-	// coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
+	coarseDistanceMap->makeK(Calib);
+	coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
 
 
 	std::vector<std::shared_ptr<ImmaturePoint>> toOptimize; toOptimize.reserve(20000);
@@ -348,16 +352,18 @@ void System::activatePointsMT()
 		if(host == newestHs) continue;
 
 		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
-        Mat33f KRKi = (Calib->pyrK[0] * fhToNew.rotationMatrix().cast<float>() * Calib->pyrKi[0] );
-        Vec3f Kt = (Calib->pyrK[0] * fhToNew.translation().cast<float>());
+        // Mat33f KRKi = (Calib->pyrK[0] * fhToNew.rotationMatrix().cast<float>() * Calib->pyrKi[0] );
+        // Vec3f Kt = (Calib->pyrK[0] * fhToNew.translation().cast<float>());
 
-		// Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
-		// Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
+		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
+		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
 
 		for(unsigned int i=0;i<host->ImmaturePoints.size();i+=1)
 		{
 			std::shared_ptr<ImmaturePoint> ph = host->ImmaturePoints[i];
+            if(!ph)
+                continue;
 			ph->idxInImmaturePoints = i;
 
 			// delete points that have never been traced successfully, or that are outlier on the last trace.
@@ -391,16 +397,16 @@ void System::activatePointsMT()
 			int u = ptp[0] / ptp[2] + 0.5f;
 			int v = ptp[1] / ptp[2] + 0.5f;
 
-			if((u > 0 && v > 0 && u < Calib->Width && v < Calib->Height))
+			if((u > 0 && v > 0 && u < Calib->wpyr[1] && v < Calib->hpyr[1]))
 			{
 
-				// float dist = coarseDistanceMap->fwdWarpedIDDistFinal[u+wG[1]*v] + (ptp[0]-floorf((float)(ptp[0])));
+				float dist = coarseDistanceMap->fwdWarpedIDDistFinal[u+Calib->wpyr[1]*v] + (ptp[0]-floorf((float)(ptp[0])));
 
-				// if(dist>=currentMinActDist* ph->my_type)
-				// {
-					// coarseDistanceMap->addIntoDistFinal(u,v);
+				if(dist>=currentMinActDist* ph->my_type)
+				{
+					coarseDistanceMap->addIntoDistFinal(u,v);
 					toOptimize.push_back(ph);
-				// }
+				}
 			}
 			else
 			{
@@ -449,18 +455,18 @@ void System::activatePointsMT()
 	}
 
 
-	for(auto host : frameHessians)
-	{
-		for(int i=0;i<(int)host->ImmaturePoints.size();i++)
-		{
-			if(host->ImmaturePoints[i]==0)
-			{
-				host->ImmaturePoints[i] = host->ImmaturePoints.back();
-				host->ImmaturePoints.pop_back();
-				i--;
-			}
-		}
-	}
+	// for(auto host : frameHessians)
+	// {
+	// 	for(int i=0;i<(int)host->ImmaturePoints.size();i++)
+	// 	{
+	// 		if(host->ImmaturePoints[i]==0)
+	// 		{
+	// 			host->ImmaturePoints[i] = host->ImmaturePoints.back();
+	// 			host->ImmaturePoints.pop_back();
+	// 			i--;
+	// 		}
+	// 	}
+	// }
 }
 
 void System::activatePointsMT_Reductor( std::vector<std::shared_ptr<MapPoint>>* optimized, std::vector<std::shared_ptr<ImmaturePoint>>* toOptimize, int min, int max, Vec10* stats, int tid)
@@ -496,6 +502,8 @@ void System::traceNewCoarse(std::shared_ptr<Frame> fh)
 
 		for(auto ph : host->ImmaturePoints)
 		{
+            if(!ph)
+                continue;
 			ph->traceOn(fh, KRKi, Kt, aff, false );
 
 			if(ph->lastTraceStatus==ImmaturePointStatus::IPS_GOOD) trace_good++;

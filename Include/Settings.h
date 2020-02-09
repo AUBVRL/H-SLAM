@@ -29,6 +29,14 @@ extern bool DrawEpipolarMatching;
 //Direct data dector
 extern int DirPyrLevels;
 
+extern float setting_keyframesPerSecond;
+extern bool setting_realTimeMaxKF;
+extern float setting_maxShiftWeightT;
+extern float setting_maxShiftWeightR;
+extern float setting_maxShiftWeightRT;
+extern float setting_maxAffineWeight;
+extern float setting_kfGlobalWeight;
+
 extern bool Pause;
 
 extern bool SequentialOperation;
@@ -81,6 +89,8 @@ extern float setting_trace_extraSlackOnTH;
 
 extern float setting_margWeightFac; // factor on hessian when marginalizing, to account for inaccurate linearization points.
 extern int setting_GNItsOnPointActivation;
+
+extern float setting_reTrackThreshold; // (larger = re-track more often)
 
 extern float setting_minTraceQuality;
 

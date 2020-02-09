@@ -549,6 +549,7 @@ void EnergyFunctional::marginalizePointsF()
 					if(r->isActive())
                         connectivityMap[(((uint64_t)r->host.lock()->id) << 32) + ((uint64_t)r->target.lock()->id)][1]++;
 				allPointsToMarg.push_back(p);
+				f->pointHessians[i].reset();
 			}
 		}
 	}
@@ -604,6 +605,7 @@ void EnergyFunctional::dropPointsF()
 			if(p->status == MapPoint::OOB || p->status == MapPoint::OUTLIER)
 			{
 				removePoint(p);
+				f->pointHessians[i].reset(); //DEBUG THIS
 			}
 		}
 	}
