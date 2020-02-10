@@ -540,7 +540,7 @@ void EnergyFunctional::marginalizePointsF()
 		for(int i=0, iend = f->pointHessians.size(); i < iend; ++i)
 		{
 			auto p = f->pointHessians[i];
-			if(!p)
+			if(!p || p->WasMarginalized)
 				continue;
 			if(p->status == MapPoint::MARGINALIZED)
 			{
@@ -549,7 +549,8 @@ void EnergyFunctional::marginalizePointsF()
 					if(r->isActive())
                         connectivityMap[(((uint64_t)r->host.lock()->id) << 32) + ((uint64_t)r->target.lock()->id)][1]++;
 				allPointsToMarg.push_back(p);
-				f->pointHessians[i].reset();
+				f->pointHessians[i]->WasMarginalized = true;
+				// f->pointHessians[i].reset();
 			}
 		}
 	}
@@ -602,7 +603,7 @@ void EnergyFunctional::dropPointsF()
 			auto p = f->pointHessians[i];
 			if(!p)
 				continue;
-			if(p->status == MapPoint::OOB || p->status == MapPoint::OUTLIER)
+			if(p->status == MapPoint::OUTLIER)
 			{
 				removePoint(p);
 				f->pointHessians[i].reset(); //DEBUG THIS

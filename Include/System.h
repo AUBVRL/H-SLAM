@@ -83,7 +83,7 @@ public:
 	void activatePointsMT();
     void flagPointsForRemoval();
 	void makeNewTraces(std::shared_ptr<Frame> newFrame);
-    void flagFramesForMarginalization(std::shared_ptr<Frame> newFH);
+    void flagFramesForMarginalization();
     void removeOutliers();
 
 	void setPrecalcValues();

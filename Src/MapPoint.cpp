@@ -20,12 +20,8 @@ MapPoint::MapPoint(std::shared_ptr<ImmaturePoint> rawPoint, std::shared_ptr<Cali
 	idepth_hessian=0;
 	maxRelBaseline=0;
 	numGoodResiduals=0;
-
+	WasMarginalized = false;
     // std::weak_ptr<Frame> host;
-    std::shared_ptr<CalibData> Calib;
-    bool hasDepthPrior;
-
-    float my_type;
 
 	assert(std::isfinite(rawPoint->idepth_max));
 

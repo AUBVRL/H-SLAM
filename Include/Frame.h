@@ -42,8 +42,8 @@ public:
     std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
     
     std::vector<std::shared_ptr<MapPoint>> pointHessians;				// contains all ACTIVE points.
-	std::vector<std::shared_ptr<MapPoint>> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
-	std::vector<std::shared_ptr<MapPoint>> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
+	// std::vector<std::shared_ptr<MapPoint>> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
+	// std::vector<std::shared_ptr<MapPoint>> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
     std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
 
     cv::Mat Descriptors;

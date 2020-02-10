@@ -111,15 +111,13 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<std::shared_ptr<Frame>> frameH
 	// make coarse tracking templates for latstRef.
 	memset(idepth[0], 0, sizeof(float)*w[0]*h[0]);
 	memset(weightSums[0], 0, sizeof(float)*w[0]*h[0]);
-int count =0;
 	for(auto fh : frameHessians)
 	{
 		for(auto ph : fh->pointHessians)
 		{
-			if(!ph)
+			if(!ph || ph->status != MapPoint::ACTIVE )
 				continue;
-			if(ph->status != MapPoint::ACTIVE)
-				continue;
+
 			if(ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN)
 			{
 				std::shared_ptr<PointFrameResidual> r = ph->lastResiduals[0].first;
@@ -131,11 +129,9 @@ int count =0;
 
 				idepth[0][u+w[0]*v] += new_idepth *weight;
 				weightSums[0][u+w[0]*v] += weight;
-				count++;
 			}
 		}
 	}
-	std::cout<<"contributing pts "<<count<<std::endl;
 
 	for(int lvl=1; lvl<DirPyrLevels; lvl++)
 	{
@@ -760,8 +756,9 @@ void CoarseDistanceMap::makeDistanceMap(
 
 		for(auto ph : fh->pointHessians)
 		{
-			if(!ph)
+			if(!ph || ph->status!= MapPoint::ACTIVE)
 				continue;
+
 			assert(ph->status == MapPoint::ACTIVE);
 			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
 			int u = ptp[0] / ptp[2] + 0.5f;

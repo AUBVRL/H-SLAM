@@ -43,7 +43,9 @@ struct MapPoint
     float maxRelBaseline;
     int numGoodResiduals;
 
-    enum PtStatus {ACTIVE = 0, OOB=1, OUTLIER=2, INACTIVE, MARGINALIZED};
+    bool WasMarginalized;
+
+    enum PtStatus {ACTIVE = 0, OUTLIER = 1, INACTIVE = 2, MARGINALIZED = 3};
     PtStatus status;
 
     inline void setPointStatus(PtStatus s) { status = s; }

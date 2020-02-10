@@ -195,6 +195,13 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 			MappedFrameSignal.wait(lock);
 		}
 
+        // int count = 0;
+        // for (auto it : allKeyFramesHistory)
+        //     for (auto it2 : it->pointHessians)
+        //         if (it2 && (it2->status == MapPoint::ACTIVE || it2->status == MapPoint::MARGINALIZED))
+        //             count++;
+        // std::cout << count << std::endl;
+
         lock.unlock();
     }
 
@@ -204,7 +211,6 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     // if(OnlinePhCalibR)
     //     OnlinePhCalibL->ProcessFrame(Frame.cvImgR);
     
-
 
 }
 
@@ -272,15 +278,12 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
 
     
     firstFrame->pointHessians.resize(firstFrame->nFeatures, nullptr);
-    firstFrame->pointHessiansMarginalized.reserve(firstFrame->nFeatures);
-    firstFrame->pointHessiansOut.reserve(firstFrame->nFeatures);
 
     for (int i = 0; i < firstFrame->nFeatures; ++i)
     {
         if(_cInit->videpth[i] <= 0.0f)
             continue;
 
-        // Pnt *point = _cInit->points[0] + i;
         std::shared_ptr<ImmaturePoint> pt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(firstFrame->mvKeys[i].pt.x + 0.5f, firstFrame->mvKeys[i].pt.y + 0.5f, firstFrame, 1, Calib));
 
         if (!std::isfinite(pt->energyTH))
@@ -322,7 +325,7 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
     }
 
     Initialized = true;
-    // printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
+    printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size() - (int)std::count(firstFrame->pointHessians.begin(), firstFrame->pointHessians.end(), nullptr) );
 }
 
 void System::setPrecalcValues()

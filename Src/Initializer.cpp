@@ -164,54 +164,54 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             shared_ptr<DirectRefinement> DirOpti = shared_ptr<DirectRefinement> (new DirectRefinement(Calib, mvIniP3D, vbTriangulated, FirstFrame, SecondFrame, Pose, videpth));
 
             // //Direct Refinement statistics!!
-            std::vector<float> pts;
-            // std::vector<float> RepErrorAft;
-            for (int i = 0; i < FirstFrame->nFeatures; ++i)
-            {
-                if(vbTriangulated[i])
-                    continue;
-                if(!DirOpti->points[i].isGood)
-                    continue;
-               
-                //red points were not triangulated by Init algorithm
-                float im1z = 1.0f/DirOpti->points[i].idepth;
-                float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
-                float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
-                
-                pts.push_back(im1x);
-                pts.push_back(im1y);
-                pts.push_back(im1z);
-                pts.push_back(1);
-
-            //     float zz = 1.0 / im1z;
-            //     float xx = Calib->fxl() * im1x * zz + Calib->cxl();
-            //     float yy = Calib->fyl() * im1y * zz + Calib->cyl();
-
+            // std::vector<float> pts;
+            // // std::vector<float> RepErrorAft;
+            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            // {
             //     if(vbTriangulated[i])
-            //         RepErrorAft.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(xx, yy)));
-            }
+            //         continue;
+            //     if(!DirOpti->points[i].isGood)
+            //         continue;
+               
+            //     //red points were not triangulated by Init algorithm
+            //     float im1z = 1.0f/DirOpti->points[i].idepth;
+            //     float  im1x =  (FirstFrame->mvKeys[i].pt.x - Calib->cxl())*Calib->fxli()* im1z;
+            //     float  im1y =  (FirstFrame->mvKeys[i].pt.y - Calib->cyl())*Calib->fyli()* im1z;
+                
+            //     pts.push_back(im1x);
+            //     pts.push_back(im1y);
+            //     pts.push_back(im1z);
+            //     pts.push_back(1);
 
-            // // std::vector<float> pts;
-            // std::vector<float> RepErrorBef;
-            for (int i = 0; i < FirstFrame->nFeatures; ++i)
-            {
-                if (vbTriangulated[i])
-                {
-                    pts.push_back(mvIniP3D[i].x);
-                    pts.push_back(mvIniP3D[i].y);
-                    pts.push_back(mvIniP3D[i].z);
-                    pts.push_back(0);
+            // //     float zz = 1.0 / im1z;
+            // //     float xx = Calib->fxl() * im1x * zz + Calib->cxl();
+            // //     float yy = Calib->fyl() * im1y * zz + Calib->cyl();
+
+            // //     if(vbTriangulated[i])
+            // //         RepErrorAft.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(xx, yy)));
+            // }
+
+            // // // std::vector<float> pts;
+            // // std::vector<float> RepErrorBef;
+            // for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            // {
+            //     if (vbTriangulated[i])
+            //     {
+            //         pts.push_back(mvIniP3D[i].x);
+            //         pts.push_back(mvIniP3D[i].y);
+            //         pts.push_back(mvIniP3D[i].z);
+            //         pts.push_back(0);
 
 
-            //         float invZ1 = 1.0 / mvIniP3D[i].z;
-            //         float im1x = Calib->fxl() * mvIniP3D[i].x * invZ1 + Calib->cxl();
-            //         float im1y = Calib->fyl() * mvIniP3D[i].y * invZ1 + Calib->cyl();
-            //         RepErrorBef.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(im1x, im1y)));
-                }
-            }
-            // // std::cout<<"Mean Rep Error Befor: "<< std::accumulate(RepErrorBef.begin(), RepErrorBef.end(), 0.0)/RepErrorBef.size();
-            // // std::cout<<"  Mean Rep Error After: "<<std::accumulate(RepErrorAft.begin(), RepErrorAft.end(), 0.0)/RepErrorAft.size() <<std::endl;
-            displayhandler->UploadPoints(pts);
+            // //         float invZ1 = 1.0 / mvIniP3D[i].z;
+            // //         float im1x = Calib->fxl() * mvIniP3D[i].x * invZ1 + Calib->cxl();
+            // //         float im1y = Calib->fyl() * mvIniP3D[i].y * invZ1 + Calib->cyl();
+            // //         RepErrorBef.push_back(norm(FirstFrame->mvKeys[i].pt - Point2f(im1x, im1y)));
+            //     }
+            // }
+            // // // std::cout<<"Mean Rep Error Befor: "<< std::accumulate(RepErrorBef.begin(), RepErrorBef.end(), 0.0)/RepErrorBef.size();
+            // // // std::cout<<"  Mean Rep Error After: "<<std::accumulate(RepErrorAft.begin(), RepErrorAft.end(), 0.0)/RepErrorAft.size() <<std::endl;
+            // displayhandler->UploadPoints(pts);
             return true;
         }
         else
@@ -1381,7 +1381,7 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
     _Pose = thisToNext;
     for (int i = 0; i < FirstFrame->nFeatures; ++i)
     {
-        if (!points[i].isGood)
+        if (!points[i].isGood || !Triangulated[0][i])
             continue;
         _videpth[i] = points[i].idepth;
         // _Triangulated[i] = true;

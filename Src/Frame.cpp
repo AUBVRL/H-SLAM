@@ -5,7 +5,7 @@
 #include "CalibData.h"
 #include "ImmaturePoint.h"
 #include "photometricUndistorter.h"
-
+#include "MapPoint.h"
 #include "EnergyFunctionalStructs.h"
 
 #include <chrono>
@@ -42,6 +42,8 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     CreateDirPyrs(Img->fImgL, DirPyr);
     nFeatures = 0;
     Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    pointHessians.resize(nFeatures);
+    ImmaturePoints.resize(nFeatures);
     //Assign Features to Grid
     mnGridCols = std::ceil(Img->cvImgL.cols / 10);
     mnGridRows = std::ceil(Img->cvImgL.rows / 10);
@@ -195,10 +197,25 @@ void Frame::ReduceToEssential(bool isKeyFrame)
         Descriptors.release();
         ImmaturePoints.resize(0); ImmaturePoints.shrink_to_fit();
         pointHessians.resize(0); pointHessians.shrink_to_fit();
-        pointHessiansMarginalized.resize(0); pointHessiansMarginalized.shrink_to_fit();
         Calib.reset();
     }
-    
+    else 
+    {
+        for(auto &it : pointHessians)
+        {
+            if (!it)
+                continue;
+            if(it->status != MapPoint::ACTIVE && it->status != MapPoint::MARGINALIZED)
+                it.reset();
+        }
+        for(auto &it : ImmaturePoints)
+        {
+            if(!it)
+                continue;
+            it.reset();
+        }
+    }
+
     Detector.reset();
 
     IndPyr.clear(); IndPyr.shrink_to_fit();
@@ -215,8 +232,7 @@ void Frame::ReduceToEssential(bool isKeyFrame)
     absSquaredGrad.shrink_to_fit();
     
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
-    pointHessiansOut.resize(0); pointHessiansOut.shrink_to_fit();
-    
+     
     return;
 }
 

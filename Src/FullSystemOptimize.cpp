@@ -611,20 +611,16 @@ void System::removeOutliers()
 	int numPointsDropped=0;
 	for(auto fh : frameHessians)
 	{
-		for(unsigned int i=0, iend = fh->pointHessians.size(); i<iend; i++)
+		for(auto &ph : fh->pointHessians)
 		{
-			auto ph = fh->pointHessians[i];
 			if(!ph) 
 				continue;
-			if(ph->status!= MapPoint::ACTIVE)
-				continue;
+			// if(ph->status!= MapPoint::ACTIVE)
+			// 	continue;
 			if(ph->residuals.size() == 0)
 			{
-				fh->pointHessiansOut.push_back(ph);
 				ph->status = MapPoint::OUTLIER;
-				fh->pointHessians[i].reset();// = fh->pointHessians.back();
-				// fh->pointHessians.pop_back();
-				// i--;
+				ph.reset();
 				numPointsDropped++;
 			}
 		}

@@ -21,7 +21,7 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
     boost::unique_lock<boost::mutex> lock(mapMutex);
 
     // =========================== Flag Frames to be Marginalized. =========================
-    flagFramesForMarginalization(fh);
+    flagFramesForMarginalization();
 
     // =========================== add New Frame to Hessian Struct. =========================
     fh->idx = frameHessians.size();
@@ -122,7 +122,6 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
             i = 0;
         }
 
-    std::cout << "adding keyframes!!" << std::endl;
     return;
 }
 
@@ -211,13 +210,6 @@ void System::makeNewTraces(std::shared_ptr<Frame> newFrame)
     //int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
     // int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
 
-    // newFrame->pointHessians.reserve(numPointsTotal*1.2f);
-    newFrame->pointHessians.resize(newFrame->nFeatures);
-    newFrame->ImmaturePoints.resize(newFrame->nFeatures);
-
-    //fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
-    newFrame->pointHessiansMarginalized.reserve(newFrame->nFeatures);
-    newFrame->pointHessiansOut.reserve(newFrame->nFeatures);
 
     for (int i = 0; i < newFrame->nFeatures; ++i)
     {
@@ -248,14 +240,13 @@ void System::flagPointsForRemoval()
         for (unsigned int i = 0; i < host->pointHessians.size(); i++)
         {
             auto ph = host->pointHessians[i];
-            if (!ph)
+            if (!ph || ph->WasMarginalized)
                 continue;
 
             if (ph->idepth_scaled < 0 || ph->residuals.size() == 0)
             {
-                host->pointHessiansOut.push_back(ph);
                 ph->status = MapPoint::OUTLIER;
-                host->pointHessians[i] = 0;
+                // host->pointHessians[i] = 0;
                 flag_nores++;
             }
             else if (ph->isOOB(fhsToMargPoints) || host->FlaggedForMarginalization)
@@ -281,20 +272,17 @@ void System::flagPointsForRemoval()
                     {
                         flag_inin++;
                         ph->status = MapPoint::MARGINALIZED;
-                        host->pointHessiansMarginalized.push_back(ph);
                     }
                     else
                     {
                         ph->status = MapPoint::OUTLIER;
-                        host->pointHessiansOut.push_back(ph);
                     }
                 }
                 else
                 {
-                    host->pointHessiansOut.push_back(ph);
                     ph->status = MapPoint::OUTLIER;
                 }
-                host->pointHessians[i].reset();
+                // host->pointHessians[i].reset();
             }
         }
         // for(int i=0;i<(int)host->pointHessians.size();i++)
@@ -311,7 +299,6 @@ void System::flagPointsForRemoval()
 
 void System::activatePointsMT()
 {
-
 	if(ef->nPoints < setting_desiredPointDensity*0.66)
 		currentMinActDist -= 0.8;
 	if(ef->nPoints < setting_desiredPointDensity*0.8)
@@ -332,7 +319,6 @@ void System::activatePointsMT()
 
 	if(currentMinActDist < 0) currentMinActDist = 0;
 	if(currentMinActDist > 4) currentMinActDist = 4;
-
     // if(!setting_debugout_runquiet)
     //     printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
     //             currentMinActDist, (int)(setting_desiredPointDensity), ef->nPoints);
@@ -345,7 +331,6 @@ void System::activatePointsMT()
 
 
 	std::vector<std::shared_ptr<ImmaturePoint>> toOptimize; toOptimize.reserve(20000);
-
 
 	for(auto host : frameHessians)		// go through all active frames
 	{
@@ -453,7 +438,6 @@ void System::activatePointsMT()
 			assert(newpoint = nullptr);
 		}
 	}
-
 
 	// for(auto host : frameHessians)
 	// {

@@ -15,7 +15,7 @@
 // #include <Eigen/SVD>
 // #include <Eigen/Eigenvalues>
 // #include "FullSystem/ResidualProjections.h"
-// #include "FullSystem/ImmaturePoint.h"
+#include "ImmaturePoint.h"
 
 #include "EnergyFunctional.h"
 #include "EnergyFunctionalStructs.h"
@@ -27,7 +27,7 @@
 namespace FSLAM
 {
 
-void System::flagFramesForMarginalization(std::shared_ptr<Frame> newFH)
+void System::flagFramesForMarginalization()
 {
 	if(setting_minFrameAge > setting_maxFrames)
 	{
@@ -39,40 +39,37 @@ void System::flagFramesForMarginalization(std::shared_ptr<Frame> newFH)
 		return;
 	}
 
-
 	int flagged = 0;
 	// marginalize all frames that have not enough points.
-	for(int i=0;i<(int)frameHessians.size();i++)
+	for(auto fh : frameHessians)
 	{
-		auto fh = frameHessians[i];
-		int in =  fh->pointHessians.size() - std::count(fh->pointHessians.begin(), fh->pointHessians.end(), nullptr) + fh->ImmaturePoints.size() - std::count(fh->ImmaturePoints.begin(), fh->ImmaturePoints.end(), nullptr);
-		// int in = fh->pointHessians.size() + fh->ImmaturePoints.size();
-		int out = fh->pointHessiansMarginalized.size() + fh->pointHessiansOut.size();
-
-		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure,
-				frameHessians.back()->aff_g2l(), fh->aff_g2l());
-
-
-		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow)
-				&& ((int)frameHessians.size())-flagged > setting_minFrames)
+		int in = 0;
+		int out = 0;
+		for (auto &it : fh->pointHessians)
 		{
-//			printf("MARGINALIZE frame %d, as only %'d/%'d points remaining (%'d %'d %'d %'d). VisInLast %'d / %'d. traces %d, activated %d!\n",
-//					fh->frameID, in, in+out,
-//					(int)fh->pointHessians.size(), (int)fh->immaturePoints.size(),
-//					(int)fh->pointHessiansMarginalized.size(), (int)fh->pointHessiansOut.size(),
-//					visInLast, outInLast,
-//					fh->statistics_tracesCreatedForThisFrame, fh->statistics_pointsActivatedForThisFrame);
+			if(!it)
+				continue;
+			if(it->status == MapPoint::ACTIVE)
+				in++;
+			else if (it->status == MapPoint::OUTLIER || it->status == MapPoint::MARGINALIZED)
+				out++;
+		}
+		for (auto &it2 : fh->ImmaturePoints)
+		{
+			if(!it2)
+				continue;
+			if(!std::isfinite(it2->idepth_max) || it2->lastTraceStatus == ImmaturePointStatus::IPS_OUTLIER || it2->lastTraceStatus == ImmaturePointStatus::IPS_OOB)
+				continue;
+			in++;
+		}
+
+		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure, frameHessians.back()->aff_g2l(), fh->aff_g2l());
+
+
+		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow) && ((int)frameHessians.size())-flagged > setting_minFrames)
+		{
 			fh->FlaggedForMarginalization = true;
 			flagged++;
-		}
-		else
-		{
-//			printf("May Keep frame %d, as %'d/%'d points remaining (%'d %'d %'d %'d). VisInLast %'d / %'d. traces %d, activated %d!\n",
-//					fh->frameID, in, in+out,
-//					(int)fh->pointHessians.size(), (int)fh->immaturePoints.size(),
-//					(int)fh->pointHessiansMarginalized.size(), (int)fh->pointHessiansOut.size(),
-//					visInLast, outInLast,
-//					fh->statistics_tracesCreatedForThisFrame, fh->statistics_pointsActivatedForThisFrame);
 		}
 	}
 
@@ -144,7 +141,7 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 				if (ph->status == MapPoint::ACTIVE)
 				{
 					size_t n = ph->residuals.size();
-					for (unsigned int i = 0; i < n; i++)
+					for (unsigned int i = 0, iend = ph->residuals.size(); i < iend; i++)
 					{
 						std::shared_ptr<PointFrameResidual> r = ph->residuals[i];
 						
@@ -161,8 +158,8 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 							// 	statistics_numForceDroppedResBwd++;
 
 							ef->dropResidual(r);
-							i--;
-							n--;
+							// i--;
+							// n--;
 							// deleteOut<PointFrameResidual>(ph->residuals, i);
 							break;
 						}
@@ -182,7 +179,7 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 
 	frame->MarginalizedAt = frameHessians.back()->id;
 	frame->MovedByOpt = frame->w2c_leftEps().norm();
-
+	frame->ReduceToEssential(true);
 	deleteOutOrder<Frame>(frameHessians, frame);
 	for(unsigned int i=0;i<frameHessians.size();i++)
 		frameHessians[i]->idx = i;
