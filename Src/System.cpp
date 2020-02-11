@@ -80,6 +80,8 @@ System::~System()
         PhoUndistL->Reset(); 
     if(PhoUndistR)
         PhoUndistR->Reset();
+    if(DisplayHandler)
+        DisplayHandler->Reset();
 
     //----------------begin dso------------------
     // delete[] selectionMap;
@@ -101,8 +103,8 @@ System::~System()
 }
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
-{
-    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight
+{    
+    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight    
     allFrameHistory.push_back(CurrentFrame);
 
     boost::unique_lock<boost::mutex> lock(trackMutex);
@@ -149,6 +151,7 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
         if (!std::isfinite((double)tres[0]) || !std::isfinite((double)tres[1]) || !std::isfinite((double)tres[2]) || !std::isfinite((double)tres[3]))
         {
             printf("Initial Tracking failed: LOST!\n");
+            CurrentFrame->ReduceToEssential(false);
             isLost = true;
             return;
         }
@@ -175,6 +178,7 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     }
 
     DrawImages(DataIn, CurrentFrame);
+    
     if (SequentialOperation && Initialized)
     {
         if (NeedNewKf)
@@ -216,38 +220,10 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 
 void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<Frame> CurrentFrame)
 {
-    if(!DisplayHandler)
+
+    if(!DisplayHandler || !DisplayHandler->Show2D->Get() || !DisplayHandler->ShowImages->Get())
         return;
-
-    if(!DisplayHandler->Show2D->Get())
-        return;
-
-    if(DisplayHandler->ShowImages->Get())
-    {
-        cv::Mat Dest;
-        if (Sensortype == Stereo || Sensortype == RGBD)
-            cv::hconcat(DataIn->cvImgL, DataIn->cvImgR, Dest);
-        else
-            Dest = DataIn->cvImgL;
-
-       cv::cvtColor(Dest, Dest, CV_GRAY2BGR);
-
-        if (DrawDetected)
-        {
-            for (size_t i = 0; i < CurrentFrame->mvKeys.size(); ++i)
-                cv::circle(Dest, CurrentFrame->mvKeys[i].pt, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
-            // if (Sensortype == Stereo)
-            // {
-            //     cv::Point2f Shift(CurrentFrame->LeftIndPyr[0].size().width, 0.0f);
-            //     for (size_t i = 0; i < CurrentFrame->mvKeysR.size(); ++i)
-            //         cv::circle(Dest, CurrentFrame->mvKeysR[i].pt + Shift, 3, cv::Scalar(255.0, 0.0, 0.0), -1, cv::LineTypes::LINE_8, 0);
-            // }
-        }
-        DisplayHandler->UploadFrameImage(Dest.data, Dest.size().width, Dest.size().height);
-        
-        // DisplayHandler->UploadDepthKeyFrameImage(Dest.data, Dest.size().width, Dest.size().height);
-
-    }
+    DisplayHandler->UploadRunningFrameData(DataIn, CurrentFrame->mvKeys, CurrentFrame->poseValid? CurrentFrame->camToWorld : SE3(Mat44::Identity()));
 }
 
 void System::ProcessNonKeyframe(std::shared_ptr<Frame> fh)
