@@ -2,6 +2,9 @@
 #include "PangolinOverwrite.h"
 #include "Settings.h"
 #include "Frame.h"
+#include "MapPoint.h"
+#include "ImmaturePoint.h"
+#include "CalibData.h"
 #include <opencv2/imgproc.hpp>
 namespace FSLAM
 {
@@ -26,7 +29,7 @@ void GUI::setup()
     DepthKfImage = std::unique_ptr<InternalImage>(new InternalImage());
 
     // scene_cam = OpenGlRenderState(ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100), ModelViewLookAt(-2, 2, -2, 0, 0, 0, AxisY));
-    scene_cam = OpenGlRenderState(ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100), ModelViewLookAt(-0, -0.1, -5, 0, 0.1, 0, 0.0, -100.0, 0.0));
+    scene_cam = OpenGlRenderState(ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.1, 1000), ModelViewLookAt(-0, -0.1, -5, 0, 0.1, 0, 0.0, -100.0, 0.0));
 
     display_cam = &CreateDisplay().SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f / 480.0f).SetHandler(new pangolin::Handler3D(scene_cam));
     panel = &CreateNewPanel("ui").SetBounds(1.0, Attach::ReversePix(500), 0.0, Attach::Pix(MenuWidth));
@@ -39,6 +42,8 @@ void GUI::setup()
     ShowImages = new Var<bool>("ui.Show Images", true, true);
     ShowDetectedFeatures = new Var<bool>("ui.Show Features", DrawDetected, true);
     Show3D = new Var<bool>("ui.Show3D", true, true);
+    ShowFullTrajectory = new Var<bool>("ui.Show Trajectory", true, true);
+    ShowAllKfs = new Var<bool>("ui.Show All Kfs", true, true);
     RecordScreen = new Var<bool>("ui.Record Screen!Stop Recording", false, false);
     FeatureFrame = &Display("FeatureFrame");
     DepthKeyFrame = &Display("DepthKeyFrame");
@@ -66,7 +71,9 @@ void GUI::Reset()
     Mat44 Identity = Eigen::Matrix4d::Identity();
     Twc = pangolin::OpenGlMatrix(Identity);
     FrameDisp.reset();
-    allFramePoses.clear();
+
+    allFramePoses.clear(); allFramePoses.shrink_to_fit(); allFramePoses.reserve(10000); 
+    AllKeyframes.clear(); AllKeyframes.shrink_to_fit(); AllKeyframes.reserve(5000);
     return;
 }
 
@@ -75,11 +82,8 @@ void GUI::run()
 {
     BindToContext(main_window_name);
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-    float blue[3] = {0.0f,0.0f,1.0f};
-	float red[3] = {1.0f,0.0f,0.0f};
-	float green[3] = {0.0f,1.0f,0.0f};
 	glEnable(GL_POINT_SMOOTH);
 
     while (!ShouldQuit())
@@ -98,8 +102,8 @@ void GUI::run()
             if(FrameDisp)
                 drawCam(FrameDisp->Pose, 1, red, 0.1);
 
-            // if (settings_showFullTrajectory)
-            // {
+            if (ShowFullTrajectory->Get())
+            {
                 glColor3f(green[0], green[1], green[2]);
                 glLineWidth(3);
                 glBegin(GL_LINE_STRIP);
@@ -110,31 +114,15 @@ void GUI::run()
                                (float)allFramePoses[i][2]);
                 }
                 glEnd();
-            // }
+            }
 
-            //     boost::unique_lock<boost::mutex> lock(mSLAMThread);
-            //     glPointSize(5);
-            //     glBegin(GL_POINTS);
-
-            //     size_t sz = Pts.size();
-            //     for (size_t i = 0; i < sz; i = i + 4)
-            //     {
-            //         if(Pts[i+3]==1)
-            //             glColor3f(255.0, 0.0, 0.0);
-            //         else
-            //             glColor3f(0.0, 255.0, 0.0);
-            //         glVertex3f(Pts[i], Pts[i + 1], Pts[i + 2]);
-            //     }
-            //     glEnd();
-            // pangolin::glDrawColouredCube();
+            DrawKeyFrames();
         }
 
         
        
         if(Show2D->Get())
         {
-            // if (ShowImages->Get())
-            //     RenderInputFrameImage(FrameImage, FeatureFrame);
 
             if (ShowDepthKF->Get())
                 RenderInputFrameImage(DepthKfImage, DepthKeyFrame);
@@ -204,7 +192,6 @@ void GUI::DrawRunningFrame()
         if (!Show2D->Get() || !ShowImages->Get())
             return;
 
-        cv::Mat Dest;
         if (Sensortype == Stereo || Sensortype == RGBD)
             cv::hconcat(FrameDisp->ImgData->cvImgL, FrameDisp->ImgData->cvImgR, Dest);
         else
@@ -288,7 +275,7 @@ void GUI::SetPointOfView()
     }
 }
 
-void GUI::drawCam(Mat44 Pose, float lineWidth, float* color, float sizeFactor)
+void GUI::drawCam(Mat44 Pose, float lineWidth, Vec3b& color, float sizeFactor)
 {
     if (!Show3D->Get())
         return;
@@ -306,12 +293,8 @@ void GUI::drawCam(Mat44 Pose, float lineWidth, float* color, float sizeFactor)
 		Sophus::Matrix4f m = Pose.cast<float>();
 		glMultMatrixf((GLfloat*)m.data());
 
-		if(color == 0)
-		{
-			glColor3f(1,0,0);
-		}
-		else
-			glColor3f(color[0],color[1],color[2]);
+
+		glColor3f(color[0],color[1],color[2]);
 
 		glLineWidth(lineWidth);
 		glBegin(GL_LINES);
@@ -338,6 +321,164 @@ void GUI::drawCam(Mat44 Pose, float lineWidth, float* color, float sizeFactor)
 
 		glEnd();
 	glPopMatrix();
+}
+
+void GUI::UploadKeyFrame(std::shared_ptr<Frame> FrameIn) //this vector wont be modified from multiple threads. No need for mutex
+{
+    boost::unique_lock<boost::mutex> lock(KeyframesMutex); 
+    AllKeyframes.push_back(std::make_pair(FrameIn, std::shared_ptr<KFDisplay>(new KFDisplay())));
+}
+
+void GUI::DrawKeyFrames()
+{
+    if(!Show3D->Get())
+        return;
+
+    boost::unique_lock<boost::mutex> lock(KeyframesMutex); 
+    for (auto it: AllKeyframes)
+    {
+        if(it.first->NeedRefresh)
+            it.second->RefreshPC(it.first);
+
+        if(ShowAllKfs->Get())
+            if(it.second->PoseValid) drawCam(it.second->camToWorld.matrix(), 1, blue, 0.1);
+        
+        if(!it.second->ValidBuffer) continue;
+        glDisable(GL_LIGHTING);
+
+        glPushMatrix();
+
+        Sophus::Matrix4f m = it.second->camToWorld.matrix().cast<float>();
+        glMultMatrixf((GLfloat *)m.data());
+
+        glPointSize(1);
+        it.second->colorBuffer.Bind();
+        glColorPointer(it.second->colorBuffer.count_per_element, it.second->colorBuffer.datatype, 0, 0);
+        glEnableClientState(GL_COLOR_ARRAY);
+
+        it.second->vertexBuffer.Bind();
+        glVertexPointer(it.second->vertexBuffer.count_per_element, it.second->vertexBuffer.datatype, 0, 0);
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glDrawArrays(GL_POINTS, 0, it.second->numGLBufferGoodPoints);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        it.second->vertexBuffer.Unbind();
+
+        glDisableClientState(GL_COLOR_ARRAY);
+        it.second->colorBuffer.Unbind();
+
+        glPopMatrix();
+    }
+
+    return;
+}
+
+KFDisplay::KFDisplay()
+{
+    ValidBuffer = false;
+    numGLBufferPoints = 0;
+
+}
+void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
+{
+    camToWorld = _In->camToWorld;
+    PoseValid = true;
+    float my_scaledTH = 0.001; //1e-10,1e10
+	float my_absTH = 0.001; //1e-10,1e10
+	float my_minRelBS = 0.1; //0,1
+	int my_sparsifyFactor = 1 ; //from 1 to 20
+
+    float fxi = _In->Calib->fxli();
+    float cxi = _In->Calib->cxli();
+    float fyi = _In->Calib->fyli();
+    float cyi = _In->Calib->cyli();
+
+    int numSparsePoints = _In->pointHessians.size() + _In->ImmaturePoints.size();
+    Vec3f* tmpVertexBuffer = new Vec3f[numSparsePoints*patternNum];
+	Vec3b* tmpColorBuffer = new Vec3b[numSparsePoints*patternNum];
+	int vertexBufferNumPoints=0;
+
+    //Update MapPoints to draw.
+    for(auto it:_In->pointHessians)
+    {
+        if(!it) continue;
+        if(it->status == MapPoint::INACTIVE) continue;
+        if(it->idepth < 0) continue;
+        float depth = 1.0f / it->idepth;
+		float depth4 = depth*depth; depth4*= depth4;
+		float var = (1.0f / (it->idepth_hessian+0.01));
+        if(var * depth4 > my_scaledTH) continue;
+		if(var > my_absTH) continue;
+        if(it->maxRelBaseline < my_minRelBS) continue;
+        for(int pnt=0;pnt<patternNum;pnt++)
+		{
+			if(my_sparsifyFactor > 1 && rand()%my_sparsifyFactor != 0) continue;
+			int dx = patternP[pnt][0];
+			int dy = patternP[pnt][1];
+
+			tmpVertexBuffer[vertexBufferNumPoints][0] = ((it->u+dx)*fxi + cxi) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][1] = ((it->v+dy)*fyi + cyi) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
+
+
+            if (it->status == MapPoint::ACTIVE)
+                tmpColorBuffer[vertexBufferNumPoints] = blue;
+            else if (it->status == MapPoint::MARGINALIZED)
+                tmpColorBuffer[vertexBufferNumPoints] = Vec3b(it->color[pnt], it->color[pnt], it->color[pnt]);
+            else if (it->status == MapPoint::OUTLIER)
+                tmpColorBuffer[vertexBufferNumPoints] = red;   
+
+            vertexBufferNumPoints++;
+		}
+    }
+
+    // //Update Immature Points to draw.
+    // for (auto it: _In->ImmaturePoints)
+    // {
+    //     if (!it) continue;
+    //     for (int pnt = 0; pnt < patternNum; pnt++)
+    //     {
+    //         if (my_sparsifyFactor > 1 && rand() % my_sparsifyFactor != 0) continue;
+
+    //         int dx = patternP[pnt][0];
+    //         int dy = patternP[pnt][1];
+            
+    //         float idepth = (it->idepth_max+it->idepth_min)*0.5f;
+    //         if(idepth < 0) continue;
+    //         float depth = 1.0f / idepth;
+           
+    //         tmpVertexBuffer[vertexBufferNumPoints][0] = ((it->u + dx) * fxi + cxi) * depth;
+    //         tmpVertexBuffer[vertexBufferNumPoints][1] = ((it->v + dy) * fyi + cyi) * depth;
+    //         tmpVertexBuffer[vertexBufferNumPoints][2] = depth * (1 + 2 * fxi * (rand() / (float)RAND_MAX - 0.5f));
+    //         tmpColorBuffer[vertexBufferNumPoints] = orange;   
+    //         vertexBufferNumPoints++;
+    //     }
+    // }
+
+    assert(vertexBufferNumPoints <= numSparsePoints*patternNum);
+
+    if(vertexBufferNumPoints==0)
+	{
+		delete[] tmpColorBuffer;
+		delete[] tmpVertexBuffer;
+		return;
+	}
+
+    numGLBufferGoodPoints = vertexBufferNumPoints;
+	if(numGLBufferGoodPoints > numGLBufferPoints)
+	{
+		numGLBufferPoints = vertexBufferNumPoints*1.3;
+		vertexBuffer.Reinitialise(pangolin::GlArrayBuffer, numGLBufferPoints, GL_FLOAT, 3, GL_DYNAMIC_DRAW );
+		colorBuffer.Reinitialise(pangolin::GlArrayBuffer, numGLBufferPoints, GL_UNSIGNED_BYTE, 3, GL_DYNAMIC_DRAW );
+	}
+	vertexBuffer.Upload(tmpVertexBuffer, sizeof(float)*3*numGLBufferGoodPoints, 0);
+	colorBuffer.Upload(tmpColorBuffer, sizeof(unsigned char)*3*numGLBufferGoodPoints, 0);
+    ValidBuffer = true;
+	delete[] tmpColorBuffer;
+	delete[] tmpVertexBuffer;
+    _In->NeedRefresh = false;
+
+
+    return;
 }
 
 } // namespace FSLAM

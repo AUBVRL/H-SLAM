@@ -6,6 +6,8 @@
 #include "ImmaturePoint.h"
 #include "CalibData.h"
 #include "CoarseTracker.h"
+#include "Display.h"
+
 namespace FSLAM
 {
 void System::AddKeyframe(std::shared_ptr<Frame> fh)
@@ -16,6 +18,8 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
         fh->camToWorld = fh->trackingRef->camToWorld * fh->camToTrackingRef;
         fh->setEvalPT_scaled(fh->camToWorld.inverse(), fh->aff_g2l_internal);
     }
+    if(DisplayHandler)
+        DisplayHandler->UploadKeyFrame(fh);
 
     traceNewCoarse(fh);
     boost::unique_lock<boost::mutex> lock(mapMutex);
@@ -113,14 +117,25 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
     //     ow->publishKeyframes(frameHessians, false, &Hcalib);
     // }
 
+    // =========================== Let the display know that these KFs need updating =========================
+    if(DisplayHandler)
+    {
+        boost::unique_lock<boost::mutex> lock(DisplayHandler->KeyframesMutex); 
+        for (auto it: frameHessians)
+            it->NeedRefresh = true;
+    }
+    
+
     // =========================== Marginalize Frames =========================
 
     for (unsigned int i = 0; i < frameHessians.size(); i++)
+    {
         if (frameHessians[i]->FlaggedForMarginalization)
         {
             marginalizeFrame(frameHessians[i]);
             i = 0;
         }
+    }
 
     return;
 }

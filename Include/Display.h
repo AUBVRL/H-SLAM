@@ -15,6 +15,13 @@ class KeyPoint;
 
 namespace FSLAM
 {
+static Vec3b blue = Vec3b(0, 0, 255);
+static Vec3b red = Vec3b(255, 0, 0);
+static Vec3b green = Vec3b(0, 255, 0);
+static Vec3b black = Vec3b(0, 0, 0);
+static Vec3b White = Vec3b(255, 255, 255);
+static Vec3b yellow = Vec3b(255, 215, 0);
+static Vec3b orange = Vec3b(255, 140, 0);
 
 class Frame;
 
@@ -45,6 +52,21 @@ struct FrameDisplayData
     std::shared_ptr<ImageData> ImgData;
     std::vector<cv::KeyPoint> Keys;
     Mat44 Pose;
+};
+
+struct KFDisplay
+{
+    public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    SE3 camToWorld;
+    bool PoseValid;
+    KFDisplay();
+    void RefreshPC(std::shared_ptr<Frame> _In);
+	pangolin::GlBuffer vertexBuffer;
+	pangolin::GlBuffer colorBuffer;
+    bool ValidBuffer;
+    int numGLBufferPoints;
+	int numGLBufferGoodPoints;
 };
 
 struct GUI
@@ -83,6 +105,9 @@ public:
     pangolin::Var<bool>* ShowDepthKF;
     pangolin::Var<bool>* Show2D;
     pangolin::Var<bool>* Show3D;
+    pangolin::Var<bool>* ShowFullTrajectory;
+    pangolin::Var<bool>* ShowAllKfs;
+
     pangolin::Var<bool>* RecordScreen;
     pangolin::Var<bool>* _Pause;
     pangolin::Var<bool>* bFollow;
@@ -100,16 +125,20 @@ public:
     boost::mutex RunningFrameMutex;
     void UploadRunningFrameData(std::shared_ptr<ImageData> ImgIn, std::vector<cv::KeyPoint>&mvKeys, SE3 _Pose);
     void DrawRunningFrame();
+    cv::Mat Dest;
     std::shared_ptr<FrameDisplayData> FrameDisp;
     pangolin::OpenGlMatrix Twc;
     std::deque<Mat44> SmoothMotion;
     void SetPointOfView();
-    void drawCam(Mat44 Pose, float lineWidth, float* color, float sizeFactor);
+    void drawCam(Mat44 Pose, float lineWidth, Vec3b& color, float sizeFactor);
 
     //Draw Trajectory
     std::vector<Vec3f,Eigen::aligned_allocator<Vec3f>> allFramePoses;
 
-	
+    void UploadKeyFrame(std::shared_ptr<Frame> FrameIn);
+    void DrawKeyFrames();
+    std::vector< std::pair< std::shared_ptr<Frame>, std::shared_ptr<KFDisplay> > > AllKeyframes;
+    boost::mutex KeyframesMutex;
 
 };
 

@@ -6,7 +6,7 @@
 #include "DirectProjection.h"
 #include "Frame.h"
 #include "MapPoint.h"
-
+#include "Display.h"
 // #include <Eigen/LU>
 // #include <algorithm>
 // #include "IOWrapper/ImageDisplay.h"
@@ -180,12 +180,16 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 	frame->MarginalizedAt = frameHessians.back()->id;
 	frame->MovedByOpt = frame->w2c_leftEps().norm();
 	frame->ReduceToEssential(true);
+
+	if (DisplayHandler)
+	{
+		boost::unique_lock<boost::mutex> lock(DisplayHandler->KeyframesMutex); 
+		frame->NeedRefresh = true;
+	}
+
 	deleteOutOrder<Frame>(frameHessians, frame);
 	for(unsigned int i=0;i<frameHessians.size();i++)
 		frameHessians[i]->idx = i;
-
-
-
 
 	setPrecalcValues();
 	ef->setAdjointsF(Calib);

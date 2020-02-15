@@ -71,6 +71,7 @@ public:
     bool isKeyFrame;
     bool poseValid;
     bool FlaggedForMarginalization;
+    bool NeedRefresh;
 
     AffLight aff_g2l_internal;
     // EFFrame* efFrame;

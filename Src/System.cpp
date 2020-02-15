@@ -293,6 +293,11 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
         firstFrame->trackingRef.reset();
         firstFrame->camToTrackingRef = SE3();
 
+        firstFrame->NeedRefresh = true;
+        if(DisplayHandler)
+            DisplayHandler->UploadKeyFrame(firstFrame);
+        
+
         secondFrame->camToWorld = firstToNew.inverse();
         secondFrame->aff_g2l_internal = AffLight(0, 0);
         secondFrame->setEvalPT_scaled(secondFrame->camToWorld.inverse(), secondFrame->aff_g2l_internal);

@@ -30,8 +30,8 @@ GLfloat GreenTransparent[4] = {0.0f, 1.0f, 0.0f, 0.5f};
 GLfloat Black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 GLfloat White[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-GLfloat TextColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-;
+GLfloat* TextColor = Black;//{1.0f, 1.0f, 1.0f, 1.0f};
+
 
 void glRect(Viewport v)
 {

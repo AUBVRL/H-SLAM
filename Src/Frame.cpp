@@ -24,6 +24,7 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     id = Globalid; Globalid++; //Set the frame id (this might be reset to 0 in the initializer so that the first keyframe in the map has id = 0)
     
     poseValid=false;
+    NeedRefresh = false;
     MarginalizedAt=-1;
     MovedByOpt=0;
 	statistics_outlierResOnThis = statistics_goodResOnThis = 0;
