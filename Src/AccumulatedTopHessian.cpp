@@ -26,7 +26,7 @@ void AccumulatedTopHessianSSE::addPoint(std::shared_ptr<MapPoint> p, EnergyFunct
 	assert(mode==0 || mode==1 || mode==2);
 
 	VecCf dc = ef->cDeltaF;
-	float dd = p->deltaF;
+	float dd = p->efpoint->deltaF;
 
 	float bd_acc=0;
 	float Hdd_acc=0;
@@ -121,21 +121,21 @@ void AccumulatedTopHessianSSE::addPoint(std::shared_ptr<MapPoint> p, EnergyFunct
 
 	if(mode==0)
 	{
-		p->Hdd_accAF = Hdd_acc;
-		p->bd_accAF = bd_acc;
-		p->Hcd_accAF = Hcd_acc;
+		p->efpoint->Hdd_accAF = Hdd_acc;
+		p->efpoint->bd_accAF = bd_acc;
+		p->efpoint->Hcd_accAF = Hcd_acc;
 	}
 	if(mode==1 || mode==2)
 	{
-		p->Hdd_accLF = Hdd_acc;
-		p->bd_accLF = bd_acc;
-		p->Hcd_accLF = Hcd_acc;
+		p->efpoint->Hdd_accLF = Hdd_acc;
+		p->efpoint->bd_accLF = bd_acc;
+		p->efpoint->Hcd_accLF = Hcd_acc;
 	}
 	if(mode==2)
 	{
-		p->Hcd_accAF.setZero();
-		p->Hdd_accAF = 0;
-		p->bd_accAF = 0;
+		p->efpoint->Hcd_accAF.setZero();
+		p->efpoint->Hdd_accAF = 0;
+		p->efpoint->bd_accAF = 0;
 	}
 
 }

@@ -34,6 +34,7 @@ MapPoint::MapPoint(std::shared_ptr<ImmaturePoint> rawPoint, std::shared_ptr<Cali
 	memcpy(color, rawPoint->color, sizeof(float)*n);
 	memcpy(weights, rawPoint->weights, sizeof(float)*n);
 	energyTH = rawPoint->energyTH;
+	efpoint = std::shared_ptr<EFPoint> (new EFPoint());
 
 	// efPoint=0;
 

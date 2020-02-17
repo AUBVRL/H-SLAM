@@ -5,7 +5,7 @@
 #include "MapPoint.h"
 
 #include "EnergyFunctional.h"
-#include "EnergyFunctionalStructs.h"
+// #include "EnergyFunctionalStructs.h"
 
 namespace FSLAM
 {
@@ -266,10 +266,10 @@ namespace FSLAM
             // compute Jp*delta
             __m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>())
                                             + J->Jpdc[0].dot(ef->cDeltaF)
-                                            + J->Jpdd[0] * point.lock()->deltaF);
+                                            + J->Jpdd[0] * point.lock()->efpoint->deltaF);
             __m128 Jp_delta_y = _mm_set1_ps(J->Jpdxi[1].dot(dp.head<6>())
                                             + J->Jpdc[1].dot(ef->cDeltaF)
-                                            + J->Jpdd[1] * point.lock()->deltaF);
+                                            + J->Jpdd[1] * point.lock()->efpoint->deltaF);
 
             __m128 delta_a = _mm_set1_ps((float) (dp[6]));
             __m128 delta_b = _mm_set1_ps((float) (dp[7]));

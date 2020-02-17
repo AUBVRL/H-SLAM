@@ -6,7 +6,7 @@
 #include "ImmaturePoint.h"
 #include "photometricUndistorter.h"
 #include "MapPoint.h"
-#include "EnergyFunctionalStructs.h"
+// #include "EnergyFunctionalStructs.h"
 
 #include <chrono>
 #include <opencv2/highgui.hpp>
@@ -212,17 +212,15 @@ void Frame::ReduceToEssential(bool isKeyFrame)
                 it.reset();
             else
             {
+                if(it->efpoint)
+                    it->efpoint.reset();
                 for (auto &it2 : it->residuals) if (it2) it2.reset();
                 if(it->lastResiduals) if(it->lastResiduals->first) it->lastResiduals->first.reset();
 
             }
         }
-        for(auto &it : ImmaturePoints)
-        {
-            if(!it)
-                continue;
-            it.reset();
-        }
+
+        ImmaturePoints.resize(0); ImmaturePoints.shrink_to_fit();
     }
 
     Detector.reset();

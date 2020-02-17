@@ -138,7 +138,7 @@ void EnergyFunctional::setDeltaF(std::shared_ptr<CalibData> HCalib)
 		for(auto p : f->pointHessians)
 			if(p)
 				if(p->status == MapPoint::ACTIVE)
-					p->deltaF = p->idepth-p->idepth_zero;
+					p->efpoint->deltaF = p->idepth-p->idepth_zero;
 	}
 
 	EFDeltaValid = true;
@@ -256,8 +256,8 @@ void EnergyFunctional::resubstituteFPt(
 			p->step = 0;
 			continue;
 		}
-		float b = p->bdSumF;
-		b -= xc.dot(p->Hcd_accAF + p->Hcd_accLF);
+		float b = p->efpoint->bdSumF;
+		b -= xc.dot(p->efpoint->Hcd_accAF + p->efpoint->Hcd_accLF);
 
 		for(auto r : p->residuals)
 		{
@@ -265,7 +265,7 @@ void EnergyFunctional::resubstituteFPt(
 			b -= xAd[r->hostIDX*nFrames + r->targetIDX] * r->JpJdF;
 		}
 
-		p->step = - b*p->HdiF;
+		p->step = - b*p->efpoint->HdiF;
 		assert(std::isfinite(p->step));
 	}
 }
@@ -293,7 +293,7 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 	for(int i=min;i<max;i++)
 	{
 		auto p = allPoints[i];
-		float dd = p->deltaF;
+		float dd = p->efpoint->deltaF;
 
 		for(auto r : p->residuals)
 		{
@@ -339,7 +339,7 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 				E.updateSingleNoShift((float)(Jdelta * (Jdelta + 2*r->res_toZeroF[i])));
 			}
 		}
-		E.updateSingle(p->deltaF*p->deltaF*p->priorF);
+		E.updateSingle(p->efpoint->deltaF*p->efpoint->deltaF*p->efpoint->priorF);
 	}
 	E.finish();
 	(*stats)[0] += E.A;
@@ -410,7 +410,7 @@ void EnergyFunctional::insertFrame(std::shared_ptr<Frame> fh, std::shared_ptr<Ca
 
 void EnergyFunctional::insertPoint(std::shared_ptr<MapPoint> ph)
 {
-	ph->takeData();
+	ph->efpoint->takeData(ph->hasDepthPrior, ph->idepth, ph->idepth_zero);
 	nPoints++;
 	EFIndicesValid = false;
 	return;
@@ -544,13 +544,12 @@ void EnergyFunctional::marginalizePointsF()
 				continue;
 			if(p->status == MapPoint::MARGINALIZED)
 			{
-				p->priorF *= setting_idepthFixPriorMargFac;
+				p->efpoint->priorF *= setting_idepthFixPriorMargFac;
 				for(auto r : p->residuals)
 					if(r->isActive())
                         connectivityMap[(((uint64_t)r->host.lock()->id) << 32) + ((uint64_t)r->target.lock()->id)][1]++;
 				allPointsToMarg.push_back(p);
 				f->pointHessians[i]->WasMarginalized = true;
-				// f->pointHessians[i].reset();
 			}
 		}
 	}

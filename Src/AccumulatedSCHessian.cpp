@@ -13,24 +13,24 @@ void AccumulatedSCHessianSSE::addPoint(std::shared_ptr<MapPoint> p, bool shiftPr
 	for(auto r : p->residuals) if(r->isActive()) ngoodres++;
 	if(ngoodres==0)
 	{
-		p->HdiF=0;
-		p->bdSumF=0;
+		p->efpoint->HdiF=0;
+		p->efpoint->bdSumF=0;
 		p->idepth_hessian=0;
 		p->maxRelBaseline=0;
 		return;
 	}
 
-	float H = p->Hdd_accAF+p->Hdd_accLF+p->priorF;
+	float H = p->efpoint->Hdd_accAF+ p->efpoint->Hdd_accLF + p->efpoint->priorF;
 	if(H < 1e-10) H = 1e-10;
 
 	p->idepth_hessian=H;
 
-	p->HdiF = 1.0 / H;
-	p->bdSumF = p->bd_accAF + p->bd_accLF;
-	if(shiftPriorToZero) p->bdSumF += p->priorF*p->deltaF;
-	VecCf Hcd = p->Hcd_accAF + p->Hcd_accLF;
-	accHcc[tid].update(Hcd,Hcd,p->HdiF);
-	accbc[tid].update(Hcd, p->bdSumF * p->HdiF);
+	p->efpoint->HdiF = 1.0 / H;
+	p->efpoint->bdSumF = p->efpoint->bd_accAF + p->efpoint->bd_accLF;
+	if(shiftPriorToZero) p->efpoint->bdSumF += p->efpoint->priorF*p->efpoint->deltaF;
+	VecCf Hcd = p->efpoint->Hcd_accAF + p->efpoint->Hcd_accLF;
+	accHcc[tid].update(Hcd,Hcd,p->efpoint->HdiF);
+	accbc[tid].update(Hcd, p->efpoint->bdSumF * p->efpoint->HdiF);
 
 	assert(std::isfinite((float)(p->HdiF)));
 
@@ -44,11 +44,11 @@ void AccumulatedSCHessianSSE::addPoint(std::shared_ptr<MapPoint> p, bool shiftPr
 		{
 			if(!r2->isActive()) continue;
 
-			accD[tid][r1ht+r2->targetIDX*nFrames2].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			accD[tid][r1ht+r2->targetIDX*nFrames2].update(r1->JpJdF, r2->JpJdF, p->efpoint->HdiF);
 		}
 
-		accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);
-		accEB[tid][r1ht].update(r1->JpJdF,p->HdiF*p->bdSumF);
+		accE[tid][r1ht].update(r1->JpJdF, Hcd, p->efpoint->HdiF);
+		accEB[tid][r1ht].update(r1->JpJdF,p->efpoint->HdiF*p->efpoint->bdSumF);
 	}
 }
 void AccumulatedSCHessianSSE::stitchDoubleInternal(

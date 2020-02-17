@@ -7,7 +7,6 @@
 #include "CalibData.h"
 #include "CoarseTracker.h"
 #include "Display.h"
-
 namespace FSLAM
 {
 void System::AddKeyframe(std::shared_ptr<Frame> fh)
@@ -43,7 +42,7 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
             continue;
         for (auto ph : fh1->pointHessians)
         {
-            if(!ph)
+            if(!ph || ph->status != MapPoint::ACTIVE)
                 continue;
             std::shared_ptr<PointFrameResidual> r = std::shared_ptr<PointFrameResidual>(new PointFrameResidual(ph, fh1, fh));
             r->setState(ResState::IN);

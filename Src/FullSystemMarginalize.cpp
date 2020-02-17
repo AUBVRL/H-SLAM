@@ -18,7 +18,7 @@
 #include "ImmaturePoint.h"
 
 #include "EnergyFunctional.h"
-#include "EnergyFunctionalStructs.h"
+// #include "EnergyFunctionalStructs.h"
 
 // #include "IOWrapper/Output3DWrapper.h"
 

@@ -7,7 +7,7 @@
 #include "MapPoint.h"
 // #include "FullSystem/HessianBlocks.h"
 #include "OptimizationClasses.h"
-#include "EnergyFunctionalStructs.h"
+// #include "EnergyFunctionalStructs.h"
 // #include "IOWrapper/ImageRW.h"
 // #include <algorithm>
 
@@ -125,7 +125,7 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<std::shared_ptr<Frame>> frameH
 				int u = r->centerProjectedTo[0] + 0.5f;
 				int v = r->centerProjectedTo[1] + 0.5f;
 				float new_idepth = r->centerProjectedTo[2];
-				float weight = sqrtf(1e-3 / (ph->HdiF+1e-12));
+				float weight = sqrtf(1e-3 / (ph->efpoint->HdiF+1e-12));
 
 				idepth[0][u+w[0]*v] += new_idepth *weight;
 				weightSums[0][u+w[0]*v] += weight;

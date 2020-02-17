@@ -11,6 +11,35 @@ class ImmaturePoint;
 // class EFPoint;
 class PointFrameResidual;
 
+struct EFPoint
+{
+    public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+    EFPoint(){};
+    ~EFPoint(){};
+    void takeData(bool hasDepthPrior, float idepth, float idepth_zero)
+    {
+        priorF = hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
+        if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
+            priorF = 0;
+        deltaF = idepth - idepth_zero;
+    }
+
+    float priorF = 0;
+    float deltaF = 0;
+
+    // H and b blocks
+    float bdSumF = 0;
+    float HdiF = 0;
+    float Hdd_accLF = 0;
+    VecCf Hcd_accLF = VecCf::Zero();
+    float bd_accLF = 0;
+    float Hdd_accAF = 0;
+    VecCf Hcd_accAF = VecCf::Zero();
+    float bd_accAF = 0;
+};
+
 struct MapPoint
 {
     public:
@@ -80,27 +109,8 @@ struct MapPoint
 
     bool isOOB(const std::vector<std::shared_ptr<Frame>> &toMarg) const;
     bool isInlierNew();
+    std::shared_ptr<EFPoint> efpoint;
 
-    void takeData()
-    {
-        priorF = hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
-        if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
-            priorF = 0;
-        deltaF = idepth - idepth_zero;
-    }
-
-    float priorF = 0;
-    float deltaF = 0;
-
-    // H and b blocks
-    float bdSumF = 0;
-    float HdiF = 0;
-    float Hdd_accLF = 0;
-    VecCf Hcd_accLF = VecCf::Zero();
-    float bd_accLF = 0;
-    float Hdd_accAF = 0;
-    VecCf Hcd_accAF = VecCf::Zero();
-    float bd_accAF = 0;
 };
 
 
