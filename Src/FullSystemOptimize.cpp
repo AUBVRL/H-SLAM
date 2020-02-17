@@ -620,7 +620,6 @@ void System::removeOutliers()
 			if(ph->residuals.size() == 0)
 			{
 				ph->status = MapPoint::OUTLIER;
-				ph.reset();
 				numPointsDropped++;
 			}
 		}

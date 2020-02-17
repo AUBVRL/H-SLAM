@@ -606,7 +606,7 @@ void EnergyFunctional::dropPointsF()
 			if(p->status == MapPoint::OUTLIER)
 			{
 				removePoint(p);
-				f->pointHessians[i].reset(); //DEBUG THIS
+				f->pointHessians[i].reset();
 			}
 		}
 	}

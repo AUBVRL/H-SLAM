@@ -17,7 +17,7 @@ namespace FSLAM
     int minThFAST = 8;
     float tolerance = 0.1; //SSC tolerance 
     int EnforcedMinDist = 5;
-    bool UseFAST = false;
+    bool UseFAST = true;
     bool DoSubPix = false;
     bool DrawDetected = true;
     bool DrawDepthKfTest = false;
