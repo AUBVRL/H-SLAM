@@ -17,7 +17,7 @@ namespace FSLAM
     int minThFAST = 8;
     float tolerance = 0.1; //SSC tolerance 
     int EnforcedMinDist = 5;
-
+    bool UseFAST = false;
     bool DoSubPix = false;
     bool DrawDetected = true;
     bool DrawDepthKfTest = false;
@@ -26,6 +26,10 @@ namespace FSLAM
 
     //Direct data dector
     int DirPyrLevels = 6;
+    float setting_minGradHistCut = 0.5;
+    float setting_minGradHistAdd = 7;
+    float setting_gradDownweightPerLevel = 0.75;
+    bool setting_selectDirectionDistribution = true;
 
     float setting_keyframesPerSecond = 0; // if !=0, takes a fixed number of KF per second.
     bool setting_realTimeMaxKF = false;   // if true, takes as many KF's as possible (will break the system if the camera stays stationary)
@@ -35,7 +39,7 @@ namespace FSLAM
     float setting_kfGlobalWeight = 1; // general weight on threshold, the larger the more KF's are taken (e.g., 2 = double the amount of KF's).
     float setting_maxAffineWeight = 2;
 
-    bool SequentialOperation = false;
+    bool SequentialOperation = true;
 
     //Display options
     bool DisplayOn = true;

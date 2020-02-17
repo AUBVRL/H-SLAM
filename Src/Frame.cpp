@@ -42,7 +42,7 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     //for now I'm only extracting features from highest resolution image!!
     CreateDirPyrs(Img->fImgL, DirPyr);
     nFeatures = 0;
-    Detector->ExtractFeatures(IndPyr[0], absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    Detector->ExtractFeatures(IndPyr[0], DirPyr, id, absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
     pointHessians.resize(nFeatures);
     ImmaturePoints.resize(nFeatures);
     //Assign Features to Grid

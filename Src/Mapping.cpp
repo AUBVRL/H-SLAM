@@ -352,8 +352,6 @@ void System::activatePointsMT()
 		if(host == newestHs) continue;
 
 		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
-        // Mat33f KRKi = (Calib->pyrK[0] * fhToNew.rotationMatrix().cast<float>() * Calib->pyrKi[0] );
-        // Vec3f Kt = (Calib->pyrK[0] * fhToNew.translation().cast<float>());
 
 		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());

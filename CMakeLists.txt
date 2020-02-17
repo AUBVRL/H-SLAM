@@ -83,6 +83,7 @@ set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/FullSystemOptimize.cpp
   ${PROJECT_SOURCE_DIR}/Src/FullSystemMarginalize.cpp
   ${PROJECT_SOURCE_DIR}/Src/FullSystemOptPoint.cpp
+  ${PROJECT_SOURCE_DIR}/Src/PixelSelector.cpp
 )
 
 include_directories(

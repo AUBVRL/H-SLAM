@@ -21,10 +21,19 @@ extern int IndNumFeatures;
 extern int minThFAST;
 extern float tolerance; //Ssc telerance ratio
 extern int EnforcedMinDist;
+extern bool UseFAST;
+
 extern bool DoSubPix;
 extern bool DrawDetected;
 extern bool DrawDepthKfTest;
 extern bool DrawEpipolarMatching;
+
+//DSO selector
+extern float setting_minGradHistCut;
+extern float setting_minGradHistAdd;
+extern float setting_gradDownweightPerLevel;
+extern bool  setting_selectDirectionDistribution;
+
 
 //Direct data dector
 extern int DirPyrLevels;

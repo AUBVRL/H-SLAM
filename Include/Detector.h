@@ -8,14 +8,15 @@ namespace FSLAM
 {
 
 template <typename Type> class IndexThreadReduce;
-
+class PixelSelector;
+class CalibData;
 class FeatureDetector
 {
 public:
-    FeatureDetector();
+    FeatureDetector(std::shared_ptr<CalibData> _Calib);
     ~FeatureDetector();
     // void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);
-    void ExtractFeatures(cv::Mat &Image, std::vector<float*>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
+    void ExtractFeatures(cv::Mat &Image, std::vector<Vec3f*>&DirPyr, int id, std::vector<float*>& GradPyr, std::vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, std::shared_ptr<IndexThreadReduce<Vec10>>thPool);
 
 private:
 
@@ -30,6 +31,9 @@ private:
     int PATCH_SIZE;
     int EDGE_THRESHOLD;
     std::vector<cv::Point> pattern;
+    std::shared_ptr<PixelSelector> PixSelector;
+    float* selectionMap;
+
 };
 } // namespace FSLAM
 

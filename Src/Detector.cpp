@@ -7,24 +7,28 @@
 #include <nmmintrin.h>
 #include <IndexThreadReduce.h>
 #include <chrono>
+#include "PixelSelector.h"
 
 using namespace std;
 
 namespace FSLAM
 {
-FeatureDetector::FeatureDetector()
+FeatureDetector::FeatureDetector(std::shared_ptr<CalibData> _Calib)
 {
     HALF_PATCH_SIZE = 15;
     PATCH_SIZE = 31;
     umax = InitUmax();
     pattern = InitPattern();
+    PixSelector = std::shared_ptr<PixelSelector>(new PixelSelector (_Calib));
+    selectionMap = new float[PixSelector->area];
 }
 
 FeatureDetector::~FeatureDetector()
 {
+    delete[] selectionMap;
 }
 
-void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<float*>& GradPyr, vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, shared_ptr<IndexThreadReduce<Vec10>>thPool)
+void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<Vec3f*>&DirPyr, int id, vector<float*>& GradPyr, vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &nOrb, int NumFeatures, shared_ptr<IndexThreadReduce<Vec10>>thPool)
 {
     if (Image.empty())
         return;
@@ -40,14 +44,28 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<float*>& GradPyr, v
     // cv::GaussianBlur(Temp, Temp, cv::Size(3, 3), 0.5, 0.5, cv::BORDER_REFLECT_101);
     // cv::imshow("absTemp",Temp);
     // cv::waitKey(1);
-    cv::FAST(Image, vKpTemp, minThFAST, true); //extract on image complement on gradient!!
-    // cv::AGAST(Image, vKpTemp, minThFAST, true,cv::AgastFeatureDetector::AGAST_7_12d);// AGAST_5_8 AGAST_7_12d AGAST_7_12s OAST_9_16
+    if (UseFAST)
+    {
+        cv::FAST(Image, vKpTemp, minThFAST, true); //extract on image complement on gradient!!
+        // cv::AGAST(Image, vKpTemp, minThFAST, true,cv::AgastFeatureDetector::AGAST_7_12d);// AGAST_5_8 AGAST_7_12d AGAST_7_12s OAST_9_16
+        std::sort(vKpTemp.begin(), vKpTemp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
+        // if (vKpTemp.size() > 2200)
+        //     vKpTemp.resize(2200);
+        mvKeys = Ssc(vKpTemp, NumFeatures, EnforcedMinDist, tolerance, width, height);
+    }
+    else
+    {
+        int numPointsTotal = PixSelector->makeMaps(DirPyr, id, GradPyr, selectionMap, 2000); //NumFeatures
+        for (int y = HALF_PATCH_SIZE + 1; y < height - HALF_PATCH_SIZE - 2; y++) //patternPadding
+            for (int x = HALF_PATCH_SIZE + 1; x < width - HALF_PATCH_SIZE - 2; x++)
+            {
+                int i = x + y * width;
+                if (selectionMap[i] == 0)
+                    continue;
+                mvKeys.push_back(cv::KeyPoint(cv::Point2f(x,y), 1));
+            }
+    }
 
-    std::sort(vKpTemp.begin(), vKpTemp.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });
-    // if (vKpTemp.size() > 2200)
-    //     vKpTemp.resize(2200);
-    
-    mvKeys = Ssc(vKpTemp, NumFeatures, EnforcedMinDist, tolerance, width, height);
     nOrb = mvKeys.size();    
     cv::Mat ImageBlurred;
     cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);

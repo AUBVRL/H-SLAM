@@ -131,6 +131,7 @@ void GUI::run()
         
         
         pangolin::FinishFrame();
+        mRenderThread.unlock();        
         usleep(10000);
     }
 
