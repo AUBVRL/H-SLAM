@@ -458,6 +458,10 @@ void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
 
     if(vertexBufferNumPoints==0)
 	{
+        ValidBuffer = false;
+        _In->NeedRefresh = false;
+        numGLBufferGoodPoints = 0;
+        numGLBufferPoints = 0;
 		delete[] tmpColorBuffer;
 		delete[] tmpVertexBuffer;
 		return;

@@ -206,8 +206,16 @@ void Frame::ReduceToEssential(bool isKeyFrame)
         {
             if (!it)
                 continue;
-            if(it->status != MapPoint::ACTIVE && it->status != MapPoint::MARGINALIZED)
+            assert(it->status != MapPoint::ACTIVE);
+             
+            if(it->status != MapPoint::MARGINALIZED)
                 it.reset();
+            else
+            {
+                for (auto &it2 : it->residuals) if (it2) it2.reset();
+                if(it->lastResiduals) if(it->lastResiduals->first) it->lastResiduals->first.reset();
+
+            }
         }
         for(auto &it : ImmaturePoints)
         {
@@ -226,14 +234,12 @@ void Frame::ReduceToEssential(bool isKeyFrame)
             delete[] DirPyr[i];
             delete[]  absSquaredGrad[i];
     }
-    DirPyr.resize(0); // resize to the highest res image only.
-    DirPyr.shrink_to_fit();
+    
+    DirPyr.resize(0); DirPyr.shrink_to_fit();
 
-    absSquaredGrad.resize(0); 
-    absSquaredGrad.shrink_to_fit();
+    absSquaredGrad.resize(0); absSquaredGrad.shrink_to_fit();
     
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
-     
     return;
 }
 
