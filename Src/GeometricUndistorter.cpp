@@ -31,7 +31,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     w = CalibIn["Output.width"]; h = CalibIn["Output.height"];
     WidthOri = wOrg; HeightOri = hOrg;
     cv::Mat K_l, distM;
-    float atanDist;
+    double atanDist;
 
     CalibIn["CameraL.K"] >> K_l;
 
@@ -41,7 +41,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     else if (Calibmodel == "Atan")
     { Cameramodel = CamModel::Atan; atanDist = CalibIn["CameraL.dist"];}
     else if (Calibmodel == "Pinhole")
-    { Cameramodel = CamModel::Pinhole; atanDist = 0.0f; } 
+    { Cameramodel = CamModel::Pinhole; atanDist = (double)0.0; } 
     else if (Calibmodel == "EquiDistant")
     { Cameramodel = CamModel::EquiDistant; CalibIn["CameraL.distM"] >> distM; }
     else if (Calibmodel == "KannalaBrandt")
@@ -58,21 +58,21 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
         ic[4] = atanDist;
     else 
     {
-        ic[4] = distM.at<float>(0, 0);
-        ic[5] = distM.at<float>(0, 1);
-        ic[6] = distM.at<float>(0, 2);
-        ic[7] = distM.at<float>(0, 3);
+        ic[4] = distM.at<double>(0, 0);
+        ic[5] = distM.at<double>(0, 1);
+        ic[6] = distM.at<double>(0, 2);
+        ic[7] = distM.at<double>(0, 3);
     }
-    if(K_l.at<float>(0,2) < 1 && K_l.at<float>(1,2) < 1)
+    if(K_l.at<double>(0,2) < 1 && K_l.at<double>(1,2) < 1)
     {
-        K_l.at<float>(0,0) *= wOrg; //fx
-        K_l.at<float>(1,1) *= hOrg; //fy
-        K_l.at<float>(0,2) *= wOrg; //-0.5 //cx
-        K_l.at<float>(1,2) *= hOrg; //-0.5 //cy
+        K_l.at<double>(0,0) *= wOrg; //fx
+        K_l.at<double>(1,1) *= hOrg; //fy
+        K_l.at<double>(0,2) = K_l.at<double>(0,2) * wOrg - 0.5; //cx
+        K_l.at<double>(1,2) = K_l.at<double>(1,2) * hOrg - 0.5; //cy
     }
 
-    ic[0] = K_l.at<float>(0,0); ic[1] = K_l.at<float>(1,1);
-    ic[2] = K_l.at<float>(0,2); ic[3] = K_l.at<float>(1,2);
+    ic[0] = K_l.at<double>(0,0); ic[1] = K_l.at<double>(1,1);
+    ic[2] = K_l.at<double>(0,2); ic[3] = K_l.at<double>(1,2);
     
     std::string CalibProcess = CalibIn["Calib.process"];
     CalibIn["Stereo.State"] >> StereoState;
@@ -85,7 +85,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
         Cameramodel = CamModel::Pinhole;
         if(baseline<=0)
             throw std::runtime_error("failed to read stereo baseline!\n");
-        baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
+        baseline/=K_l.at<double>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
     }
 
     remapX = new float[w*h];
@@ -102,24 +102,24 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
             if (w != wOrg || h != hOrg)
                 throw std::runtime_error("ERROR: rectification mode none requires input and output dimenstions to match!\n");
             K.setIdentity();
-            K(0, 0) = K_l.at<float>(0, 0); //ic[0] = 
-            K(1, 1) = K_l.at<float>(1, 1); //ic[1] = 
-            K(0, 2) = K_l.at<float>(0, 2); //-0.5;  //ic[2] = 
-            K(1, 2) = K_l.at<float>(1, 2);// -0.5; //ic[3] = 
+            K(0, 0) = K_l.at<double>(0, 0); //ic[0] = 
+            K(1, 1) = K_l.at<double>(1, 1); //ic[1] = 
+            K(0, 2) = K_l.at<double>(0, 2); //-0.5;  //ic[2] = 
+            K(1, 2) = K_l.at<double>(1, 2);// -0.5; //ic[3] = 
             passthrough = true;
         }
         else if (CalibProcess == "useK")
         {
             cv::Mat DesiredK;
             CalibIn["Calib.desiK"] >> DesiredK;
-            if (DesiredK.empty() || DesiredK.at<float>(0,2) > 1 || DesiredK.at<float>(0,3) > 1)
+            if (DesiredK.empty() || DesiredK.at<double>(0,2) > 1 || DesiredK.at<double>(0,3) > 1)
                 throw std::runtime_error("Error reading desired camera calibration! it should be fx fy cx cy relative to the width and height exit.\n");
 
             K.setIdentity();
-            K(0, 0) = DesiredK.at<float>(0, 0) * w; //ic[0]=
-            K(1, 1) = DesiredK.at<float>(0, 1) * h;  //ic[1]=
-            K(0, 2) = DesiredK.at<float>(0, 2) * w;// -0.5;  //ic[2]=
-            K(1, 2) = DesiredK.at<float>(0, 3) * h;// -0.5;  //ic[3]=
+            K(0, 0) = DesiredK.at<double>(0, 0) * w; //ic[0]=
+            K(1, 1) = DesiredK.at<double>(0, 1) * h;  //ic[1]=
+            K(0, 2) = DesiredK.at<double>(0, 2) * w -0.5; //ic[2]=
+            K(1, 2) = DesiredK.at<double>(0, 3) * h -0.5; //ic[3]=
         }
     }
     else //rquire stereo rectification
@@ -142,15 +142,15 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
 
         hOrg = h; wOrg=w;
         K.setIdentity();
-        K(0, 0) = NewInt.at<float>(0,0); //ic[0] =
-        K(1, 1) = NewInt.at<float>(1,1); //ic[1] = 
-        K(0, 2) = NewInt.at<float>(0,2); //ic[2] =
-        K(1, 2) = NewInt.at<float>(1,2); //ic[3] = 
+        K(0, 0) = NewInt.at<double>(0,0); //ic[0] =
+        K(1, 1) = NewInt.at<double>(1,1); //ic[1] = 
+        K(0, 2) = NewInt.at<double>(0,2); //ic[2] =
+        K(1, 2) = NewInt.at<double>(1,2); //ic[3] = 
 
         baseline = CalibIn["Stereo.bf"];
         if(baseline<=0)
             throw std::runtime_error("failed to read stereo baseline!\n");
-        baseline/=K_l.at<float>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
+        baseline/=K_l.at<double>(0,0); //this assumes horizonal stereo! if vertical stereo need to divide by fy
         cv::initUndistortRectifyMap(K_l, distM, R_L, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1l, M2l);
         cv::initUndistortRectifyMap(IntR, DistR, R_R, NewInt.rowRange(0, 3).colRange(0, 3), cv::Size(w, h), CV_32F, M1r, M2r);
     }
@@ -193,7 +193,7 @@ void GeometricUndistorter::LoadGeometricCalibration(std::string GeomCalibPath)
     remapX_ = cv::Mat(cv::Size(w, h), CV_32F,  remapX);
     remapY_ = cv::Mat(cv::Size(w, h), CV_32F,  remapY);
 
-    std::cout << K << std::endl;
+    // std::cout << "used K:\n" << K << std::endl;
 }
 
 void GeometricUndistorter::makeOptimalK_crop()
