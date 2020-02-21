@@ -18,7 +18,7 @@ Output.height: 480
 CameraL.K: !!opencv-matrix
    rows: 3
    cols: 3
-   dt: f
+   dt: d
    data:[0.535719308086809, 0.0, 0.493248545285398, 0.0, 0.669566858850269, 0.500408664348414, 0.0, 0.0, 1.0]
 
 #only used if calibration model is Atan (straight lines have to be straight)
@@ -28,5 +28,5 @@ CameraL.dist: 0.897966326944875
 Calib.desiK: !!opencv-matrix
    rows: 1
    cols: 4
-   dt: f
+   dt: d
    data:[0.4, 0.53, 0.5, 0.5] #fx fy cx cy (relative wrt width and height)

@@ -37,9 +37,9 @@ class CalibData
     VecC value_minus_value_zero;
 
     std::vector<int> wpyr, hpyr;
-    std::vector<float> pyrfx, pyrfxi, pyrfy, pyrfyi, pyrcx, pyrcxi, pyrcy, pyrcyi;
+    std::vector<double> pyrfx, pyrfxi, pyrfy, pyrfyi, pyrcx, pyrcxi, pyrcy, pyrcyi;
     
-    std::vector<Mat33f> pyrK, pyrKi;
+    std::vector<Mat33> pyrK, pyrKi;
 
     std::vector<cv::Size> IndPyrSizes;
     std::vector<float> IndScaleFactors;
@@ -99,7 +99,7 @@ class CalibData
     inline float &cxli() { return value_scaledi[2]; }
     inline float &cyli() { return value_scaledi[3]; }
 
-    inline CalibData(int _Width, int _Height, Mat33f K, float baseline, std::shared_ptr<PhotometricUndistorter> _PhoUndL,
+    inline CalibData(int _Width, int _Height, Mat33 K, float baseline, std::shared_ptr<PhotometricUndistorter> _PhoUndL,
                      std::shared_ptr<PhotometricUndistorter> _PhoUndR, int& DirPyrSize, int IndPyrLevels,
                      float IndPyrScaleFactor) : Width(_Width), Height(_Height), PhotoUnDistL(_PhoUndL), PhotoUnDistR(_PhoUndL), mbf(baseline)
     {

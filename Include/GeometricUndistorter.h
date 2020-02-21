@@ -23,8 +23,8 @@ public:
     std::string StereoState;
     int w, h, wOrg, hOrg; //w, h is the largest resolution SLAM will operate at. wOrg, hOrg is the input res.
     float baseline;
-    float ic[10];
-    Mat33f K;
+    double ic[10];
+    Mat33 K;
 
 
 protected:

@@ -61,29 +61,28 @@ endif (MSVC)
 
 # Sources files
 set(fslam_SOURCE
-  ${PROJECT_SOURCE_DIR}/Src/System.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Display.cpp
   ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
-  ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp
-  ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/photometricUndistorter.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
-  ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/OnlineCalibrator.cpp
-  ${PROJECT_SOURCE_DIR}/Src/OptimizationClasses.cpp
   ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp  
+  ${PROJECT_SOURCE_DIR}/Src/MapPoint.cpp
+  ${PROJECT_SOURCE_DIR}/Src/PixelSelector.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
   ${PROJECT_SOURCE_DIR}/Src/Map.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Mapping.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Initializer.cpp
   ${PROJECT_SOURCE_DIR}/Src/CoarseTracker.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Initializer.cpp
   ${PROJECT_SOURCE_DIR}/Src/AccumulatedSCHessian.cpp
   ${PROJECT_SOURCE_DIR}/Src/AccumulatedTopHessian.cpp
+  ${PROJECT_SOURCE_DIR}/Src/OptimizationClasses.cpp
   ${PROJECT_SOURCE_DIR}/Src/EnergyFunctional.cpp
-  # ${PROJECT_SOURCE_DIR}/Src/EnergyFunctionalStructs.cpp
-  ${PROJECT_SOURCE_DIR}/Src/MapPoint.cpp
+  ${PROJECT_SOURCE_DIR}/Src/System.cpp
   ${PROJECT_SOURCE_DIR}/Src/FullSystemOptimize.cpp
   ${PROJECT_SOURCE_DIR}/Src/FullSystemMarginalize.cpp
   ${PROJECT_SOURCE_DIR}/Src/FullSystemOptPoint.cpp
-  ${PROJECT_SOURCE_DIR}/Src/PixelSelector.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Mapping.cpp
+  ${PROJECT_SOURCE_DIR}/Src/Display.cpp
+  ${PROJECT_SOURCE_DIR}/Src/GeometricUndistorter.cpp
+  ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/photometricUndistorter.cpp
+  ${PROJECT_SOURCE_DIR}/Src/PhotometricDistorter/OnlineCalibrator.cpp
 )
 
 include_directories(

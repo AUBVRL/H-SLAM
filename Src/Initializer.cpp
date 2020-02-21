@@ -1556,8 +1556,8 @@ void DirectRefinement::trace(Pnt* _pl)
 {
 	float maxPixSearch = (Calib->Width + Calib->Height) * setting_maxPixSearch ; // 640*480 * 0.027
     SE3 Temp = thisToNext;
-    Mat33f KRKi = (Calib->pyrK[0].cast<double>() * Temp.rotationMatrix() * Calib->pyrKi[0].cast<double>()).cast<float>();
-	Vec3f Kt = Calib->pyrK[0] * Temp.translation().cast<float>();
+    Mat33f KRKi = (Calib->pyrK[0] * Temp.rotationMatrix() * Calib->pyrKi[0]).cast<float>();
+	Vec3f Kt = (Calib->pyrK[0] * Temp.translation()).cast<float>();
 
     Eigen::Vector3f* colorRef = FirstFrame->DirPyr[0];
     Eigen::Vector3f *colorNew = SecondFrame->DirPyr[0];
