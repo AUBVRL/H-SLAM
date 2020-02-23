@@ -41,7 +41,7 @@ mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INS
 
 echo -e "Compiling G2O\n"
 cd $SCRIPTPATH/Thirdparty/g2o
-mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir #-DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF -DG2O_USE_OPENMP=true
+mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF #-DG2O_USE_OPENMP=true
 make -j $(nproc) && make install && cd .. && rm -r build && rm -r bin && rm -r lib
 
 echo -e "Compiling DBoW3\n"

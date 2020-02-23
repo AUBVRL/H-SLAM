@@ -54,17 +54,17 @@
                 "photomCalibmodel=HaveCalib", //OnlineCalib, HaveCalib, NoCalib
 
                 // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/EuRoC.yaml", //Euroc
-                "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34.yaml
+                "intrinsics=/media/gy/Drive/devel/FSLAM2/Extras/Calib/TumMono_25to26-28to32-35to50.yaml", //TumMono TumMono_25to26-28to32-35to50.yaml  TumMono_20-27-33-34.yaml
                 // "intrinsics=/media/gy/Drive/devel/FSLAM/Extras/Calib/Kitti00to02.yaml", //Kitti Kitti00to02.yaml Kitti03.yaml Kitti04-12.yaml
 
                 "vocabulary=pathtovocab",
 
                 // "path=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy",//Euroc 
-                "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/images.zip", //TumMono 
+                "path=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip", //TumMono 
                 // "path=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/", //Kitti      
 
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/EuroC/MH_01_easy/mav0/cam0/data.csv", //Euroc
-                "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/times.txt", //TumMono
+                "timestampsL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt", //TumMono
                 // "timestampsL=/media/gy/Drive/VSLAM_Datasets/Kitti/Sequence_00/times.txt", //Kitti
 
                 "gammaL=/media/gy/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
@@ -80,7 +80,7 @@
                 "playbackspeed=0",
                 "IndPyrLevels=6",
                 "IndPyrScaleFactor=1.2",
-                "IndNumFeatures=3000",
+                "IndNumFeatures=2000",
                 "DirPyrLevels=4",
             ],
             "problemMatcher": []
