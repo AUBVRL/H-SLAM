@@ -7,50 +7,40 @@
 #include "CalibData.h"
 #include "Frame.h"
 #include "MapPoint.h"
-// #include <Eigen/LU>
-// #include <algorithm>
-// #include "IOWrapper/ImageDisplay.h"
-// #include "util/globalCalib.h"
-// #include <Eigen/SVD>
-// #include <Eigen/Eigenvalues>
 #include "DirectProjection.h"
 
 #include "EnergyFunctional.h"
-// #include "EnergyFunctionalStructs.h"
 
-// #include <cmath>
-
-// #include <algorithm>
 
 namespace FSLAM
 {
 
 
-void System::linearizeAll_Reductor(bool fixLinearization, std::vector<std::shared_ptr<PointFrameResidual>>* toRemove, int min, int max, Vec10* stats, int tid)
+void System::linearizeAll_Reductor(bool fixLinearization, vector<pair<shared_ptr<MapPoint>,shared_ptr<PointFrameResidual>>>* toRemove, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
 	{
 		auto r = activeResiduals[k];
-		(*stats)[0] += r->linearize(Calib);
+		(*stats)[0] += r.second->linearize(r.first, Calib);
 
 		if(fixLinearization)
 		{
-			r->applyRes(true);
+			r.second->applyRes(true);
 
-			if(r->isActive())
+			if(r.second->isActive())
 			{
-				if(r->isNew)
+				if(r.second->isNew)
 				{
-					auto p = r->point.lock();
-					Vec3f ptp_inf = r->host.lock()->targetPrecalc[r->target.lock()->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + r->host.lock()->targetPrecalc[r->target.lock()->idx].PRE_KtTll*p->idepth_scaled;	// projected point with real depth.
+					// auto p = r->point.lock();
+					Vec3f ptp_inf = r.second->host->frame->targetPrecalc[r.second->target->frame->idx].PRE_KRKiTll * Vec3f(r.first->u,r.first->v, 1);	// projected point assuming infinite depth.
+					Vec3f ptp = ptp_inf + r.second->host->frame->targetPrecalc[r.second->target->frame->idx].PRE_KtTll* r.first->idepth;	// projected point with real depth.
 					float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 
-					if(relBS > p->maxRelBaseline)
-						p->maxRelBaseline = relBS;
+					if(relBS > r.first->maxRelBaseline)
+						r.first->maxRelBaseline = relBS;
 
-					p->numGoodResiduals++;
+					r.first->numGoodResiduals++;
 				}
 			}
 			else
@@ -65,26 +55,24 @@ void System::linearizeAll_Reductor(bool fixLinearization, std::vector<std::share
 void System::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
-		activeResiduals[k]->applyRes(true);
+		activeResiduals[k].second->applyRes(true);
 }
 void System::setNewFrameEnergyTH()
 {
-
 	// collect all residuals and make decision on TH.
 	allResVec.clear();
 	allResVec.reserve(activeResiduals.size()*2);
-	std::shared_ptr<Frame> newFrame = frameHessians.back();
+	shared_ptr<FrameShell> newFrame = frameHessians.back();
 
-	for(auto r : activeResiduals)
-		if(r->state_NewEnergyWithOutlier >= 0 && r->target.lock() == newFrame)
+	for(auto &r : activeResiduals)
+		if(r.second->state_NewEnergyWithOutlier >= 0 && r.second->target == newFrame)
 		{
-			allResVec.push_back(r->state_NewEnergyWithOutlier);
-
+			allResVec.push_back(r.second->state_NewEnergyWithOutlier);
 		}
 
 	if(allResVec.size()==0)
 	{
-		newFrame->frameEnergyTH = 12*12*patternNum;
+		newFrame->frame->frameEnergyTH = 12*12*patternNum;
 		return;		// should never happen, but lets make sure.
 	}
 
@@ -97,15 +85,10 @@ void System::setNewFrameEnergyTH()
 	std::nth_element(allResVec.begin(), allResVec.begin()+nthIdx, allResVec.end());
 	float nthElement = sqrtf(allResVec[nthIdx]);
 
-
-
-
-
-
-    newFrame->frameEnergyTH = nthElement*setting_frameEnergyTHFacMedian;
-	newFrame->frameEnergyTH = 26.0f*setting_frameEnergyTHConstWeight + newFrame->frameEnergyTH*(1-setting_frameEnergyTHConstWeight);
-	newFrame->frameEnergyTH = newFrame->frameEnergyTH*newFrame->frameEnergyTH;
-	newFrame->frameEnergyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
+    newFrame->frame->frameEnergyTH = nthElement*setting_frameEnergyTHFacMedian;
+	newFrame->frame->frameEnergyTH = 26.0f*setting_frameEnergyTHConstWeight + newFrame->frame->frameEnergyTH*(1-setting_frameEnergyTHConstWeight);
+	newFrame->frame->frameEnergyTH = newFrame->frame->frameEnergyTH*newFrame->frame->frameEnergyTH;
+	newFrame->frame->frameEnergyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
 
 
 
@@ -123,7 +106,7 @@ Vec3 System::linearizeAll(bool fixLinearization)
 	double num = 0;
 
 
-	std::vector<std::shared_ptr<PointFrameResidual>> toRemove[NUM_THREADS];
+	vector<pair<shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>> toRemove[NUM_THREADS];
 	for(int i=0;i<NUM_THREADS;i++) toRemove[i].clear();
 
 	if(multiThreading)
@@ -138,36 +121,32 @@ Vec3 System::linearizeAll(bool fixLinearization)
 		lastEnergyP = stats[0];
 	}
 
-
 	setNewFrameEnergyTH();
-
 
 	if(fixLinearization)
 	{
-
-		for(auto r : activeResiduals)
+		for(auto &r : activeResiduals)
 		{
-			auto ph = r->point.lock();
-			if(ph->lastResiduals[0].first == r)
-				ph->lastResiduals[0].second = r->state_state;
-			else if(ph->lastResiduals[1].first == r)
-				ph->lastResiduals[1].second = r->state_state;
+			auto &ph = r.first;
+			if(ph->lastResiduals[0].first == r.second)
+				ph->lastResiduals[0].second = r.second->state_state;
+			else if(ph->lastResiduals[1].first == r.second)
+				ph->lastResiduals[1].second = r.second->state_state;
 		}
 
-		int nResRemoved=0;
 		for(int i=0;i<NUM_THREADS;i++)
 		{
 			for(auto r : toRemove[i])
 			{
-				auto ph = r->point.lock();
+				auto &ph = r.first;
 
-				if(ph->lastResiduals[0].first == r)
+				if(ph->lastResiduals[0].first == r.second)
 					ph->lastResiduals[0].first.reset();
-				else if (ph->lastResiduals[1].first == r)
+				else if (ph->lastResiduals[1].first == r.second)
 					ph->lastResiduals[1].first.reset();
 
-				ef->dropResidual(r);
-				nResRemoved++;
+				ef->dropResidual(ph, r.second);
+				
 			}
 		}
 		//printf("FINAL LINEARIZATION: removed %d / %d residuals!\n", nResRemoved, (int)activeResiduals.size());
@@ -199,52 +178,52 @@ bool System::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float
 	if(setting_solverMode & SOLVER_MOMENTUM)
 	{
 		Calib->setValue(Calib->value_backup + Calib->step);
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			Vec10 step = fh->step;
-			step.head<6>() += 0.5f*(fh->step_backup.head<6>());
+			Vec10 step = fh->frame->efFrame->step;
+			step.head<6>() += 0.5f*(fh->frame->efFrame->step_backup.head<6>());
 
-			fh->setState(fh->state_backup + step);
+			fh->frame->efFrame->setState(fh->frame->efFrame->state_backup + step);
 			sumA += step[6]*step[6];
 			sumB += step[7]*step[7];
 			sumT += step.segment<3>(0).squaredNorm();
 			sumR += step.segment<3>(3).squaredNorm();
 
-			for(auto ph : fh->pointHessians)
+			for(auto &ph : fh->frame->pointHessians)
 			{
-				if(!ph)
+				if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE
 					continue;
-				float step = ph->step+0.5f*(ph->step_backup);
-				ph->setIdepth(ph->idepth_backup + step);
+				float step = ph->efPoint->step+0.5f*(ph->efPoint->step_backup);
+				ph->setIdepth(ph->efPoint->idepth_backup + step);
 				sumID += step*step;
-				sumNID += fabsf(ph->idepth_backup);
+				sumNID += fabsf(ph->efPoint->idepth_backup);
 				numID++;
 
-                ph->setIdepthZero(ph->idepth_backup + step);
+                ph->efPoint->setIdepthZero(ph->efPoint->idepth_backup + step);
 			}
 		}
 	}
 	else
 	{
 		Calib->setValue(Calib->value_backup + stepfacC *Calib->step);
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
-			sumA += fh->step[6]*fh->step[6];
-			sumB += fh->step[7]*fh->step[7];
-			sumT += fh->step.segment<3>(0).squaredNorm();
-			sumR += fh->step.segment<3>(3).squaredNorm();
+			fh->frame->efFrame->setState(fh->frame->efFrame->state_backup + pstepfac.cwiseProduct(fh->frame->efFrame->step));
+			sumA += fh->frame->efFrame->step[6]*fh->frame->efFrame->step[6];
+			sumB += fh->frame->efFrame->step[7]*fh->frame->efFrame->step[7];
+			sumT += fh->frame->efFrame->step.segment<3>(0).squaredNorm();
+			sumR += fh->frame->efFrame->step.segment<3>(3).squaredNorm();
 
-			for(auto ph : fh->pointHessians)
+			for(auto &ph : fh->frame->pointHessians)
 			{
-				if(!ph)
+				if(!ph || !ph->efPoint) // ph->getPointStatus() != ACTIVE)
 					continue;
-				ph->setIdepth(ph->idepth_backup + stepfacD*ph->step);
-				sumID += ph->step*ph->step;
-				sumNID += fabsf(ph->idepth_backup);
+				ph->setIdepth(ph->efPoint->idepth_backup + stepfacD*ph->efPoint->step);
+				sumID += ph->efPoint->step*ph->efPoint->step;
+				sumNID += fabsf(ph->efPoint->idepth_backup);
 				numID++;
 
-                ph->setIdepthZero(ph->idepth_backup + stepfacD*ph->step);
+                ph->efPoint->setIdepthZero(ph->efPoint->idepth_backup + stepfacD*ph->efPoint->step);
 			}
 		}
 	}
@@ -291,16 +270,16 @@ void System::backupState(bool backupLastStep)
 		{
 			Calib->step_backup = Calib->step;
 			Calib->value_backup = Calib->value;
-			for(auto fh : frameHessians)
+			for(auto &fh : frameHessians)
 			{
-				fh->step_backup = fh->step;
-				fh->state_backup = fh->get_state();
-				for(auto ph : fh->pointHessians)
+				fh->frame->efFrame->step_backup = fh->frame->efFrame->step;
+				fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
+				for(auto &ph : fh->frame->pointHessians)
 				{
-					if(!ph)
+					if(!ph || !ph->efPoint)// ph->getPointStatus() != ACTIVE)
 						continue;
-					ph->idepth_backup = ph->idepth;
-					ph->step_backup = ph->step;
+					ph->efPoint->idepth_backup = ph->idepth;
+					ph->efPoint->step_backup = ph->efPoint->step;
 				}
 			}
 		}
@@ -308,16 +287,16 @@ void System::backupState(bool backupLastStep)
 		{
 			Calib->step_backup.setZero();
 			Calib->value_backup = Calib->value;
-			for(auto fh : frameHessians)
+			for(auto &fh : frameHessians)
 			{
-				fh->step_backup.setZero();
-				fh->state_backup = fh->get_state();
-				for(auto ph : fh->pointHessians)
+				fh->frame->efFrame->step_backup.setZero();
+				fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
+				for(auto &ph : fh->frame->pointHessians)
 				{
-					if(!ph)
+					if(!ph || !ph->efPoint)//ph->getPointStatus() != ACTIVE)
 						continue;
-					ph->idepth_backup = ph->idepth;
-					ph->step_backup=0;
+					ph->efPoint->idepth_backup = ph->idepth;
+					ph->efPoint->step_backup=0;
 				}
 			}
 		}
@@ -325,12 +304,12 @@ void System::backupState(bool backupLastStep)
 	else
 	{
 		Calib->value_backup = Calib->value;
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			fh->state_backup = fh->get_state();
-			for(auto ph : fh->pointHessians)
-				if(ph)
-					ph->idepth_backup = ph->idepth;
+			fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
+			for(auto &ph : fh->frame->pointHessians)
+				if(ph && ph->efPoint) //ph->getPointStatus() == ACTIVE)
+					ph->efPoint->idepth_backup = ph->idepth;
 		}
 	}
 }
@@ -339,16 +318,16 @@ void System::backupState(bool backupLastStep)
 void System::loadSateBackup()
 {
 	Calib->setValue(Calib->value_backup);
-	for(auto fh : frameHessians)
+	for(auto &fh : frameHessians)
 	{
-		fh->setState(fh->state_backup);
-		for(auto ph : fh->pointHessians)
+		fh->frame->efFrame->setState(fh->frame->efFrame->state_backup);
+		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph)
+			if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE)
 				continue;
-			ph->setIdepth(ph->idepth_backup);
+			ph->setIdepth(ph->efPoint->idepth_backup);
 
-            ph->setIdepthZero(ph->idepth_backup);
+            ph->efPoint->setIdepthZero(ph->efPoint->idepth_backup);
 		}
 
 	}
@@ -396,18 +375,17 @@ float System::optimize(int mnumOptIts)
 	activeResiduals.clear();
 	int numPoints = 0;
 	int numLRes = 0;
-	for(auto fh : frameHessians)
-		for(auto ph : fh->pointHessians)
+	for(auto &fh : frameHessians)
+		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph)
+			if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE)
 				continue;
-			if(ph->status != MapPoint::ACTIVE)
-				continue;
-			for(auto r : ph->residuals)
+			
+			for(auto &r : ph->residuals)
 			{
 				if(!r->isLinearized)
 				{
-					activeResiduals.push_back(r);
+					activeResiduals.push_back(make_pair(ph,r));
 					r->resetOOB();
 				}
 				else
@@ -425,9 +403,6 @@ float System::optimize(int mnumOptIts)
 	double lastEnergyM = calcMEnergy();
 
 
-
-
-
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&System::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 	else
@@ -441,7 +416,6 @@ float System::optimize(int mnumOptIts)
     // }
 
 	// debugPlotTracking();
-
 
 
 	double lambda = 1e-1;
@@ -526,9 +500,9 @@ float System::optimize(int mnumOptIts)
 
 
 	Vec10 newStateZero = Vec10::Zero();
-	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
+	newStateZero.segment<2>(6) = frameHessians.back()->frame->efFrame->get_state().segment<2>(6);
 
-	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam,
+	frameHessians.back()->frame->efFrame->setEvalPT(frameHessians.back()->frame->efFrame->PRE_worldToCam,
 			newStateZero);
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
@@ -536,11 +510,7 @@ float System::optimize(int mnumOptIts)
 	setPrecalcValues();
 
 
-
-
 	lastEnergy = linearizeAll(true);
-
-
 
 
 	if(!std::isfinite((double)lastEnergy[0]) || !std::isfinite((double)lastEnergy[1]) || !std::isfinite((double)lastEnergy[2]))
@@ -563,10 +533,10 @@ float System::optimize(int mnumOptIts)
 
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			fh->camToWorld = fh->PRE_camToWorld;
-			fh->aff_g2l_internal = fh->aff_g2l();
+			fh->camToWorld = fh->frame->efFrame->PRE_camToWorld;
+			fh->aff_g2l = fh->frame->efFrame->aff_g2l();
 		}
 	}
 
@@ -609,17 +579,18 @@ double System::calcLEnergy()
 void System::removeOutliers()
 {
 	int numPointsDropped=0;
-	for(auto fh : frameHessians)
+	for(auto &fh : frameHessians)
 	{
-		for(auto &ph : fh->pointHessians)
+		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph) 
+			if(!ph || !ph->efPoint)  //->getPointStatus() != ACTIVE
 				continue;
 			// if(ph->status!= MapPoint::ACTIVE)
 			// 	continue;
 			if(ph->residuals.size() == 0)
 			{
-				ph->status = MapPoint::OUTLIER;
+				ph->efPoint->stateFlag = energyStatus::toDrop;
+				// ph->setPointStatus(OUTLIER); //debug this
 				numPointsDropped++;
 			}
 		}
@@ -650,9 +621,9 @@ std::vector<VecX> System::getNullspaces(
 		nullspace_x0.setZero();
 		for(auto fh : frameHessians)
 		{
-			nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_pose.col(i);
-			nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-			nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+			nullspace_x0.segment<6>(CPARS+fh->frame->idx*8) = fh->frame->efFrame->nullspaces_pose.col(i);
+			nullspace_x0.segment<3>(CPARS+fh->frame->idx*8) *= SCALE_XI_TRANS_INVERSE;
+			nullspace_x0.segment<3>(CPARS+fh->frame->idx*8+3) *= SCALE_XI_ROT_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		nullspaces_pose.push_back(nullspace_x0);
@@ -661,11 +632,11 @@ std::vector<VecX> System::getNullspaces(
 	{
 		VecX nullspace_x0(n);
 		nullspace_x0.setZero();
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			nullspace_x0.segment<2>(CPARS+fh->idx*8+6) = fh->nullspaces_affine.col(i).head<2>();
-			nullspace_x0[CPARS+fh->idx*8+6] *= SCALE_A_INVERSE;
-			nullspace_x0[CPARS+fh->idx*8+7] *= SCALE_B_INVERSE;
+			nullspace_x0.segment<2>(CPARS+fh->frame->idx*8+6) = fh->frame->efFrame->nullspaces_affine.col(i).head<2>();
+			nullspace_x0[CPARS+fh->frame->idx*8+6] *= SCALE_A_INVERSE;
+			nullspace_x0[CPARS+fh->frame->idx*8+7] *= SCALE_B_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		if(i==0) nullspaces_affA.push_back(nullspace_x0);
@@ -674,11 +645,11 @@ std::vector<VecX> System::getNullspaces(
 
 	VecX nullspace_x0(n);
 	nullspace_x0.setZero();
-	for(auto fh : frameHessians)
+	for(auto &fh : frameHessians)
 	{
-		nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_scale;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+		nullspace_x0.segment<6>(CPARS+fh->frame->idx*8) = fh->frame->efFrame->nullspaces_scale;
+		nullspace_x0.segment<3>(CPARS+fh->frame->idx*8) *= SCALE_XI_TRANS_INVERSE;
+		nullspace_x0.segment<3>(CPARS+fh->frame->idx*8+3) *= SCALE_XI_ROT_INVERSE;
 	}
 	nullspaces_x0_pre.push_back(nullspace_x0);
 	nullspaces_scale.push_back(nullspace_x0);

@@ -9,25 +9,28 @@
 #include "Display.h"
 namespace FSLAM
 {
-void System::AddKeyframe(std::shared_ptr<Frame> fh)
+void System::AddKeyframe(std::shared_ptr<FrameShell> fh)
 {
     {
         boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
         assert(fh->trackingRef != nullptr);
         fh->camToWorld = fh->trackingRef->camToWorld * fh->camToTrackingRef;
-        fh->setEvalPT_scaled(fh->camToWorld.inverse(), fh->aff_g2l_internal);
+        fh->frame->efFrame->setEvalPT_scaled(fh->camToWorld.inverse(), fh->aff_g2l);
+        fh->KfId = FrameShell::GlobalKfId; FrameShell::GlobalKfId++;
+        fh->isKeyFrame = true;
     }
     if(DisplayHandler)
         DisplayHandler->UploadKeyFrame(fh);
 
     traceNewCoarse(fh);
+    
     boost::unique_lock<boost::mutex> lock(mapMutex);
 
     // =========================== Flag Frames to be Marginalized. =========================
     flagFramesForMarginalization();
 
     // =========================== add New Frame to Hessian Struct. =========================
-    fh->idx = frameHessians.size();
+    fh->frame->idx = frameHessians.size();
     frameHessians.push_back(fh);
     // fh->frameID = allKeyFramesHistory.size();
     allKeyFramesHistory.push_back(fh);
@@ -36,18 +39,19 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
     setPrecalcValues();
     // =========================== add new residuals for old points =========================
     int numFwdResAdde = 0;
-    for (auto fh1 : frameHessians) // go through all active frames
+    for (auto &fh1 : frameHessians) // go through all active frames
     {
         if (fh1 == fh)
             continue;
-        for (auto ph : fh1->pointHessians)
+        for (auto &ph : fh1->frame->pointHessians)
         {
-            if(!ph || ph->status != MapPoint::ACTIVE)
+            if(!ph || ph->getPointStatus() != ACTIVE)
                 continue;
-            std::shared_ptr<PointFrameResidual> r = std::shared_ptr<PointFrameResidual>(new PointFrameResidual(ph, fh1, fh));
+            shared_ptr<PointFrameResidual> r = shared_ptr<PointFrameResidual>(new PointFrameResidual(fh1, fh));
             r->setState(ResState::IN);
+            
             ph->residuals.push_back(r);
-            ef->insertResidual(r);
+            ef->insertResidual(ph, r);
             ph->lastResiduals[1] = ph->lastResiduals[0];
             ph->lastResiduals[0] = std::pair<std::shared_ptr<PointFrameResidual>, ResState>(r, ResState::IN);
             numFwdResAdde += 1;
@@ -59,7 +63,7 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
 
     // =========================== OPTIMIZE ALL =========================
 
-    fh->frameEnergyTH = frameHessians.back()->frameEnergyTH;
+    fh->frame->frameEnergyTH = frameHessians.back()->frame->frameEnergyTH;
     float rmse = optimize(setting_maxOptIterations);
 
     // =========================== Figure Out if INITIALIZATION FAILED =========================
@@ -120,8 +124,8 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
     if(DisplayHandler)
     {
         boost::unique_lock<boost::mutex> lock(DisplayHandler->KeyframesMutex); 
-        for (auto it: frameHessians)
-            it->NeedRefresh = true;
+        for (auto &it: frameHessians)
+            it->frame->NeedRefresh = true;
     }
     
 
@@ -129,7 +133,7 @@ void System::AddKeyframe(std::shared_ptr<Frame> fh)
 
     for (unsigned int i = 0; i < frameHessians.size(); i++)
     {
-        if (frameHessians[i]->FlaggedForMarginalization)
+        if (frameHessians[i]->frame->FlaggedForMarginalization)
         {
             marginalizeFrame(frameHessians[i]);
             i = 0;
@@ -152,7 +156,7 @@ void System::MappingThread()
                 return;
         }
 
-        std::shared_ptr<Frame> frame = UnmappedTrackedFrames.front();
+        shared_ptr<FrameShell> frame = UnmappedTrackedFrames.front();
         UnmappedTrackedFrames.pop_front();
 
         // guaranteed to make a KF for the very first two tracked frames.
@@ -176,13 +180,13 @@ void System::MappingThread()
 
             if (NeedToCatchUp && UnmappedTrackedFrames.size() > 0)
             {
-                std::shared_ptr<Frame> frame = UnmappedTrackedFrames.front();
+                shared_ptr<FrameShell> frame = UnmappedTrackedFrames.front();
                 UnmappedTrackedFrames.pop_front();
                 {
                     boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
                     assert(frame->trackingRef);
                     frame->camToWorld = frame->trackingRef->camToWorld * frame->camToTrackingRef;
-                    frame->setEvalPT_scaled(frame->camToWorld.inverse(), frame->aff_g2l_internal);
+                    frame->frame->efFrame->setEvalPT_scaled(frame->camToWorld.inverse(), frame->aff_g2l);
                 }
                 frame.reset();
             }
@@ -218,22 +222,22 @@ void System::BlockUntilMappingIsFinished()
     tMappingThread.join();
 }
 
-void System::makeNewTraces(std::shared_ptr<Frame> newFrame)
+void System::makeNewTraces(std::shared_ptr<FrameShell> newFrame)
 {
     // pixelSelector->allowFast = true;
     //int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
     // int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
 
 
-    for (int i = 0; i < newFrame->nFeatures; ++i)
+    for (int i = 0; i < newFrame->frame->nFeatures; ++i)
     {
         // if (newFrame->pointHessians[i])
         //     continue;
-        std::shared_ptr<ImmaturePoint> impt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(newFrame->mvKeys[i].pt.x, newFrame->mvKeys[i].pt.y, newFrame, 1, Calib));
+        std::shared_ptr<ImmaturePoint> impt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(newFrame->frame->mvKeys[i].pt.x, newFrame->frame->mvKeys[i].pt.y, newFrame, 1, Calib));
         if (!std::isfinite(impt->energyTH))
             continue;
         else
-            newFrame->ImmaturePoints[i] = impt;
+            newFrame->frame->ImmaturePoints[i] = impt;
     }
 }
 
@@ -241,60 +245,64 @@ void System::flagPointsForRemoval()
 {
     assert(EFIndicesValid);
 
-    std::vector<std::shared_ptr<Frame>> fhsToMargPoints;
+    std::vector<std::shared_ptr<FrameShell>> fhsToMargPoints;
 
     for (int i = 0; i < (int)frameHessians.size(); i++)
-        if (frameHessians[i]->FlaggedForMarginalization)
+        if (frameHessians[i]->frame->FlaggedForMarginalization)
             fhsToMargPoints.push_back(frameHessians[i]);
 
     int flag_oob = 0, flag_in = 0, flag_inin = 0, flag_nores = 0;
 
-    for (auto host : frameHessians) // go through all active frames
+    for (auto &host : frameHessians) // go through all active frames
     {
-        for (unsigned int i = 0; i < host->pointHessians.size(); i++)
+        for (unsigned int i = 0; i < host->frame->pointHessians.size(); i++)
         {
-            auto ph = host->pointHessians[i];
-            if (!ph || ph->WasMarginalized)
+            auto &ph = host->frame->pointHessians[i];
+            if (!ph || ph->getPointStatus() != ACTIVE)
                 continue;
 
-            if (ph->idepth_scaled < 0 || ph->residuals.size() == 0)
+            if (ph->idepth < 0 || ph->residuals.size() == 0)
             {
-                ph->status = MapPoint::OUTLIER;
+                ph->efPoint->stateFlag = energyStatus::toDrop;
+                ph->setPointStatus(OUTLIER);
                 // host->pointHessians[i] = 0;
                 flag_nores++;
             }
-            else if (ph->isOOB(fhsToMargPoints) || host->FlaggedForMarginalization)
+            else if (ph->isOOB(fhsToMargPoints) || host->frame->FlaggedForMarginalization)
             {
                 flag_oob++;
                 if (ph->isInlierNew())
                 {
                     flag_in++;
                     int ngoodRes = 0;
-                    for (auto r : ph->residuals)
+                    for (auto &r : ph->residuals)
                     {
                         r->resetOOB();
-                        r->linearize(Calib);
+                        r->linearize(ph, Calib);
                         r->isLinearized = false;
                         r->applyRes(true);
                         if (r->isActive())
                         {
-                            r->fixLinearizationF(ef);
+                            r->fixLinearizationF(ph, ef);
                             ngoodRes++;
                         }
                     }
                     if (ph->idepth_hessian > setting_minIdepthH_marg)
                     {
                         flag_inin++;
-                        ph->status = MapPoint::MARGINALIZED;
+                        ph->efPoint->stateFlag = energyStatus::toMarg;
+                        ph->setPointStatus(MARGINALIZED);
                     }
                     else
                     {
-                        ph->status = MapPoint::OUTLIER;
+                        ph->efPoint->stateFlag = energyStatus::toDrop;
+                        ph->setPointStatus(OUTLIER);
                     }
                 }
                 else
                 {
-                    ph->status = MapPoint::OUTLIER;
+                    ph->efPoint->stateFlag = energyStatus::toDrop;
+                    ph->setPointStatus(OUTLIER);
                 }
                 // host->pointHessians[i].reset();
             }
@@ -337,8 +345,7 @@ void System::activatePointsMT()
     //     printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
     //             currentMinActDist, (int)(setting_desiredPointDensity), ef->nPoints);
 
-	std::shared_ptr<Frame> newestHs = frameHessians.back();
-
+	std::shared_ptr<FrameShell> newestHs = frameHessians.back();
 	// // make dist map.
 	coarseDistanceMap->makeK(Calib);
 	coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
@@ -346,19 +353,19 @@ void System::activatePointsMT()
 
 	std::vector<std::shared_ptr<ImmaturePoint>> toOptimize; toOptimize.reserve(20000);
 
-	for(auto host : frameHessians)		// go through all active frames
+	for(auto &host : frameHessians)		// go through all active frames
 	{
 		if(host == newestHs) continue;
 
-		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
+		SE3 fhToNew = newestHs->frame->efFrame->PRE_worldToCam * host->frame->efFrame->PRE_camToWorld;
 
 		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
 
-		for(unsigned int i=0;i<host->ImmaturePoints.size();i+=1)
+		for(unsigned int i=0;i<host->frame->ImmaturePoints.size();i++)
 		{
-			std::shared_ptr<ImmaturePoint> ph = host->ImmaturePoints[i];
+			std::shared_ptr<ImmaturePoint> &ph = host->frame->ImmaturePoints[i];
             if(!ph)
                 continue;
 			ph->idxInImmaturePoints = i;
@@ -367,7 +374,6 @@ void System::activatePointsMT()
 			if(!std::isfinite(ph->idepth_max) || ph->lastTraceStatus == IPS_OUTLIER)
 			{
 				ph.reset();
-				host->ImmaturePoints[i].reset();
 				continue;
 			}
 
@@ -380,10 +386,9 @@ void System::activatePointsMT()
 			if(!canActivate)
 			{
 				// if point will be out afterwards, delete it instead.
-				if(ph->host.lock()->FlaggedForMarginalization || ph->lastTraceStatus == IPS_OOB)
+				if(ph->host->frame->FlaggedForMarginalization || ph->lastTraceStatus == IPS_OOB)
 				{
 					ph.reset();
-					host->ImmaturePoints[i].reset();
 				}
 				continue;
 			}
@@ -408,7 +413,6 @@ void System::activatePointsMT()
 			else
 			{
 				ph.reset();
-				host->ImmaturePoints[i].reset();
 			}
 		}
 	}
@@ -430,18 +434,21 @@ void System::activatePointsMT()
 		std::shared_ptr<MapPoint> newpoint = optimized[k];
 		std::shared_ptr<ImmaturePoint> ph = toOptimize[k];
 
-		if(newpoint != nullptr)
+		if(newpoint != nullptr) //&& newpoint != (PointHessian*)((long)(-1))
 		{
-			newpoint->host.lock()->ImmaturePoints[ph->idxInImmaturePoints].reset();
-			newpoint->host.lock()->pointHessians[ph->idxInImmaturePoints] = newpoint;
+			newpoint->host->frame->ImmaturePoints[ph->idxInImmaturePoints].reset();
+			newpoint->host->frame->pointHessians[ph->idxInImmaturePoints] = newpoint;
 			ef->insertPoint(newpoint);
-			for(auto r : newpoint->residuals)
-				ef->insertResidual(r);
+			for(auto &r : newpoint->residuals)
+            {
+                ef->insertResidual(newpoint, r);
+            }
+				
 			ph.reset();
 		}
 		else if(!newpoint || ph->lastTraceStatus==IPS_OOB)
 		{
-            ph->host.lock()->ImmaturePoints[ph->idxInImmaturePoints].reset();
+            ph->host->frame->ImmaturePoints[ph->idxInImmaturePoints].reset();
 			ph.reset();
 			
 		}
@@ -467,15 +474,17 @@ void System::activatePointsMT()
 
 void System::activatePointsMT_Reductor( std::vector<std::shared_ptr<MapPoint>>* optimized, std::vector<std::shared_ptr<ImmaturePoint>>* toOptimize, int min, int max, Vec10* stats, int tid)
 {
-	std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>> tr;
-  
+	std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>> tr; tr.reserve(frameHessians.size());
+    for (int i=0; i< frameHessians.size(); ++i)
+        tr.push_back(std::make_shared<ImmaturePointTemporaryResidual>());
+
 	for(int k=min;k<max;k++)
 		(*optimized)[k] = optimizeImmaturePoint((*toOptimize)[k],1,tr);
 	
 	
 }
 
-void System::traceNewCoarse(std::shared_ptr<Frame> fh)
+void System::traceNewCoarse(std::shared_ptr<FrameShell> fh)
 {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
@@ -487,20 +496,20 @@ void System::traceNewCoarse(std::shared_ptr<Frame> fh)
 	K(0,2) = Calib->cxl();
 	K(1,2) = Calib->cyl();
 
-	for(auto host : frameHessians)		// go through all active frames
+	for(auto &host : frameHessians)		// go through all active frames
 	{
 
-		SE3 hostToNew = fh->PRE_worldToCam * host->PRE_camToWorld;
+		SE3 hostToNew = fh->frame->efFrame->PRE_worldToCam * host->frame->efFrame->PRE_camToWorld;
 		Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
 		Vec3f Kt = K * hostToNew.translation().cast<float>();
 
-		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->aff_g2l(), fh->aff_g2l()).cast<float>();
+		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->frame->efFrame->aff_g2l(), fh->frame->efFrame->aff_g2l()).cast<float>();
 
-		for(auto ph : host->ImmaturePoints)
+		for(auto &ph : host->frame->ImmaturePoints)
 		{
             if(!ph)
                 continue;
-			ph->traceOn(fh, KRKi, Kt, aff, false );
+			ph->traceOn(fh, KRKi, Kt, aff, Calib ,false );
 
 			if(ph->lastTraceStatus==ImmaturePointStatus::IPS_GOOD) trace_good++;
 			if(ph->lastTraceStatus==ImmaturePointStatus::IPS_BADCONDITION) trace_badcondition++;

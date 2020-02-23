@@ -3,19 +3,12 @@
 
  
 #include "Settings.h"
-// #include "vector"
-// #include <math.h>
-// #include "util/settings.h"
 #include "MatrixAccumulators.h"
-// #include "IOWrapper/Output3DWrapper.h"
-
-
-
 
 namespace FSLAM
 {
 struct CalibData;
-struct Frame;
+struct FrameShell;
 struct PointFrameResidual;
 
 class CoarseTracker {
@@ -26,12 +19,11 @@ public:
 	~CoarseTracker();
 
 	bool trackNewestCoarse(
-			std::shared_ptr<Frame> newFrameHessian,
+			std::shared_ptr<FrameShell>& newFrameHessian,
 			SE3 &lastToNew_out, AffLight &aff_g2l_out,
 			int coarsestLvl, Vec5 minResForAbort);
 
-	void setCoarseTrackingRef(
-			std::vector<std::shared_ptr<Frame>> frameHessians);
+	void setCoarseTrackingRef( std::vector<std::shared_ptr<FrameShell>>& frameHessians);
 
 	void makeK(
 			std::shared_ptr<CalibData> HCalib);
@@ -54,9 +46,9 @@ public:
     // void debugPlotIDepthMap(float* minID, float* maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
     // void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);
 
-	std::shared_ptr<Frame> lastRef;
+	std::shared_ptr<FrameShell> lastRef;
 	AffLight lastRef_aff_g2l;
-	std::shared_ptr<Frame> newFrame;
+	std::shared_ptr<FrameShell> newFrame;
 	int refFrameID;
 
 	// act as pure ouptut
@@ -66,7 +58,7 @@ public:
 private:
 
 
-	void makeCoarseDepthL0(std::vector<std::shared_ptr<Frame>> frameHessians);
+	void makeCoarseDepthL0(std::vector<std::shared_ptr<FrameShell>>& frameHessians);
 	float* idepth[PYR_LEVELS];
 	float* weightSums[PYR_LEVELS];
 	float* weightSums_bak[PYR_LEVELS];
@@ -110,14 +102,9 @@ public:
 	CoarseDistanceMap(int w, int h);
 	~CoarseDistanceMap();
 
-	void makeDistanceMap(
-			std::vector<std::shared_ptr<Frame>> frameHessians,
-			std::shared_ptr<Frame> frame);
+	void makeDistanceMap( std::vector<std::shared_ptr<FrameShell>>& frameHessians, std::shared_ptr<FrameShell>& frame);
 
-	void makeInlierVotes(
-			std::vector<std::shared_ptr<Frame>> frameHessians);
-
-	void makeK( std::shared_ptr<CalibData> HCalib);
+	void makeK( std::shared_ptr<CalibData>& HCalib);
 
 
 	float* fwdWarpedIDDistFinal;

@@ -35,7 +35,6 @@ System::System(std::shared_ptr<GeometricUndistorter> _GeomUndist, std::shared_pt
     Calib = std::shared_ptr<CalibData>(new CalibData(GeomUndist->w, GeomUndist->h, GeomUndist->K, GeomUndist->baseline, PhoUndistL, PhoUndistR,
                                         DirPyrLevels, IndPyrLevels, IndPyrScaleFactor));
     Detector = std::make_shared<FeatureDetector>(Calib);
-    SlamMap = std::shared_ptr<Map>(new Map());
 
 
     //----------------begin dso------------------
@@ -104,7 +103,7 @@ System::~System()
 
 void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 {    
-    std::shared_ptr<Frame> CurrentFrame = std::shared_ptr<Frame>(new Frame(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight    
+    std::shared_ptr<FrameShell> CurrentFrame = std::shared_ptr<FrameShell>(new FrameShell(DataIn, Detector, Calib, FrontEndThreadPoolLeft, !Initialized)); // FrontEndThreadPoolRight    
     allFrameHistory.push_back(CurrentFrame);
 
     boost::unique_lock<boost::mutex> lock(trackMutex);
@@ -151,7 +150,8 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
         if (!std::isfinite((double)tres[0]) || !std::isfinite((double)tres[1]) || !std::isfinite((double)tres[2]) || !std::isfinite((double)tres[3]))
         {
             printf("Initial Tracking failed: LOST!\n");
-            CurrentFrame->ReduceToEssential(false);
+            CurrentFrame->frame->efFrame.reset();
+            CurrentFrame->frame.reset();
             isLost = true;
             return;
         }
@@ -164,7 +164,7 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
         else
         {
             Vec2 refToFh = AffLight::fromToVecExposure(coarseTracker->lastRef->ab_exposure, CurrentFrame->ab_exposure,
-                                                       coarseTracker->lastRef_aff_g2l, CurrentFrame->aff_g2l_internal);
+                                                       coarseTracker->lastRef_aff_g2l, CurrentFrame->aff_g2l);
 
             // BRIGHTNESS CHECK
             NeedNewKf = allFrameHistory.size() == 1 ||
@@ -182,7 +182,9 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     if (SequentialOperation && Initialized)
     {
         if (NeedNewKf)
-            AddKeyframe(CurrentFrame);
+        {
+            AddKeyframe(CurrentFrame);            
+        }
         else
             ProcessNonKeyframe(CurrentFrame);
     }
@@ -218,49 +220,52 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
 
 }
 
-void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<Frame> CurrentFrame)
+void System::DrawImages(std::shared_ptr<ImageData> DataIn, std::shared_ptr<FrameShell> CurrentFrame)
 {
 
     if(!DisplayHandler || !DisplayHandler->Show2D->Get() || !DisplayHandler->ShowImages->Get())
         return;
-    DisplayHandler->UploadRunningFrameData(DataIn, CurrentFrame->mvKeys, CurrentFrame->poseValid? CurrentFrame->camToWorld : SE3(Mat44::Identity()));
+    DisplayHandler->UploadRunningFrameData(DataIn, CurrentFrame->frame->mvKeys, CurrentFrame->poseValid? CurrentFrame->camToWorld : SE3(Mat44::Identity()));
 }
 
-void System::ProcessNonKeyframe(std::shared_ptr<Frame> fh)
+void System::ProcessNonKeyframe(std::shared_ptr<FrameShell> fh)
 {
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->trackingRef != nullptr);
 		fh->camToWorld = fh->trackingRef->camToWorld * fh->camToTrackingRef;
-		fh->setEvalPT_scaled(fh->camToWorld.inverse(),fh->aff_g2l_internal);
+		fh->frame->efFrame->setEvalPT_scaled(fh->camToWorld.inverse(),fh->aff_g2l);
 	}
 
 	traceNewCoarse(fh);
-    fh->ReduceToEssential(false);
-	fh.reset();
+
+    if(fh->frame->efFrame)
+        fh->frame->efFrame.reset();
+    fh->frame.reset(); //end of life for a regular frame! keep only its shell
 }
 
 void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
 {
-    std::shared_ptr<Frame> firstFrame = _cInit->FirstFrame;
-    std::shared_ptr<Frame> secondFrame = _cInit->SecondFrame;
-    firstFrame->idx = 0;
+    std::shared_ptr<FrameShell> firstFrame = _cInit->FirstFrame;
+    std::shared_ptr<FrameShell> secondFrame = _cInit->SecondFrame;
+    firstFrame->frame->idx = 0;
     frameHessians.push_back(_cInit->FirstFrame);
-    firstFrame->id = 0;
-
+    firstFrame->KfId = 0;
+    FrameShell::GlobalKfId = 1;
     allKeyFramesHistory.push_back(firstFrame);
     ef->insertFrame(firstFrame, Calib);
     setPrecalcValues();
 
     
-    firstFrame->pointHessians.resize(firstFrame->nFeatures, nullptr);
+    firstFrame->frame->pointHessians.resize(firstFrame->frame->nFeatures, nullptr);
 
-    for (int i = 0; i < firstFrame->nFeatures; ++i)
+    for (int i = 0; i < firstFrame->frame->nFeatures; ++i)
     {
         if(_cInit->videpth[i] <= 0.0f)
             continue;
 
-        std::shared_ptr<ImmaturePoint> pt = std::shared_ptr<ImmaturePoint>(new ImmaturePoint(firstFrame->mvKeys[i].pt.x + 0.5f, firstFrame->mvKeys[i].pt.y + 0.5f, firstFrame, 1, Calib));
+        std::shared_ptr<ImmaturePoint> pt = std::shared_ptr<ImmaturePoint>(
+            new ImmaturePoint(firstFrame->frame->mvKeys[i].pt.x + 0.5f, firstFrame->frame->mvKeys[i].pt.y + 0.5f, firstFrame, 1, Calib));
 
         if (!std::isfinite(pt->energyTH))
             continue;
@@ -272,12 +277,12 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
             continue;
         
 
-        ph->setIdepthScaled(_cInit->videpth[i]);
-        ph->setIdepthZero(_cInit->videpth[i]);
+        ph->setIdepth(_cInit->videpth[i]);
+        ph->efPoint->setIdepthZero(_cInit->videpth[i]);
         ph->hasDepthPrior = true;
-        ph->setPointStatus(MapPoint::ACTIVE);
+        ph->setPointStatus(ACTIVE);
 
-        firstFrame->pointHessians[i] = ph;
+        firstFrame->frame->pointHessians[i] = ph;
         ef->insertPoint(ph);
     }
 
@@ -288,40 +293,41 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
     {
         boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
         firstFrame->camToWorld = SE3();
-        firstFrame->aff_g2l_internal = AffLight(0, 0);
-        firstFrame->setEvalPT_scaled(firstFrame->camToWorld.inverse(), firstFrame->aff_g2l_internal);
+        firstFrame->aff_g2l = AffLight(0, 0);
+        firstFrame->frame->efFrame->setEvalPT_scaled(firstFrame->camToWorld.inverse(), firstFrame->aff_g2l);
         firstFrame->trackingRef.reset();
         firstFrame->camToTrackingRef = SE3();
 
-        firstFrame->NeedRefresh = true;
+        firstFrame->frame->NeedRefresh = true;
         if(DisplayHandler)
             DisplayHandler->UploadKeyFrame(firstFrame);
         
 
         secondFrame->camToWorld = firstToNew.inverse();
-        secondFrame->aff_g2l_internal = AffLight(0, 0);
-        secondFrame->setEvalPT_scaled(secondFrame->camToWorld.inverse(), secondFrame->aff_g2l_internal);
+        secondFrame->aff_g2l = AffLight(0, 0);
+        secondFrame->frame->efFrame->setEvalPT_scaled(secondFrame->camToWorld.inverse(), secondFrame->aff_g2l);
         secondFrame->trackingRef = firstFrame;
         secondFrame->camToTrackingRef =  secondFrame->camToWorld;
     }
 
     Initialized = true;
-    printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size() - (int)std::count(firstFrame->pointHessians.begin(), firstFrame->pointHessians.end(), nullptr) );
+    printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->frame->pointHessians.size() - 
+        (int)std::count(firstFrame->frame->pointHessians.begin(), firstFrame->frame->pointHessians.end(), nullptr) );
 }
 
 void System::setPrecalcValues()
 {
-	for(auto fh : frameHessians)
+	for(auto &fh : frameHessians)
 	{
-		fh->targetPrecalc.resize(frameHessians.size());
+		fh->frame->targetPrecalc.resize(frameHessians.size());
 		for(unsigned int i=0, iend = frameHessians.size(); i<iend; ++i)
-			fh->targetPrecalc[i].set(fh, frameHessians[i], Calib);
+			fh->frame->targetPrecalc[i].set(fh, frameHessians[i], Calib);
 	}
 
 	ef->setDeltaF(Calib);
 }
 
-Vec4 System::trackNewCoarse(std::shared_ptr<Frame> fh)
+Vec4 System::trackNewCoarse(std::shared_ptr<FrameShell>& fh)
 {
 
 	assert(allFrameHistory.size() > 0);
@@ -332,7 +338,7 @@ Vec4 System::trackNewCoarse(std::shared_ptr<Frame> fh)
 
 
 
-	std::shared_ptr<Frame> lastF = coarseTracker->lastRef;
+	std::shared_ptr<FrameShell> lastF = coarseTracker->lastRef;
 
 	AffLight aff_last_2_l = AffLight(0,0);
 
@@ -341,15 +347,15 @@ Vec4 System::trackNewCoarse(std::shared_ptr<Frame> fh)
 		for(unsigned int i=0;i<lastF_2_fh_tries.size();i++) lastF_2_fh_tries.push_back(SE3());
 	else
 	{
-		std::shared_ptr<Frame> slast = allFrameHistory[allFrameHistory.size()-2];
-		std::shared_ptr<Frame> sprelast = allFrameHistory[allFrameHistory.size()-3];
+		std::shared_ptr<FrameShell> slast = allFrameHistory[allFrameHistory.size()-2];
+		std::shared_ptr<FrameShell> sprelast = allFrameHistory[allFrameHistory.size()-3];
 		SE3 slast_2_sprelast;
 		SE3 lastF_2_slast;
 		{	// lock on global pose consistency!
 			boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 			slast_2_sprelast = sprelast->camToWorld.inverse() * slast->camToWorld;
 			lastF_2_slast = slast->camToWorld.inverse() * lastF->camToWorld;
-			aff_last_2_l = slast->aff_g2l_internal;
+			aff_last_2_l = slast->aff_g2l;
 		}
 		SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
 
@@ -484,9 +490,10 @@ Vec4 System::trackNewCoarse(std::shared_ptr<Frame> fh)
 	// no lock required, as fh is not used anywhere yet.
 	fh->camToTrackingRef = lastF_2_fh.inverse();
 	fh->trackingRef = lastF;
-	fh->aff_g2l_internal = aff_g2l;
+	fh->aff_g2l = aff_g2l;
 	fh->camToWorld = fh->trackingRef->camToWorld * fh->camToTrackingRef;
-    fh->poseValid = true;
+    if(haveOneGood)
+        fh->poseValid = true;
 
 	if(coarseTracker->firstCoarseRMSE < 0)
 		coarseTracker->firstCoarseRMSE = achievedRes[0];

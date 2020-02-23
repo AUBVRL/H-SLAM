@@ -1389,7 +1389,7 @@ void IndirectInitializer::StructureOnlyDirectOptimization(std::vector<std::share
         Points[i] = Point;
 
         Points[i]->Residual.state_NewEnergy = Points[i]->Residual.state_energy = 0;
-        Points[i]->Residual.state_NewState = ResState::OUTLIER;
+        Points[i]->Residual.state_NewState = ResState::OUT;
         Points[i]->Residual.state_state = ResState::IN;
         Points[i]->Residual.target = SecondFrame;
 
@@ -1587,7 +1587,7 @@ double IndirectInitializer::linearizeResidual(std::shared_ptr<Pnt> Point, const 
 	if (energyLeft > energyTH * outlierTHSlack)
 	{
 		energyLeft = energyTH * outlierTHSlack;
-		Point->Residual.state_NewState = ResState::OUTLIER;
+		Point->Residual.state_NewState = ResState::OUT;
 	}
 	else
 	{

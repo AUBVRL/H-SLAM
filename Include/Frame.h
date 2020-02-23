@@ -15,19 +15,20 @@ class CalibData;
 class Frame;
 class ImmaturePoint;
 class MapPoint;
-// class EFFrame;
+struct FrameOptimizationData;
+
 template<typename Type> class IndexThreadReduce;
 
-class Frame
+class Frame //structure that contains all the data needed for keyframes
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     
-    Frame(std::shared_ptr<ImageData>Img, std::shared_ptr<FeatureDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
+    Frame(std::shared_ptr<ImageData>Img, int id, float ab_exposure, std::shared_ptr<FeatureDetector>_Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit = false);
     ~Frame();
     void CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr);    
     void CreateDirPyrs(std::vector<float>& Img, std::vector<Vec3f*> &DirPyr);
-    void ReduceToEssential(bool KeepIndirectData);
+    void ReduceToEssential();
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
 
@@ -48,67 +49,103 @@ public:
 
     cv::Mat Descriptors;
 
-    size_t id; //frame id number
-    size_t frameNumb;
-    static size_t Globalid;
-    static size_t GlobalIncoming_id; //frame id number
     unsigned int idx; // frame number in the moving optimization window
     
-    int nFeatures; // number of extracted keypoints
-    int mnGridCols, mnGridRows;
+    static int mnGridCols, mnGridRows;
+    static float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
+    static bool GridStructInit;
+    static int EDGE_THRESHOLD; 
+
     // statisitcs
 	int statistics_outlierResOnThis;
 	int statistics_goodResOnThis;
-	int MarginalizedAt;
+
 
 	double MovedByOpt;
-    double TimeStamp;
-    float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
-    float ab_exposure;
     float frameEnergyTH;
-
-    bool isReduced;
-    bool isKeyFrame;
-    bool poseValid;
     bool FlaggedForMarginalization;
+    int nFeatures; 
+    bool isReduced;
     bool NeedRefresh;
+    std::shared_ptr<CalibData> Calib;
+    shared_ptr<FrameOptimizationData> efFrame; //CLEAR THIS ONCE KeyFRAME IS MARGINALIZED in reducetoessential!!!
+};
 
-    AffLight aff_g2l_internal;
-    // EFFrame* efFrame;
+struct FrameShell
+{
+    public:
+	    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    
+    inline FrameShell(std::shared_ptr<ImageData> Img, std::shared_ptr<FeatureDetector> _Detector, std::shared_ptr<CalibData>_Calib, 
+                std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit)
+    {
+        id = Globalid; Globalid++;
+        KfId = -1;
+        MarginalizedAt = -1;
+        camToWorld = SE3();
+        camToTrackingRef = SE3();
+        trackingRef = nullptr;
+        aff_g2l = AffLight(0, 0); //Past to present affine model of left image
+        TimeStamp = Img->timestamp;
+        ab_exposure = Img->ExposureL; //Exposure time of the left image
+        poseValid = false;
+        isKeyFrame = false;
+        frame = std::shared_ptr<Frame> (new Frame(Img, id, ab_exposure, _Detector, _Calib, FrontEndThreadPoolLeft, ForInit ));
+    }
 
+    ~FrameShell(){};
+    shared_ptr<Frame> frame;
+    double TimeStamp;
 
-    SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+    size_t id; //frame id number
+    int KfId;
+    static int GlobalKfId;
+    static size_t Globalid; //frame id number that starts counting from the first initializing keyframe as 0.
+    
+    bool poseValid;
+    bool isKeyFrame;
+    SE3 camToWorld;
+    SE3 camToTrackingRef;
+	shared_ptr<FrameShell> trackingRef;
+    AffLight aff_g2l;
+    float ab_exposure;
+    int MarginalizedAt;
+};
+
+struct FrameOptimizationData //contains all data needed to perform gradient based optimization
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    
+    int id;
+    float ab_exposure;
+    
     SE3 PRE_worldToCam;
-	SE3 PRE_camToWorld;
+    SE3 PRE_camToWorld;
     SE3 worldToCam_evalPT;
-	Vec10 state_zero;
-	Vec10 state_scaled;
-	Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
-	Vec10 step;
-	Vec10 step_backup;
-	Vec10 state_backup;
+    Vec10 state_zero;
+    Vec10 state_scaled;
+    Vec10 state; // [0-5: worldToCam-leftEps. 6-7: a,b]
+    Vec10 step;
+    Vec10 step_backup;
+    Vec10 state_backup;
 
     Mat66 nullspaces_pose;
-	Mat42 nullspaces_affine;
-	Vec6 nullspaces_scale;
+    Mat42 nullspaces_affine;
+    Vec6 nullspaces_scale;
+
+    FrameOptimizationData(int _id, float _ab_exposure) : id(_id), ab_exposure(_ab_exposure){};
+    ~FrameOptimizationData(){};
     
-    int EDGE_THRESHOLD; 
+    inline Vec6 w2c_leftEps() const { return get_state_scaled().head<6>(); }
+    inline AffLight aff_g2l() const { return AffLight(get_state_scaled()[6], get_state_scaled()[7]); }
+    inline AffLight aff_g2l_0() const { return AffLight(get_state_zero()[6] * SCALE_A, get_state_zero()[7] * SCALE_B); }
 
-    std::shared_ptr<CalibData> Calib;
-
-    SE3 camToTrackingRef;
-	std::shared_ptr<Frame> trackingRef;
-
-    inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
-    inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
-    inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
-	
-   
-    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();}
+    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const { return worldToCam_evalPT; }
+    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const { return state_zero; }
+    EIGEN_STRONG_INLINE const Vec10 &get_state() const { return state; }
+    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const { return state_scaled; }
+    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const { return get_state() - get_state_zero(); }
 
     inline void setStateZero(const Vec10 &state_zero)
     {
@@ -224,10 +261,16 @@ public:
         return Vec10::Zero();
     }
 
-    void takeData();                 // take data from frame hessian
     Vec8 prior = Vec8::Zero();       // prior hessian (diagonal)
     Vec8 delta_prior = Vec8::Zero(); // = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
     Vec8 delta = Vec8::Zero();       // state - state_zero.
+    inline void takeData()
+    {
+        prior = getPrior().head<8>();
+        delta = get_state_minus_stateZero().head<8>();
+        delta_prior = (get_state() - getPriorZero()).head<8>();
+        return;
+    }
 };
 
 

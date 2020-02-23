@@ -6,7 +6,7 @@
 namespace FSLAM
 {
 
-class Frame;
+class FrameShell;
 class CalibData;
 class MapPoint;
 class EnergyFunctional;
@@ -15,10 +15,8 @@ class EnergyFunctional;
 struct FrameFramePrecalc
 {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    // static values
-    // static int instanceCounter;
-    std::weak_ptr<Frame> host;   // defines row
-    std::weak_ptr<Frame> target; // defines column
+    std::shared_ptr<FrameShell> host;   // defines row
+    std::shared_ptr<FrameShell> target; // defines column
 
     // precalc values
     Mat33f PRE_RTll;
@@ -35,9 +33,13 @@ struct FrameFramePrecalc
 
     float distanceLL;
 
-    inline ~FrameFramePrecalc() {}
+    inline ~FrameFramePrecalc() 
+	{
+		host.reset();
+		target.reset();
+	}
     inline FrameFramePrecalc() { }
-    void set(std::shared_ptr<Frame> host, std::shared_ptr<Frame> target, std::shared_ptr<CalibData> HCalib);
+    void set(shared_ptr<FrameShell>& _host, shared_ptr<FrameShell>& _target, shared_ptr<CalibData>& HCalib);
 
 };
 
@@ -77,8 +79,6 @@ class PointFrameResidual
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-	// EFResidual* efResidual;
-	// static int instanceCounter;
 	ResState state_state;
 	double state_energy;
 	ResState state_NewState;
@@ -88,10 +88,10 @@ public:
 
 	void setState(ResState s) {state_state = s;}
 
-	std::weak_ptr<MapPoint> point;
-	std::weak_ptr<Frame> host;
-	std::weak_ptr<Frame> target;
-	std::shared_ptr<RawResidualJacobian> J;
+	// shared_ptr<MapPoint> point;
+	shared_ptr<FrameShell> host;
+	shared_ptr<FrameShell> target;
+	shared_ptr<RawResidualJacobian> J;
 
 	bool isNew;
 
@@ -101,22 +101,29 @@ public:
 
 	PointFrameResidual()
 	{
-		J = std::shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
+		J = shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
 	}
-	PointFrameResidual(std::shared_ptr<MapPoint> point_, std::shared_ptr<Frame> host_, std::shared_ptr<Frame> target_): point(point_), host(host_), target(target_)
+	PointFrameResidual(shared_ptr<FrameShell>& host_, shared_ptr<FrameShell> target_): host(host_), target(target_) //point(point_), shared_ptr<MapPoint> &point_,
 	{
-		J = std::shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
 		resetOOB();
+		J = shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
 		isNew = true;
 
 	}
-	double linearize(std::shared_ptr<CalibData> HCalib);
+	inline ~PointFrameResidual()
+	{
+		//point.reset();
+		host.reset();
+		target.reset();
+		J.reset();
+	}
+	double linearize(shared_ptr<MapPoint> &point, std::shared_ptr<CalibData> &HCalib);
 
 
 	void resetOOB()
 	{
 		state_NewEnergy = state_energy = 0;
-		state_NewState = ResState::OUTLIER;
+		state_NewState = ResState::OUT;
 
 		setState(ResState::IN);
 	};
@@ -124,9 +131,11 @@ public:
 
 	
     inline bool isActive() const { return isActiveAndIsGoodNEW; }
-    void fixLinearizationF(std::shared_ptr<EnergyFunctional> ef); 	// fix the jacobians
+    void fixLinearizationF(shared_ptr<MapPoint>& point, shared_ptr<EnergyFunctional>& ef); 	// fix the jacobians
 	int hostIDX = 0;
 	int targetIDX = 0;
+	int idxInAll;
+
 	VecNRf res_toZeroF;
 	Vec8f JpJdF = Vec8f::Zero();
 	bool isLinearized = false; // if linearization is fixed.

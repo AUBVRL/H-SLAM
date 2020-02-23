@@ -772,7 +772,7 @@ double ImmaturePoint::linearizeResidual(std::shared_ptr<CalibData> Calib, const 
 	if (energyLeft > energyTH * outlierTHSlack)
 	{
 		energyLeft = energyTH * outlierTHSlack;
-		tmpRes->state_NewState = ResState::OUTLIER;
+		tmpRes->state_NewState = ResState::OUT;
 	}
 	else
 	{

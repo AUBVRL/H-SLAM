@@ -63,11 +63,9 @@ endif (MSVC)
 set(fslam_SOURCE
   ${PROJECT_SOURCE_DIR}/Src/Settings.cpp
   ${PROJECT_SOURCE_DIR}/Src/ImmaturePoint.cpp  
-  ${PROJECT_SOURCE_DIR}/Src/MapPoint.cpp
   ${PROJECT_SOURCE_DIR}/Src/PixelSelector.cpp
   ${PROJECT_SOURCE_DIR}/Src/Detector.cpp
   ${PROJECT_SOURCE_DIR}/Src/Frame.cpp
-  ${PROJECT_SOURCE_DIR}/Src/Map.cpp
   ${PROJECT_SOURCE_DIR}/Src/CoarseTracker.cpp
   ${PROJECT_SOURCE_DIR}/Src/Initializer.cpp
   ${PROJECT_SOURCE_DIR}/Src/AccumulatedSCHessian.cpp

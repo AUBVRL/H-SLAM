@@ -25,7 +25,7 @@ Initializer::Initializer(std::shared_ptr<CalibData> _Calib, std::shared_ptr<Inde
     randomGen = std::shared_ptr<cv::RNG>(new cv::RNG(0));
 }
 
-bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
+bool Initializer::Initialize(std::shared_ptr<FrameShell> _Frame)
 {
     static std::vector<int> NumMatches;
     if (Sensortype == Monocular)
@@ -39,19 +39,19 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
 
         if (!FirstFrame)
         {
-            if (_Frame->nFeatures > 100)
+            if (_Frame->frame->nFeatures > 100)
             {
                 FirstFrame = _Frame;
-                FirstFrame->IndPyr[0].copyTo(TransitImage);
+                FirstFrame->frame->IndPyr[0].copyTo(TransitImage);
 
                 FirstFramePts.clear();
-                FirstFramePts.reserve(FirstFrame->nFeatures);
+                FirstFramePts.reserve(FirstFrame->frame->nFeatures);
                 ColorVec.clear();
-                ColorVec.reserve(FirstFrame->nFeatures);
+                ColorVec.reserve(FirstFrame->frame->nFeatures);
 
-                for (size_t i = 0; i < FirstFrame->nFeatures; ++i)
+                for (size_t i = 0; i < FirstFrame->frame->nFeatures; ++i)
                 {
-                    FirstFramePts.push_back(FirstFrame->mvKeys[i].pt);
+                    FirstFramePts.push_back(FirstFrame->frame->mvKeys[i].pt);
                     ColorVec.push_back(Scalar(randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255)));
                 }
 
@@ -62,8 +62,6 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
                     MatchedPts.clear();
                     MatchedPts.shrink_to_fit();
                 }
-                Frame::Globalid = 1;
-
                 // //Testing IndirectMatcher
                 // mvbIndPrevMatched.resize(FirstFrame->nFeatures);
                 // for (size_t i = 0; i < FirstFrame->nFeatures; ++i)
@@ -75,7 +73,7 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
         }
 
         //Processing Second Frame
-        if (_Frame->nFeatures > 100)
+        if (_Frame->frame->nFeatures > 100)
         {
             SecondFrame = _Frame;
         }
@@ -110,7 +108,7 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
 
         int nmatches = FindMatches(15, 7);
 
-        if (nmatches < 0.2f * ((float)FirstFrame->nFeatures))
+        if (nmatches < 0.2f * ((float)FirstFrame->frame->nFeatures))
         {
             FirstFrame.reset();
             return false;
@@ -132,7 +130,7 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
                 if (!vbTriangulated[i])
                     nmatches--;
 
-            if (nmatches < 0.1 * FirstFrame->nFeatures || nmatches < 150) //did not triangulate enough repeat the process!
+            if (nmatches < 0.1 * FirstFrame->frame->nFeatures || nmatches < 150) //did not triangulate enough repeat the process!
             {
                 FirstFrame.reset();
                 return false;
@@ -141,22 +139,21 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
             cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
             Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
             tcw.copyTo(Tcw.rowRange(0, 3).col(3));
-            float MedianInvDepth = 1.0f / ComputeSceneMedianDepth(2, mvIniP3D, vbTriangulated); //Initialize all untriangulated features to this inverse deph
+            float MedianDepth = ComputeSceneMedianDepth(2, mvIniP3D, vbTriangulated); //Initialize all untriangulated features to this inverse deph
 
-            Tcw.col(3).rowRange(0, 3) = Tcw.col(3).rowRange(0, 3) * MedianInvDepth; // update baseline between first and Second Keyframes so that meandepth =1
+            Tcw.col(3).rowRange(0, 3) = Tcw.col(3).rowRange(0, 3) / MedianDepth; // update baseline between first and Second Keyframes so that meandepth =1
             
-            for (int i = 0; i < FirstFrame->nFeatures; ++i)                         // update points coordinates so that their inversedepth has a median of 1.
+            for (int i = 0; i < FirstFrame->frame->nFeatures; ++i)                         // update points coordinates so that their inversedepth has a median of 1.
                 if (vbTriangulated[i])
-                    mvIniP3D[i] *= MedianInvDepth;
+                    mvIniP3D[i] /= MedianDepth;
 
-            FirstFrame->id = 0;
             FirstFrame->camToWorld = SE3();
 
             Mat44 _Pose; cv::cv2eigen(Tcw, _Pose);
             Pose = SE3(_Pose);
 
-            videpth.reserve(FirstFrame->nFeatures);
-            for (int i = 0; i < FirstFrame->nFeatures; ++i)
+            videpth.reserve(FirstFrame->frame->nFeatures);
+            for (int i = 0; i < FirstFrame->frame->nFeatures; ++i)
                 if(vbTriangulated[i])
                     videpth.push_back(1.0 / mvIniP3D[i].z);
                 else videpth.push_back(-1.0);
@@ -230,28 +227,28 @@ bool Initializer::Initialize(std::shared_ptr<Frame> _Frame)
 int Initializer::MatchIndirect(vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize, int TH_LOW, float mfNNratio, bool CheckOrientation)
 {
     int nmatches = 0;
-    vnMatches12 = vector<int>(FirstFrame->mvKeys.size(), -1);
+    vnMatches12 = vector<int>(FirstFrame->frame->mvKeys.size(), -1);
 
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; ++i)
         rotHist[i].reserve(500);
     const float factor = 1.0f / HISTO_LENGTH;
 
-    vector<int> vMatchedDistance(SecondFrame->mvKeys.size(), INT_MAX);
-    vector<int> vnMatches21(SecondFrame->mvKeys.size(), -1);
+    vector<int> vMatchedDistance(SecondFrame->frame->mvKeys.size(), INT_MAX);
+    vector<int> vnMatches21(SecondFrame->frame->mvKeys.size(), -1);
 
-    for (size_t i1 = 0, iend1 = FirstFrame->mvKeys.size(); i1 < iend1; i1++)
+    for (size_t i1 = 0, iend1 = FirstFrame->frame->mvKeys.size(); i1 < iend1; i1++)
     {
-        cv::KeyPoint kp1 = FirstFrame->mvKeys[i1];
+        cv::KeyPoint kp1 = FirstFrame->frame->mvKeys[i1];
         int level1 = kp1.octave;
         if (level1 > 0)
             continue;
 
-        vector<size_t> vIndices2 = SecondFrame->GetFeaturesInArea(vbPrevMatched[i1].x, vbPrevMatched[i1].y, windowSize);
+        vector<size_t> vIndices2 = SecondFrame->frame->GetFeaturesInArea(vbPrevMatched[i1].x, vbPrevMatched[i1].y, windowSize);
         if (vIndices2.empty())
             continue;
 
-        cv::Mat d1 = FirstFrame->Descriptors.row(i1);
+        cv::Mat d1 = FirstFrame->frame->Descriptors.row(i1);
 
         int bestDist = INT_MAX;
         int bestDist2 = INT_MAX;
@@ -261,7 +258,7 @@ int Initializer::MatchIndirect(vector<cv::Point2f> &vbPrevMatched, vector<int> &
         {
             size_t i2 = *vit;
 
-            cv::Mat d2 = SecondFrame->Descriptors.row(i2);
+            cv::Mat d2 = SecondFrame->frame->Descriptors.row(i2);
 
             int dist = DescriptorDistance(d1, d2);
 
@@ -296,7 +293,7 @@ int Initializer::MatchIndirect(vector<cv::Point2f> &vbPrevMatched, vector<int> &
 
                 if (CheckOrientation)
                 {
-                    float rot = FirstFrame->mvKeys[i1].angle - SecondFrame->mvKeys[bestIdx2].angle;
+                    float rot = FirstFrame->frame->mvKeys[i1].angle - SecondFrame->frame->mvKeys[bestIdx2].angle;
                     if (rot < 0.0)
                         rot += 360.0f;
                     int bin = round(rot * factor);
@@ -336,7 +333,7 @@ int Initializer::MatchIndirect(vector<cv::Point2f> &vbPrevMatched, vector<int> &
     //Update prev matched
     for (size_t i1 = 0, iend1 = vnMatches12.size(); i1 < iend1; i1++)
         if (vnMatches12[i1] >= 0)
-            vbPrevMatched[i1] = SecondFrame->mvKeys[vnMatches12[i1]].pt;
+            vbPrevMatched[i1] = SecondFrame->frame->mvKeys[vnMatches12[i1]].pt;
 
     return nmatches;
 }
@@ -352,7 +349,7 @@ int Initializer::FindMatches(int windowSize, int maxL1Error)
     MatchedPtsBkp = MatchedPts;
     if(MatchedPtsBkp.empty())
         MatchedPtsBkp = mvbPrevMatched;
-    calcOpticalFlowPyrLK(TransitImage, SecondFrame->IndPyr[0], mvbPrevMatched, MatchedPts, status, err, Size(windowSize, windowSize), 2, criteria, flowFlag);
+    calcOpticalFlowPyrLK(TransitImage, SecondFrame->frame->IndPyr[0], mvbPrevMatched, MatchedPts, status, err, Size(windowSize, windowSize), 2, criteria, flowFlag);
 
     MatchedStatus.clear();
 
@@ -373,7 +370,7 @@ int Initializer::FindMatches(int windowSize, int maxL1Error)
     }
 
     
-    SecondFrame->IndPyr[0].copyTo(TransitImage);
+    SecondFrame->frame->IndPyr[0].copyTo(TransitImage);
     mvbPrevMatched = MatchedPts;
 
 
@@ -385,14 +382,14 @@ int Initializer::FindMatches(int windowSize, int maxL1Error)
         cv::Mat Image;
 
         if(ShowInitializationMatchesSideBySide)
-            hconcat(FirstFrame->IndPyr[0], SecondFrame->IndPyr[0], Image);
+            hconcat(FirstFrame->frame->IndPyr[0], SecondFrame->frame->IndPyr[0], Image);
         else 
-            SecondFrame->IndPyr[0].copyTo(Image);
+            SecondFrame->frame->IndPyr[0].copyTo(Image);
 
         cvtColor(Image, Image, CV_GRAY2RGB);
         for (int i = 0; i < FirstFramePts.size(); ++i)
             if (MatchedStatus[i])
-                line(Image, FirstFramePts[i], cv::Point2f(ShowInitializationMatchesSideBySide ? FirstFrame->IndPyr[0].cols : 0, 0) +  MatchedPts[i], ColorVec[i], 1);
+                line(Image, FirstFramePts[i], cv::Point2f(ShowInitializationMatchesSideBySide ? FirstFrame->frame->IndPyr[0].cols : 0, 0) +  MatchedPts[i], ColorVec[i], 1);
 
         imshow("InitMatches", Image);
         waitKey(1);
@@ -1286,9 +1283,9 @@ void Initializer::DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat
 float Initializer::ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated)
 {
     std::vector<float> vDepths;
-    vDepths.reserve(FirstFrame->nFeatures);
+    vDepths.reserve(FirstFrame->frame->nFeatures);
    
-    for(int i=0; i< FirstFrame->nFeatures; ++i)
+    for(int i=0; i< FirstFrame->frame->nFeatures; ++i)
     {
         if(vbTriangulated[i])
             vDepths.push_back(vP3D[i].z);
@@ -1297,6 +1294,20 @@ float Initializer::ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f>
     std::sort(vDepths.begin(),vDepths.end());
 
     return vDepths[(vDepths.size()-1)/q];
+}
+
+float Initializer::ComputeSceneMeanDepth(std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated)
+{
+    std::vector<float> vDepths;
+    vDepths.reserve(FirstFrame->frame->nFeatures);
+   
+    for(int i=0; i< FirstFrame->frame->nFeatures; ++i)
+    {
+        if(vbTriangulated[i])
+            vDepths.push_back(vP3D[i].z);
+    }
+
+    return accumulate(vDepths.begin(), vDepths.end(), 0)/ vDepths.size();
 }
 
 float Initializer::ComputeMeanOpticalFlow(vector<Point2f> &Prev, vector<Point2f> &New)
@@ -1316,8 +1327,8 @@ float Initializer::ComputeMeanOpticalFlow(vector<Point2f> &Prev, vector<Point2f>
 
 }
 
-DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &_Pts3D, std::vector<bool> &_Triangulated, std::shared_ptr<Frame> _FirstFrame,
-                                   std::shared_ptr<Frame> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth)
+DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &_Pts3D, std::vector<bool> &_Triangulated, std::shared_ptr<FrameShell> _FirstFrame,
+                                   std::shared_ptr<FrameShell> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth)
 {
     Calib = _Calib;
     thisToNext_aff = AffLight(0, 0);
@@ -1346,13 +1357,13 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
     if (points != 0)
         delete[] points;
 
-    points = new Pnt[FirstFrame->nFeatures];
+    points = new Pnt[FirstFrame->frame->nFeatures];
     Pnt* pl = points;
 
-    for (int i = 0; i < FirstFrame->nFeatures; i++)
+    for (int i = 0; i < FirstFrame->frame->nFeatures; i++)
     {
-        pl[i].u = FirstFrame-> mvKeys[i].pt.x;
-		pl[i].v = FirstFrame-> mvKeys[i].pt.y;
+        pl[i].u = FirstFrame->frame->mvKeys[i].pt.x;
+		pl[i].v = FirstFrame->frame->mvKeys[i].pt.y;
 
         if(Triangulated[0][i])
         {
@@ -1372,14 +1383,14 @@ DirectRefinement::DirectRefinement(shared_ptr<CalibData> _Calib, std::vector<cv:
 		pl[i].my_type= 1;
         pl[i].outlierTH = patternNum*setting_outlierTH;
     }
-    numPoints = FirstFrame->nFeatures;
+    numPoints = FirstFrame->frame->nFeatures;
     snapped = false;
 
     // trace(pl);
     Refine();
     //Update optimized data!!
     _Pose = thisToNext;
-    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    for (int i = 0; i < FirstFrame->frame->nFeatures; ++i)
     {
         if (!points[i].isGood || !Triangulated[0][i])
             continue;
@@ -1559,25 +1570,25 @@ void DirectRefinement::trace(Pnt* _pl)
     Mat33f KRKi = (Calib->pyrK[0] * Temp.rotationMatrix() * Calib->pyrKi[0]).cast<float>();
 	Vec3f Kt = (Calib->pyrK[0] * Temp.translation()).cast<float>();
 
-    Eigen::Vector3f* colorRef = FirstFrame->DirPyr[0];
-    Eigen::Vector3f *colorNew = SecondFrame->DirPyr[0];
+    Eigen::Vector3f* colorRef = FirstFrame->frame->DirPyr[0];
+    Eigen::Vector3f *colorNew = SecondFrame->frame->DirPyr[0];
 
     cv::Mat Image;
     if (DrawEpipolarMatching)
     {
-        cv::hconcat(FirstFrame->IndPyr[0], SecondFrame->IndPyr[0], Image);
+        cv::hconcat(FirstFrame->frame->IndPyr[0], SecondFrame->frame->IndPyr[0], Image);
         cvtColor(Image, Image, CV_GRAY2RGB);
         cv::namedWindow("epi trace", cv::WindowFlags::WINDOW_KEEPRATIO);
     }
 
     float d_min = 0.0f;
-    for (int i = 0; i < FirstFrame->nFeatures; ++i)
+    for (int i = 0; i < FirstFrame->frame->nFeatures; ++i)
     {
         if(Triangulated[0][i])
             continue;
 
-        float u = FirstFrame->mvKeys[i].pt.x;
-        float v = (float)FirstFrame->mvKeys[i].pt.y;
+        float u = FirstFrame->frame->mvKeys[i].pt.x;
+        float v = (float)FirstFrame->frame->mvKeys[i].pt.y;
 
         Vec3f pr = KRKi * Vec3f(u, v, 1.0f);
         Vec3f ptpMin = pr + Kt*d_min;
@@ -1869,7 +1880,7 @@ void DirectRefinement::trace(Pnt* _pl)
         if (DrawEpipolarMatching)
         {
             cv::Scalar COlor = cv::Scalar(randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255), randomGen->uniform((int)0, (int)255));
-            cv::circle(Image, FirstFrame->mvKeys[i].pt, 3, COlor);
+            cv::circle(Image, FirstFrame->frame->mvKeys[i].pt, 3, COlor);
             cv::line(Image, cv::Point2f(Calib->Width, 0) + cv::Point2f(uMax, vMax), cv::Point2f(Calib->Width, 0) + cv::Point2f(uMin, vMin), COlor);
             cv::circle(Image, cv::Point2f(Calib->Width, 0) + cv::Point2f(bestU, bestV), 3, COlor);
         }
@@ -1916,10 +1927,10 @@ Vec3f DirectRefinement::calcResAndGS( int lvl, Mat88f &H_out, Vec8f &b_out, Mat8
 {
 	int wl = Calib->Width;
     int hl = Calib->Height;
-	Eigen::Vector3f* colorRef = FirstFrame->DirPyr[lvl];
-	Eigen::Vector3f* colorNew = SecondFrame->DirPyr[lvl];
+	Eigen::Vector3f* colorRef = FirstFrame->frame->DirPyr[lvl];
+	Eigen::Vector3f* colorNew = SecondFrame->frame->DirPyr[lvl];
 
-	Mat33f RKi = (refToNew.rotationMatrix() * Calib->pyrKi[lvl].cast<double>()).cast<float>();
+	Mat33f RKi = (refToNew.rotationMatrix() * Calib->pyrKi[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
     
@@ -2265,9 +2276,9 @@ void DirectRefinement::debugPlot(Pnt* Points)
     // FirstFrame->LeftDirPyr[0];
 	// MinimalImageB3 iRImg(wl,hl);
     cv::Mat Depth; 
-    cv::cvtColor(FirstFrame->IndPyr[0], Depth, CV_GRAY2RGB);
+    cv::cvtColor(FirstFrame->frame->IndPyr[0], Depth, CV_GRAY2RGB);
 
-	int npts = FirstFrame->nFeatures;
+	int npts = FirstFrame->frame->nFeatures;
 
 	float nid = 0, sid=0;
 	for(int i=0;i<npts;i++)

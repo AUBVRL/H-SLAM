@@ -2,23 +2,37 @@
 #define __MAPPOINT_H__
 
 #include "Settings.h"
+#include "ImmaturePoint.h"
+#include "OptimizationClasses.h"
 
 namespace FSLAM
 {
 class CalibData;
-class Frame;
+class FrameShell;
 class ImmaturePoint;
-// class EFPoint;
-class PointFrameResidual;
+struct MapPointOptimizationData;
+// class PointFrameResidual;
 
-struct EFPoint
+struct MapPointOptimizationData
 {
     public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    float idepth_zero = NAN;
+    float step;
+    float step_backup;
+    float idepth_backup;
 
-    EFPoint(){};
-    ~EFPoint(){};
-    void takeData(bool hasDepthPrior, float idepth, float idepth_zero)
+    float nullspaces_scale;
+    MapPointOptimizationData(){};
+    ~MapPointOptimizationData(){};
+
+    inline void setIdepthZero(float _idepth)
+    {
+        idepth_zero = _idepth;
+        nullspaces_scale = -(_idepth * 1.001 - _idepth / 1.001) * 500;
+    }
+
+    void takeData(bool hasDepthPrior, float idepth)
     {
         priorF = hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
         if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
@@ -28,7 +42,6 @@ struct EFPoint
 
     float priorF = 0;
     float deltaF = 0;
-
     // H and b blocks
     float bdSumF = 0;
     float HdiF = 0;
@@ -38,81 +51,101 @@ struct EFPoint
     float Hdd_accAF = 0;
     VecCf Hcd_accAF = VecCf::Zero();
     float bd_accAF = 0;
+    energyStatus stateFlag = energyStatus::Good;
 };
 
 struct MapPoint
 {
-    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    // static int instanceCounter;
-    // EFPoint* efPoint;
+    shared_ptr<MapPointOptimizationData> efPoint;
 
     // static values
     float color[MAX_RES_PER_POINT];   // colors in host frame
     float weights[MAX_RES_PER_POINT]; // host-weights for respective residuals.
 
     float u, v;
-    // int idx;
+    int idx;
     float energyTH;
-    std::weak_ptr<Frame> host;
-    std::shared_ptr<CalibData> Calib;
+    shared_ptr<FrameShell> host;
     bool hasDepthPrior;
 
     float my_type;
-
-    float idepth_scaled;
-    float idepth_zero_scaled;
-    float idepth_zero;
     float idepth;
-    float step;
-    float step_backup;
-    float idepth_backup;
 
-    float nullspaces_scale;
     float idepth_hessian;
     float maxRelBaseline;
     int numGoodResiduals;
 
-    bool WasMarginalized;
-
-    enum PtStatus {ACTIVE = 0, OUTLIER = 1, INACTIVE = 2, MARGINALIZED = 3};
     PtStatus status;
 
     inline void setPointStatus(PtStatus s) { status = s; }
+    inline PtStatus getPointStatus() { return status; }
 
-    inline void setIdepth(float idepth)
+    inline void setIdepth(float _idepth)
     {
-        this->idepth = idepth;
-        this->idepth_scaled = SCALE_IDEPTH * idepth;
-
+        idepth = _idepth;
     }
 
-    inline void setIdepthScaled(float idepth_scaled)
+    vector<shared_ptr<PointFrameResidual>> residuals;                // only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+    pair<shared_ptr<PointFrameResidual>, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
+
+    inline MapPoint(shared_ptr<ImmaturePoint> &rawPoint, shared_ptr<CalibData> &Hcalib)
     {
-        this->idepth = SCALE_IDEPTH_INVERSE * idepth_scaled;
-        this->idepth_scaled = idepth_scaled;
+        host = rawPoint->host;
+        hasDepthPrior = false;
+
+        u = rawPoint->u;
+        v = rawPoint->v;
+
+        idepth_hessian = 0;
+        maxRelBaseline = 0;
+        numGoodResiduals = 0;
+
+        assert(std::isfinite(rawPoint->idepth_max));
+
+        my_type = rawPoint->my_type;
+
+        setIdepth((rawPoint->idepth_max + rawPoint->idepth_min) * 0.5);
+        setPointStatus(INACTIVE);
+
+        memcpy(color, rawPoint->color, sizeof(float) * patternNum);
+        memcpy(weights, rawPoint->weights, sizeof(float) * patternNum);
+        energyTH = rawPoint->energyTH;
+        efPoint = shared_ptr<MapPointOptimizationData>(new MapPointOptimizationData()); //remove this during reduce essential for all points of a keyframe.
     }
 
-    inline void setIdepthZero(float idepth)
-    {
-        idepth_zero = idepth;
-        idepth_zero_scaled = SCALE_IDEPTH * idepth;
-        nullspaces_scale = -(idepth * 1.001 - idepth / 1.001) * 500;
-    }
-
-    std::vector<std::shared_ptr<PointFrameResidual>> residuals;                // only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
-    std::pair<std::shared_ptr<PointFrameResidual>, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
-
-    MapPoint(std::shared_ptr<ImmaturePoint> rawPoint, std::shared_ptr<CalibData> Hcalib);
-   
     inline ~MapPoint() {}
 
-    bool isOOB(const std::vector<std::shared_ptr<Frame>> &toMarg) const;
-    bool isInlierNew();
-    std::shared_ptr<EFPoint> efpoint;
+    inline bool isOOB( const vector<shared_ptr<FrameShell>> &toMarg) const
+    {
+        int visInToMarg = 0;
+        for (auto &r : residuals)
+        {
+            if (r->state_state != ResState::IN)
+                continue;
+            for (auto &k : toMarg)
+                if (r->target == k)
+                    visInToMarg++;
+        }
+        if ((int)residuals.size() >= setting_minGoodActiveResForMarg &&
+            numGoodResiduals > setting_minGoodResForMarg + 10 &&
+            (int)residuals.size() - visInToMarg < setting_minGoodActiveResForMarg)
+            return true;
 
+        if (lastResiduals[0].second == ResState::OOB)
+            return true;
+        if (residuals.size() < 2)
+            return false;
+        if (lastResiduals[0].second == ResState::OUT && lastResiduals[1].second == ResState::OUT)
+            return true;
+        return false;
+    }
+
+    inline bool isInlierNew()
+    {
+        return (int)residuals.size() >= setting_minGoodActiveResForMarg && numGoodResiduals >= setting_minGoodResForMarg;
+    }
 };
-
 
 } // namespace FSLAM
 

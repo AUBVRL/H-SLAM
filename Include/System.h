@@ -4,15 +4,15 @@
 
 namespace FSLAM
 {
+
 class ImageData;
 class OnlineCalibrator;
 class FeatureDetector;
-class Frame;
+class FrameShell;
 class CalibData;
 class GeometricUndistorter;
 class PhotometricUndistorter;
 class GUI;
-class Map;
 class Initializer;
 
 //----------------begin dso------------------
@@ -27,43 +27,41 @@ class PointFrameResidual;
 //----------------end dso------------------
 
 
-
-
 class System
 {
 
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    System(std::shared_ptr<GeometricUndistorter> GeomUndist, std::shared_ptr<PhotometricUndistorter> 
-            PhoUndistL, std::shared_ptr<PhotometricUndistorter> PhoUndistR, std::shared_ptr<GUI> _DisplayHandler);
+    System(std::shared_ptr<GeometricUndistorter> GeomUndist, std::shared_ptr<PhotometricUndistorter>  PhoUndistL, std::shared_ptr<PhotometricUndistorter> PhoUndistR,
+            std::shared_ptr<GUI> _DisplayHandler);
     ~System();
     void ProcessNewFrame(std::shared_ptr<ImageData> DataIn);
 	
-    std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft;
-    std::shared_ptr<IndexThreadReduce<Vec10>> BackEndThreadPool;
+    shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft;
+    shared_ptr<IndexThreadReduce<Vec10>> BackEndThreadPool;
 
 
     //----------------begin dso------------------
 
-    std::shared_ptr<EnergyFunctional> ef;
+    shared_ptr<EnergyFunctional> ef;
 	// float* selectionMap;
 	CoarseDistanceMap* coarseDistanceMap;
 
-    std::vector<std::shared_ptr<Frame>> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
-	std::vector<std::shared_ptr<PointFrameResidual>> activeResiduals;
+    vector<shared_ptr<FrameShell>> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
+	vector<pair<shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>> activeResiduals;
 	float currentMinActDist;
     
     boost::mutex trackMutex;
-	std::vector<std::shared_ptr<Frame>> allFrameHistory;
+	vector<shared_ptr<FrameShell>> allFrameHistory;
 	Vec5 lastCoarseRMSE;
 	// ================== changed by mapper-thread. protected by mapMutex ===============
 	boost::mutex mapMutex;
-	std::vector<std::shared_ptr<Frame>> allKeyFramesHistory;
+	vector<shared_ptr<FrameShell>> allKeyFramesHistory;
 
 
 	IndexThreadReduce<Vec10> treadReduce;
-	std::vector<float> allResVec;
+	vector<float> allResVec;
 
 	// mutex etc. for tracker exchange.
 	boost::mutex coarseTrackerSwapMutex;			// if tracker sees that there is a new reference, tracker locks [coarseTrackerSwapMutex] and swaps the two.
@@ -72,17 +70,17 @@ public:
     int lastRefStopID;
 
     // marginalizes a frame. drops / marginalizes points & residuals.
-	void marginalizeFrame(std::shared_ptr<Frame> frame);
+	void marginalizeFrame(shared_ptr<FrameShell> frame);
     float optimize(int mnumOptIts);
     // opt single point
-	int optimizePoint(std::shared_ptr<MapPoint> point, int minObs, bool flagOOB);
-	std::shared_ptr<MapPoint> optimizeImmaturePoint(std::shared_ptr<ImmaturePoint> point, int minObs, std::vector<std::shared_ptr<ImmaturePointTemporaryResidual>>& residuals);
-    Vec4 trackNewCoarse(std::shared_ptr<Frame> fh);
-	void traceNewCoarse(std::shared_ptr<Frame> fh);
+	int optimizePoint(shared_ptr<MapPoint> &point, int minObs, bool flagOOB);
+	shared_ptr<MapPoint> optimizeImmaturePoint(shared_ptr<ImmaturePoint>& point, int minObs, vector<shared_ptr<ImmaturePointTemporaryResidual>>& residuals);
+    Vec4 trackNewCoarse(shared_ptr<FrameShell> &fh);
+	void traceNewCoarse(shared_ptr<FrameShell> fh);
 	void activatePoints();
 	void activatePointsMT();
     void flagPointsForRemoval();
-	void makeNewTraces(std::shared_ptr<Frame> newFrame);
+	void makeNewTraces(shared_ptr<FrameShell> newFrame);
     void flagFramesForMarginalization();
     void removeOutliers();
 
@@ -94,12 +92,12 @@ public:
 	void loadSateBackup();
 	double calcLEnergy();
 	double calcMEnergy();
-	void linearizeAll_Reductor(bool fixLinearization, std::vector<std::shared_ptr<PointFrameResidual>>* toRemove, int min, int max, Vec10* stats, int tid);
-	void activatePointsMT_Reductor(std::vector<std::shared_ptr<MapPoint>>* optimized, std::vector<std::shared_ptr<ImmaturePoint>>* toOptimize,int min, int max, Vec10* stats, int tid);
+	void linearizeAll_Reductor(bool fixLinearization, vector< pair< shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>>* toRemove, int min, int max, Vec10* stats, int tid);
+	void activatePointsMT_Reductor(vector<shared_ptr<MapPoint>>* optimized, vector<shared_ptr<ImmaturePoint>>* toOptimize,int min, int max, Vec10* stats, int tid);
 	void applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid);
    	void printOptRes(const Vec3 &res, double resL, double resM, double resPrior, double LExact, float a, float b);
 
-    std::vector<VecX> getNullspaces(std::vector<VecX> &nullspaces_pose, std::vector<VecX> &nullspaces_scale, std::vector<VecX> &nullspaces_affA, std::vector<VecX> &nullspaces_affB);
+    vector<VecX> getNullspaces(vector<VecX> &nullspaces_pose, vector<VecX> &nullspaces_scale, vector<VecX> &nullspaces_affA, vector<VecX> &nullspaces_affB);
 	void setNewFrameEnergyTH();
 
     bool isLost;
@@ -111,37 +109,35 @@ public:
 
 
 private:
-    void DrawImages(std::shared_ptr<ImageData> DataIn,std::shared_ptr<Frame> CurrentFrame);
-    void AddKeyframe(std::shared_ptr<Frame> fh);
-    void ProcessNonKeyframe(std::shared_ptr<Frame> Frame);
+    void DrawImages(shared_ptr<ImageData> DataIn, std::shared_ptr<FrameShell> CurrentFrame);
+    void AddKeyframe(shared_ptr<FrameShell> fh);
+    void ProcessNonKeyframe(shared_ptr<FrameShell> Frame);
     void BlockUntilMappingIsFinished();
     void MappingThread();
-    void InitFromInitializer(std::shared_ptr<Initializer> _cInit);
+    void InitFromInitializer(shared_ptr<Initializer> _cInit);
 
     bool Initialized;
-    std::shared_ptr<CalibData> Calib; //Calibration data that is used for projection and optimization
-    std::shared_ptr<GUI> DisplayHandler;
+    shared_ptr<CalibData> Calib; //Calibration data that is used for projection and optimization
+    shared_ptr<GUI> DisplayHandler;
 
-    std::shared_ptr<Map> SlamMap;
-
-    std::shared_ptr<Initializer> cInitializer;
+    shared_ptr<Initializer> cInitializer;
 
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibL;
     // std::shared_ptr<OnlineCalibrator> OnlinePhCalibR;
 
-    std::shared_ptr<FeatureDetector> Detector;
+    shared_ptr<FeatureDetector> Detector;
 
     //stored here without being used within the system.
-    std::shared_ptr<PhotometricUndistorter> PhoUndistL; //The input photometric undistorter 
-    std::shared_ptr<PhotometricUndistorter> PhoUndistR; //The input photometric undistorter 
-    std::shared_ptr<GeometricUndistorter> GeomUndist;     //geometric calib data used for undistorting the images. Only used to initialize the calib ptr.
+    shared_ptr<PhotometricUndistorter> PhoUndistL; //The input photometric undistorter 
+    shared_ptr<PhotometricUndistorter> PhoUndistR; //The input photometric undistorter 
+    shared_ptr<GeometricUndistorter> GeomUndist;     //geometric calib data used for undistorting the images. Only used to initialize the calib ptr.
 
     
     boost::thread tMappingThread;
     boost::mutex MapThreadMutex;
     boost::condition_variable TrackedFrameSignal;
 	boost::condition_variable MappedFrameSignal;
-	std::deque<std::shared_ptr<Frame>> UnmappedTrackedFrames;
+	deque<shared_ptr<FrameShell>> UnmappedTrackedFrames;
     bool RunMapping;
     bool NeedToCatchUp;
     int NeedNewKFAfter;

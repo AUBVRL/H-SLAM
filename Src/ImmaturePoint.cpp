@@ -4,8 +4,8 @@
 
 namespace FSLAM
 {
-ImmaturePoint::ImmaturePoint(float u_, float v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> HCalib)
-: u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED), Calib(HCalib)
+ImmaturePoint::ImmaturePoint(float u_, float v_, shared_ptr<FrameShell> host_, float type, shared_ptr<CalibData> HCalib)
+: u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED)
 {
 
 	gradH.setZero();
@@ -15,7 +15,7 @@ ImmaturePoint::ImmaturePoint(float u_, float v_, std::shared_ptr<Frame> host_, f
 		int dx = patternP[idx][0];
 		int dy = patternP[idx][1];
 
-        Vec3f ptc = getInterpolatedElement33BiLin(host_->DirPyr[0], u+dx, v+dy,Calib->Width);
+        Vec3f ptc = getInterpolatedElement33BiLin(host_->frame->DirPyr[0], u+dx, v+dy, HCalib->Width);
 
 		color[idx] = ptc[0];
 		if(!std::isfinite(color[idx])) {energyTH=NAN; return;}
@@ -27,15 +27,9 @@ ImmaturePoint::ImmaturePoint(float u_, float v_, std::shared_ptr<Frame> host_, f
 	energyTH = patternNum*setting_outlierTH;
 	energyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
 
-	idepth_GT=0;
+	
 	quality=10000;
 }
-
-ImmaturePoint::~ImmaturePoint()
-{
-}
-
-
 
 /*
  * returns
@@ -43,7 +37,8 @@ ImmaturePoint::~ImmaturePoint()
  * * UPDATED -> point has been updated.
  * * SKIP -> point has not been updated.
  */
-ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f& hostToFrame_affine, bool debugPrint)
+ImmaturePointStatus ImmaturePoint::traceOn(shared_ptr<FrameShell> frame,const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f& hostToFrame_affine,
+												 shared_ptr<CalibData>& Calib, bool debugPrint)
 {
 	if(lastTraceStatus == ImmaturePointStatus::IPS_OOB) return lastTraceStatus;
 
@@ -53,13 +48,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 
 	if(debugPrint)
 		printf("trace pt (%.1f %.1f) from frame %zu to %zu. Range %f -> %f. t %f %f %f!\n",
-				u,v,
-				host.lock()->id, frame->id,
-				idepth_min, idepth_max,
-				hostToFrame_Kt[0],hostToFrame_Kt[1],hostToFrame_Kt[2]);
+				u,v, host->id, frame->id, idepth_min, idepth_max, hostToFrame_Kt[0],hostToFrame_Kt[1],hostToFrame_Kt[2]);
 
 
-//	const float minImprovementFactor = 2;		// if pixel-interval is smaller than this, leave it be.
 	// ============== project min and max. return if one of them is OOB ===================
 	Vec3f pr = hostToFrame_KRKi * Vec3f(u,v, 1);
 	Vec3f ptpMin = pr + hostToFrame_Kt*idepth_min;
@@ -177,13 +168,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 
 	if(debugPrint)
 		printf("trace pt (%.1f %.1f) from frame %zu to %zu. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
-				u,v,
-				host.lock()->id, frame->id,
-				idepth_min, uMin, vMin,
-				idepth_max, uMax, vMax,
-				errorInPixel
-				);
-
+				u,v, host->id, frame->id, idepth_min, uMin, vMin, idepth_max, uMax, vMax, errorInPixel);
 
 	if(dist>maxPixSearch)
 	{
@@ -204,9 +189,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 	for(int idx=0;idx<patternNum;idx++)
 		rotatetPattern[idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
 
-
-
-
 	if(!std::isfinite(dx) || !std::isfinite(dy))
 	{
 		//printf("COUGHT INF / NAN dxdy (%f %f)!\n", dx, dx);
@@ -215,8 +197,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 		lastTraceUV = Vec2f(-1,-1);
 		return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 	}
-
-
 
 	float errors[100];
 	float bestU=0, bestV=0, bestEnergy=1e10;
@@ -228,10 +208,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 		float energy=0;
 		for(int idx=0;idx<patternNum;idx++)
 		{
-			float hitColor = getInterpolatedElement31(frame->DirPyr[0],
-										(float)(ptx+rotatetPattern[idx][0]),
-										(float)(pty+rotatetPattern[idx][1]),
-										Calib->Width);
+			float hitColor = getInterpolatedElement31(frame->frame->DirPyr[0], (float)(ptx+rotatetPattern[idx][0]), (float)(pty+rotatetPattern[idx][1]), Calib->Width);
 
 			if(!std::isfinite(hitColor)) {energy+=1e5; continue;}
 			float residual = hitColor - (float)(hostToFrame_affine[0] * color[idx] + hostToFrame_affine[1]);
@@ -242,7 +219,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 		if(debugPrint)
 			printf("step %.1f %.1f (id %f): energy = %f!\n",
 					ptx, pty, 0.0f, energy);
-
 
 		errors[i] = energy;
 		if(energy < bestEnergy)
@@ -275,7 +251,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 		float H = 1, b=0, energy=0;
 		for(int idx=0;idx<patternNum;idx++)
 		{
-			Vec3f hitColor = getInterpolatedElement33(frame->DirPyr[0],
+			Vec3f hitColor = getInterpolatedElement33(frame->frame->DirPyr[0],
 					(float)(bestU+rotatetPattern[idx][0]),
 					(float)(bestV+rotatetPattern[idx][1]),Calib->Width);
 
@@ -300,8 +276,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 			bestV = vBak + stepBack*dy;
 			if(debugPrint)
 				printf("GN BACK %d: E %f, H %f, b %f. id-step %f. UV %f %f -> %f %f.\n",
-						it, energy, H, b, stepBack,
-						uBak, vBak, bestU, bestV);
+						it, energy, H, b, stepBack, uBak, vBak, bestU, bestV);
 		}
 		else
 		{
@@ -323,8 +298,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 
 			if(debugPrint)
 				printf("GN step %d: E %f, H %f, b %f. id-step %f. UV %f %f -> %f %f.\n",
-						it, energy, H, b, step,
-						uBak, vBak, bestU, bestV);
+						it, energy, H, b, step, uBak, vBak, bestU, bestV);
 		}
 
 		if(fabsf(stepBack) < setting_trace_GNThreshold) break;
@@ -376,12 +350,12 @@ ImmaturePointStatus ImmaturePoint::traceOn(std::shared_ptr<Frame> frame,const Ma
 }
 
 
-float ImmaturePoint::calcResidual( const float outlierTHSlack, std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float idepth)
+float ImmaturePoint::calcResidual( const float outlierTHSlack, std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float idepth, shared_ptr<CalibData> &Calib)
 {
-	FrameFramePrecalc* precalc = &(host.lock()->targetPrecalc[tmpRes->target.lock()->idx]);
+	FrameFramePrecalc* precalc = &(host->frame->targetPrecalc[tmpRes->target->frame->idx]);
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target.lock()->DirPyr[0];
+	const Eigen::Vector3f* dIl = tmpRes->target->frame->DirPyr[0];
 	const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
 	const Vec3f &PRE_KtTll = precalc->PRE_KtTll;
 	Vec2f affLL = precalc->PRE_aff_mode;
@@ -412,17 +386,18 @@ float ImmaturePoint::calcResidual( const float outlierTHSlack, std::shared_ptr<I
 
 
 
-double ImmaturePoint::linearizeResidual(const float outlierTHSlack, std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float &Hdd, float &bd, float idepth)
+double ImmaturePoint::linearizeResidual(const float outlierTHSlack, shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float &Hdd, float &bd, float idepth, 
+										shared_ptr<CalibData> &Calib)
 {
 	if(tmpRes->state_state == ResState::OOB)
 		{ tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy; }
 
-	FrameFramePrecalc* precalc = &(host.lock()->targetPrecalc[tmpRes->target.lock()->idx]);
+	FrameFramePrecalc* precalc = &(host->frame->targetPrecalc[tmpRes->target->frame->idx]);
 
 	// check OOB due to scale angle change.
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target.lock()->DirPyr[0];
+	const Eigen::Vector3f* dIl = tmpRes->target->frame->DirPyr[0];
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 	//const float * const Il = tmpRes->target->I;
@@ -438,10 +413,8 @@ double ImmaturePoint::linearizeResidual(const float outlierTHSlack, std::shared_
 		float Ku, Kv;
 		Vec3f KliP;
 
-		if(!projectPoint(this->u,this->v, idepth, dx, dy,Calib,
-				PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
+		if(!projectPoint(this->u,this->v, idepth, dx, dy,Calib,	PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
 			{tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy;}
-
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, Calib->Width));
 
@@ -466,7 +439,7 @@ double ImmaturePoint::linearizeResidual(const float outlierTHSlack, std::shared_
 	if(energyLeft > energyTH*outlierTHSlack)
 	{
 		energyLeft = energyTH*outlierTHSlack;
-		tmpRes->state_NewState = ResState::OUTLIER;
+		tmpRes->state_NewState = ResState::OUT;
 	}
 	else
 	{

@@ -13,27 +13,36 @@
 
 namespace FSLAM
 {
-size_t Frame::Globalid = 0;
-size_t Frame::GlobalIncoming_id = 0;
+size_t FrameShell::Globalid = 0;
+int FrameShell::GlobalKfId = 0;
 
+bool Frame::GridStructInit = false;
+int Frame::mnGridCols = 0;
+int Frame::mnGridRows = 0;
+float Frame::mnMinX = 0.0f;
+float Frame::mnMaxX = 0.0f;
+float Frame::mnMinY = 0.0f;
+float Frame::mnMaxY = 0.0f;
+float Frame::mfGridElementWidthInv = 0.0f;
+float Frame::mfGridElementHeightInv = 0.0f;
+int Frame::EDGE_THRESHOLD = 19;
 
-Frame::Frame(std::shared_ptr<ImageData> Img, std::shared_ptr<FeatureDetector> _Detector, std::shared_ptr<CalibData>_Calib, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit):
-Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)  
+Frame::Frame(std::shared_ptr<ImageData> Img, int id, float ab_exposure, std::shared_ptr<FeatureDetector> _Detector, std::shared_ptr<CalibData>_Calib, 
+                std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, bool ForInit): Detector(_Detector), Calib(_Calib)  
 {
-    frameNumb = GlobalIncoming_id; GlobalIncoming_id++; //keeps track of the number of frames processed
-    id = Globalid; Globalid++; //Set the frame id (this might be reset to 0 in the initializer so that the first keyframe in the map has id = 0)
-    
-    poseValid=false;
+    if(!GridStructInit)
+    {
+        mnGridCols = std::ceil(Img->cvImgL.cols / 10);  mnGridRows = std::ceil(Img->cvImgL.rows / 10);
+        mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
+        mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
+        mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
+        GridStructInit = true;
+    }
+
     NeedRefresh = false;
-    MarginalizedAt=-1;
     MovedByOpt=0;
 	statistics_outlierResOnThis = statistics_goodResOnThis = 0;
-    TimeStamp = Img->timestamp;
-    camToWorld = SE3();
-    camToTrackingRef = SE3();
-    aff_g2l_internal = AffLight(0,0); //Past to present affine model of left image
     
-    ab_exposure = Img->ExposureL; //Exposure time of the left image
     FlaggedForMarginalization = false;
     frameEnergyTH = 8*8*patternNum;
 
@@ -69,11 +78,9 @@ Detector(_Detector), EDGE_THRESHOLD(19), Calib(_Calib)
     for (int i = 0, iend = mGrid.size(); i < iend; ++i)
         for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
             mGrid[i][j].shrink_to_fit();
-    
-
    
     isReduced = false;
-    isKeyFrame = false;
+    efFrame = shared_ptr<FrameOptimizationData>(new FrameOptimizationData(id, ab_exposure));
 }
 
 void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
@@ -185,42 +192,40 @@ Frame::~Frame()
     absSquaredGrad.clear(); absSquaredGrad.shrink_to_fit();
 }
 
-void Frame::ReduceToEssential(bool isKeyFrame)
+void Frame::ReduceToEssential()
 {
     if(isReduced)
         return;
     isReduced = true;
     
-    if(!isKeyFrame) //if true (global keyframe) keep these
+    ImmaturePoints.clear(); ImmaturePoints.shrink_to_fit();
+
+    mvKeys.resize(0); mvKeys.shrink_to_fit();   
+    mGrid.clear(); mGrid.shrink_to_fit();
+    Descriptors.release();
+   
+    // pointHessians.resize(0); pointHessians.shrink_to_fit();
+
+
+    for (auto &it : pointHessians)
     {
-        mvKeys.resize(0); mvKeys.shrink_to_fit();   
-        mGrid.clear(); mGrid.shrink_to_fit();
-        Descriptors.release();
-        ImmaturePoints.resize(0); ImmaturePoints.shrink_to_fit();
-        pointHessians.resize(0); pointHessians.shrink_to_fit();
-        Calib.reset();
-    }
-    else 
-    {
-        for(auto &it : pointHessians)
+        if (!it)
+            continue;
+        assert(it->getPointStatus() != ACTIVE);
+
+        if (it->status != MARGINALIZED)
+            it.reset();
+        else
         {
-            if (!it)
-                continue;
-            assert(it->status != MapPoint::ACTIVE);
-             
-            if(it->status != MapPoint::MARGINALIZED)
-                it.reset();
-            else
-            {
-                if(it->efpoint)
-                    it->efpoint.reset();
-                for (auto &it2 : it->residuals) if (it2) it2.reset();
-                if(it->lastResiduals) if(it->lastResiduals->first) it->lastResiduals->first.reset();
-
-            }
+            if (it->efPoint)
+                it->efPoint.reset();
+            for (auto &it2 : it->residuals)
+                if (it2)
+                    it2.reset();
+            if (it->lastResiduals)
+                if (it->lastResiduals->first)
+                    it->lastResiduals->first.reset();
         }
-
-        ImmaturePoints.resize(0); ImmaturePoints.shrink_to_fit();
     }
 
     Detector.reset();
@@ -234,10 +239,11 @@ void Frame::ReduceToEssential(bool isKeyFrame)
     }
     
     DirPyr.resize(0); DirPyr.shrink_to_fit();
-
     absSquaredGrad.resize(0); absSquaredGrad.shrink_to_fit();
-    
     targetPrecalc.clear(); targetPrecalc.shrink_to_fit();
+
+    if(efFrame)
+        efFrame.reset();
     return;
 }
 
@@ -289,14 +295,6 @@ bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
     if (posX < 0 || posX >= mnGridCols || posY < 0 || posY >= mnGridRows)
         return false;
     return true;
-}
-
-void Frame::takeData()
-{
-    prior = getPrior().head<8>();
-    delta = get_state_minus_stateZero().head<8>();
-    delta_prior = (get_state() - getPriorZero()).head<8>();
-    return;
 }
 
 }

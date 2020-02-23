@@ -324,7 +324,7 @@ void GUI::drawCam(Mat44 Pose, float lineWidth, Vec3b& color, float sizeFactor)
 	glPopMatrix();
 }
 
-void GUI::UploadKeyFrame(std::shared_ptr<Frame> FrameIn) //this vector wont be modified from multiple threads. No need for mutex
+void GUI::UploadKeyFrame(std::shared_ptr<FrameShell> FrameIn) //this vector wont be modified from multiple threads. No need for mutex
 {
     boost::unique_lock<boost::mutex> lock(KeyframesMutex); 
     AllKeyframes.push_back(std::make_pair(FrameIn, std::shared_ptr<KFDisplay>(new KFDisplay())));
@@ -338,7 +338,7 @@ void GUI::DrawKeyFrames()
     boost::unique_lock<boost::mutex> lock(KeyframesMutex); 
     for (auto it: AllKeyframes)
     {
-        if(it.first->NeedRefresh)
+        if(it.first->frame->NeedRefresh)
             it.second->RefreshPC(it.first);
 
         if(ShowAllKfs->Get())
@@ -379,7 +379,7 @@ KFDisplay::KFDisplay()
     numGLBufferPoints = 0;
 
 }
-void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
+void KFDisplay::RefreshPC(std::shared_ptr<FrameShell> _In)
 {
     camToWorld = _In->camToWorld;
     PoseValid = true;
@@ -388,21 +388,21 @@ void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
 	float my_minRelBS = 0.1; //0,1
 	int my_sparsifyFactor = 1 ; //from 1 to 20
 
-    float fxi = _In->Calib->fxli();
-    float cxi = _In->Calib->cxli();
-    float fyi = _In->Calib->fyli();
-    float cyi = _In->Calib->cyli();
+    float fxi = _In->frame->Calib->fxli();
+    float cxi = _In->frame->Calib->cxli();
+    float fyi = _In->frame->Calib->fyli();
+    float cyi = _In->frame->Calib->cyli();
 
-    int numSparsePoints = _In->pointHessians.size() + _In->ImmaturePoints.size();
+    int numSparsePoints = _In->frame->pointHessians.size() + _In->frame->ImmaturePoints.size();
     Vec3f* tmpVertexBuffer = new Vec3f[numSparsePoints*patternNum];
 	Vec3b* tmpColorBuffer = new Vec3b[numSparsePoints*patternNum];
 	int vertexBufferNumPoints=0;
 
     //Update MapPoints to draw.
-    for(auto it:_In->pointHessians)
+    for(auto it:_In->frame->pointHessians) //this thread locks the shared_ptr in case it was removed elsewhere!
     {
         if(!it) continue;
-        if(it->status == MapPoint::INACTIVE) continue;
+        if(it->getPointStatus() == INACTIVE) continue;
         if(it->idepth < 0) continue;
         float depth = 1.0f / it->idepth;
 		float depth4 = depth*depth; depth4*= depth4;
@@ -421,11 +421,11 @@ void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
 			tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
 
 
-            if (it->status == MapPoint::ACTIVE)
+            if (it->getPointStatus() == ACTIVE)
                 tmpColorBuffer[vertexBufferNumPoints] = blue;
-            else if (it->status == MapPoint::MARGINALIZED)
+            else if (it->getPointStatus() == MARGINALIZED)
                 tmpColorBuffer[vertexBufferNumPoints] = Vec3b(it->color[pnt], it->color[pnt], it->color[pnt]);
-            else if (it->status == MapPoint::OUTLIER)
+            else if (it->getPointStatus() == OUTLIER)
                 tmpColorBuffer[vertexBufferNumPoints] = red;   
 
             vertexBufferNumPoints++;
@@ -460,7 +460,7 @@ void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
     if(vertexBufferNumPoints==0)
 	{
         ValidBuffer = false;
-        _In->NeedRefresh = false;
+        _In->frame->NeedRefresh = false;
         numGLBufferGoodPoints = 0;
         numGLBufferPoints = 0;
 		delete[] tmpColorBuffer;
@@ -480,7 +480,7 @@ void KFDisplay::RefreshPC(std::shared_ptr<Frame> _In)
     ValidBuffer = true;
 	delete[] tmpColorBuffer;
 	delete[] tmpVertexBuffer;
-    _In->NeedRefresh = false;
+    _In->frame->NeedRefresh = false;
 
 
     return;

@@ -23,7 +23,7 @@ static Vec3b White = Vec3b(255, 255, 255);
 static Vec3b yellow = Vec3b(255, 215, 0);
 static Vec3b orange = Vec3b(255, 140, 0);
 
-class Frame;
+class FrameShell;
 
 struct InternalImage
 {
@@ -61,7 +61,7 @@ struct KFDisplay
     SE3 camToWorld;
     bool PoseValid;
     KFDisplay();
-    void RefreshPC(std::shared_ptr<Frame> _In);
+    void RefreshPC(std::shared_ptr<FrameShell> _In);
 	pangolin::GlBuffer vertexBuffer;
 	pangolin::GlBuffer colorBuffer;
     bool ValidBuffer;
@@ -135,9 +135,9 @@ public:
     //Draw Trajectory
     std::vector<Vec3f,Eigen::aligned_allocator<Vec3f>> allFramePoses;
 
-    void UploadKeyFrame(std::shared_ptr<Frame> FrameIn);
+    void UploadKeyFrame(std::shared_ptr<FrameShell> FrameIn);
     void DrawKeyFrames();
-    std::vector< std::pair< std::shared_ptr<Frame>, std::shared_ptr<KFDisplay> > > AllKeyframes;
+    std::vector< std::pair< std::shared_ptr<FrameShell>, std::shared_ptr<KFDisplay> > > AllKeyframes;
     boost::mutex KeyframesMutex;
 
 };

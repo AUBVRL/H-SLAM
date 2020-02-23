@@ -3,10 +3,6 @@
 
  
 #include "GlobalTypes.h"
-// #include "vector"
-// #include <math.h>
-// #include "map"
-
 
 namespace FSLAM
 {
@@ -15,13 +11,9 @@ template <typename Type> class IndexThreadReduce;
 
 class PointFrameResidual;
 class CalibData;
-class Frame;
+class FrameShell;
 class MapPoint;
 
-
-// class EFResidual;
-// class EFPoint;
-// class EFFrame;
 class EnergyFunctional;
 class AccumulatedTopHessian;
 class AccumulatedTopHessianSSE;
@@ -38,42 +30,38 @@ extern bool EFDeltaValid;
 class EnergyFunctional {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	// friend class EFFrame;
-	// friend class EFPoint;
-	// friend class EFResidual;
+
 	friend class AccumulatedTopHessian;
-	friend class AccumulatedTopHessianSSE;
 	friend class AccumulatedSCHessian;
-	friend class AccumulatedSCHessianSSE;
 
 	EnergyFunctional();
 	~EnergyFunctional();
 
 
-	void insertResidual(std::shared_ptr<PointFrameResidual> r);
-	void insertFrame(std::shared_ptr<Frame> fh, std::shared_ptr<CalibData> Hcalib);
-	void insertPoint(std::shared_ptr<MapPoint> ph);
+	void insertResidual(shared_ptr<MapPoint>& ph, shared_ptr<PointFrameResidual>& r);
+	void insertFrame(shared_ptr<FrameShell>& frame, shared_ptr<CalibData>& Hcalib);
+	void insertPoint(shared_ptr<MapPoint>& ph);
 
-	void dropResidual(std::shared_ptr<PointFrameResidual> r);
-	void marginalizeFrame(std::shared_ptr<Frame> fh);
-	void removePoint(std::shared_ptr<MapPoint> ph);
+	void dropResidual(shared_ptr<MapPoint>& ph, shared_ptr<PointFrameResidual> r);
+	void marginalizeFrame(shared_ptr<FrameShell>& fh);
+	void removePoint(shared_ptr<MapPoint>& ph);
 
 
 
 	void marginalizePointsF();
 	void dropPointsF();
-	void solveSystemF(int iteration, double lambda, std::shared_ptr<CalibData> HCalib);
+	void solveSystemF(int iteration, double lambda, shared_ptr<CalibData>& HCalib);
 	double calcMEnergyF();
 	double calcLEnergyF_MT();
 
 
 	void makeIDX();
 
-	void setDeltaF(std::shared_ptr<CalibData> HCalib);
+	void setDeltaF(shared_ptr<CalibData>& HCalib);
 
-	void setAdjointsF(std::shared_ptr<CalibData> Hcalib);
+	void setAdjointsF(shared_ptr<CalibData>& Hcalib);
 
-	std::vector<std::shared_ptr<Frame>> frames;
+	vector<shared_ptr<FrameShell>> frames;
 	int nPoints, nFrames, nResiduals;
 
 	MatXX HM;
@@ -83,29 +71,21 @@ public:
 	MatXX lastHS;
 	VecX lastbS;
 	VecX lastX;
-	std::vector<VecX> lastNullspaces_forLogging;
-	std::vector<VecX> lastNullspaces_pose;
-	std::vector<VecX> lastNullspaces_scale;
-	std::vector<VecX> lastNullspaces_affA;
-	std::vector<VecX> lastNullspaces_affB;
+	vector<VecX> lastNullspaces_forLogging;
+	vector<VecX> lastNullspaces_pose;
+	vector<VecX> lastNullspaces_scale;
+	vector<VecX> lastNullspaces_affA;
+	vector<VecX> lastNullspaces_affB;
 
 	IndexThreadReduce<Vec10>* red;
 
 
-	std::map<uint64_t,
-	  Eigen::Vector2i,
-	  std::less<uint64_t>,
-	  Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>
-	  > connectivityMap;
-	
-	Mat18f* adHTdeltaF;
-	VecCf cDeltaF;
+	std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> connectivityMap;
 
-private:
 
 	VecX getStitchedDeltaF() const;
 
-	void resubstituteF_MT(VecX x, std::shared_ptr<CalibData> HCalib, bool MT);
+	void resubstituteF_MT(VecX x, shared_ptr<CalibData>& HCalib, bool MT);
     void resubstituteFPt(const VecCf &xc, Mat18f* xAd, int min, int max, Vec10* stats, int tid);
 
 	void accumulateAF_MT(MatXX &H, VecX &b, bool MT);
@@ -115,7 +95,7 @@ private:
 	void calcLEnergyPt(int min, int max, Vec10* stats, int tid);
 
 	void orthogonalize(VecX* b, MatXX* H);
-
+	Mat18f* adHTdeltaF;
 
 	Mat88* adHost;
 	Mat88* adTarget;
@@ -125,14 +105,17 @@ private:
 
 
 	VecC cPrior;
+	VecCf cDeltaF;
 	VecCf cPriorF;
 
 	AccumulatedTopHessianSSE* accSSE_top_L;
 	AccumulatedTopHessianSSE* accSSE_top_A;
+
+
 	AccumulatedSCHessianSSE* accSSE_bot;
 
-	std::vector<std::shared_ptr<MapPoint>> allPoints;
-	std::vector<std::shared_ptr<MapPoint>> allPointsToMarg;
+	vector<shared_ptr<MapPoint>> allPoints;
+	vector<shared_ptr<MapPoint>> allPointsToMarg;
 
 	float currentLambda;
 };

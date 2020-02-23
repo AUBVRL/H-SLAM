@@ -26,7 +26,7 @@ void AccumulatedTopHessianSSE::addPoint(std::shared_ptr<MapPoint> p, EnergyFunct
 	assert(mode==0 || mode==1 || mode==2);
 
 	VecCf dc = ef->cDeltaF;
-	float dd = p->efpoint->deltaF;
+	float dd = p->efPoint->deltaF;
 
 	float bd_acc=0;
 	float Hdd_acc=0;
@@ -121,21 +121,21 @@ void AccumulatedTopHessianSSE::addPoint(std::shared_ptr<MapPoint> p, EnergyFunct
 
 	if(mode==0)
 	{
-		p->efpoint->Hdd_accAF = Hdd_acc;
-		p->efpoint->bd_accAF = bd_acc;
-		p->efpoint->Hcd_accAF = Hcd_acc;
+		p->efPoint->Hdd_accAF = Hdd_acc;
+		p->efPoint->bd_accAF = bd_acc;
+		p->efPoint->Hcd_accAF = Hcd_acc;
 	}
 	if(mode==1 || mode==2)
 	{
-		p->efpoint->Hdd_accLF = Hdd_acc;
-		p->efpoint->bd_accLF = bd_acc;
-		p->efpoint->Hcd_accLF = Hcd_acc;
+		p->efPoint->Hdd_accLF = Hdd_acc;
+		p->efPoint->bd_accLF = bd_acc;
+		p->efPoint->Hcd_accLF = Hcd_acc;
 	}
 	if(mode==2)
 	{
-		p->efpoint->Hcd_accAF.setZero();
-		p->efpoint->Hdd_accAF = 0;
-		p->efpoint->bd_accAF = 0;
+		p->efPoint->Hcd_accAF.setZero();
+		p->efPoint->Hdd_accAF = 0;
+		p->efPoint->bd_accAF = 0;
 	}
 
 }
@@ -208,8 +208,8 @@ void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional 
 		b.head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
 		for(int h=0;h<nframes[tid];h++)
 		{
-            H.diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->prior;
-            b.segment<8>(CPARS+h*8) += EF->frames[h]->prior.cwiseProduct(EF->frames[h]->delta_prior);
+            H.diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->frame->efFrame->prior;
+            b.segment<8>(CPARS+h*8) += EF->frames[h]->frame->efFrame->prior.cwiseProduct(EF->frames[h]->frame->efFrame->delta_prior);
 		}
 	}
 }
@@ -272,8 +272,8 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(
 		b[tid].head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
 		for(int h=0;h<nframes[tid];h++)
 		{
-            H[tid].diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->prior;
-            b[tid].segment<8>(CPARS+h*8) += EF->frames[h]->prior.cwiseProduct(EF->frames[h]->delta_prior);
+            H[tid].diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->frame->efFrame->prior;
+            b[tid].segment<8>(CPARS+h*8) += EF->frames[h]->frame->efFrame->prior.cwiseProduct(EF->frames[h]->frame->efFrame->delta_prior);
 
 		}
 	}

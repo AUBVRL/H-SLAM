@@ -67,6 +67,7 @@
 #else
 #define NUM_THREADS (6)
 #endif
+using namespace std;
 
 namespace FSLAM
 {
@@ -93,7 +94,9 @@ enum PhotoUnDistMode
     Emptyp
 };
 
-enum ResState {IN=0, OOB=1, OUTLIER=2};
+enum ResState {IN=0, OOB=1, OUT=2};
+enum PtStatus {ACTIVE = 0, OUTLIER = 1, INACTIVE = 2, MARGINALIZED = 3}; //for pointhessians
+enum energyStatus {Good =0, toDrop = 1, toMarg = 2}; // for energy function representation of pointhessians
 
 struct ImageData
 {

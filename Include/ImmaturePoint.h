@@ -4,11 +4,10 @@
  
 #include "GlobalTypes.h"
  
-// #include "FullSystem/HessianBlocks.h"
 namespace FSLAM
 {
 
-class Frame;
+class FrameShell;
 class CalibData;
 
 struct ImmaturePointTemporaryResidual
@@ -18,7 +17,7 @@ public:
 	double state_energy;
 	ResState state_NewState;
 	double state_NewEnergy;
-	std::weak_ptr<Frame> target;
+	shared_ptr<FrameShell> target;
 };
 
 
@@ -35,7 +34,7 @@ class ImmaturePoint
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	// static values
+
 	float color[MAX_RES_PER_POINT];
 	float weights[MAX_RES_PER_POINT];
 
@@ -44,39 +43,25 @@ public:
 	Mat22f gradH_eig;
 	float energyTH;
 	float u,v;
-	std::weak_ptr<Frame> host;
-	std::shared_ptr<CalibData> Calib;
+	shared_ptr<FrameShell> host;
 	int idxInImmaturePoints;
 
 	float quality;
-
 	float my_type;
-
 	float idepth_min;
 	float idepth_max;
-	ImmaturePoint(float u_, float v_, std::shared_ptr<Frame> host_, float type, std::shared_ptr<CalibData> Calib);
-	~ImmaturePoint();
-
-	ImmaturePointStatus traceOn(std::shared_ptr<Frame> frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine, bool debugPrint=false);
+	ImmaturePoint(float u_, float v_, shared_ptr<FrameShell> host_, float type, shared_ptr<CalibData> Calib);
+	~ImmaturePoint(){};
 
 	ImmaturePointStatus lastTraceStatus;
 	Vec2f lastTraceUV;
 	float lastTracePixelInterval;
 
-	float idepth_GT;
+	ImmaturePointStatus traceOn(shared_ptr<FrameShell> frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine,
+								shared_ptr<CalibData>& Calib, bool debugPrint = false);
+	double linearizeResidual( const float outlierTHSlack, shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float &Hdd, float &bd, float idepth, shared_ptr<CalibData> &Calib);
+	float calcResidual(const float outlierTHSlack, shared_ptr<ImmaturePointTemporaryResidual> tmpRes, float idepth, shared_ptr<CalibData> &Calib);
 
-	double linearizeResidual(
-			const float outlierTHSlack,
-			std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes,
-			float &Hdd, float &bd,
-			float idepth);
-
-	float calcResidual(
-			const float outlierTHSlack,
-			std::shared_ptr<ImmaturePointTemporaryResidual> tmpRes,
-			float idepth);
-
-private:
 };
 
 }

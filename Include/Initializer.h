@@ -12,7 +12,7 @@ namespace boost
 namespace FSLAM
 {
 
-class Frame;
+class FrameShell;
 class CalibData;
 class GUI;
 template<typename Type> class IndexThreadReduce;
@@ -25,15 +25,15 @@ struct CheckRTIn
 public:
     float fx, fy, cx, cy;
     cv::Mat R, t, P1, P2, O1, O2;
-    std::vector<bool> *vbMatchesInliers, *vbGood;
-    std::vector<cv::Point2f> *vKeys1, *vKeys2;
-    std::vector<cv::Point3f> *vP3D;
-    std::vector<float> *vCosParallax;
+    vector<bool> *vbMatchesInliers, *vbGood;
+    vector<cv::Point2f> *vKeys1, *vKeys2;
+    vector<cv::Point3f> *vP3D;
+    vector<float> *vCosParallax;
     float th2;
     int nGood;
     CheckRTIn(){};
     ~CheckRTIn(){};
-    std::shared_ptr<boost::mutex> thPoolLock;
+    shared_ptr<boost::mutex> thPoolLock;
 };
 
 class Initializer
@@ -59,6 +59,7 @@ private:
     int FindMatches(int windowSize = 10, int maxL1Error = 7);
     bool FindTransformation(cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeSceneMedianDepth(const int q, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
+    float ComputeSceneMeanDepth(std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated);
     float ComputeMeanOpticalFlow(std::vector<cv::Point2f> &Prev, std::vector<cv::Point2f> &New);
     void ParallelCheckRT (std::shared_ptr<CheckRTIn> In, int min, int max);
     void Deliver();
@@ -94,11 +95,11 @@ private:
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     std::vector<float> videpth;
-    std::shared_ptr<Frame> FirstFrame;
-    std::shared_ptr<Frame> SecondFrame;
+    std::shared_ptr<FrameShell> FirstFrame;
+    std::shared_ptr<FrameShell> SecondFrame;
     SE3 Pose;
 
-    bool Initialize(std::shared_ptr<Frame> _Frame);
+    bool Initialize(std::shared_ptr<FrameShell> _Frame);
     Initializer(std::shared_ptr<CalibData> _Calib,  std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft, std::shared_ptr<GUI>_DisplayHandler);
     ~Initializer(){};
 
@@ -119,8 +120,8 @@ private:
     Accumulator9 acc9;
 	Accumulator9 acc9SC;
 
-    std::shared_ptr<Frame> FirstFrame;
-    std::shared_ptr<Frame> SecondFrame;
+    std::shared_ptr<FrameShell> FirstFrame;
+    std::shared_ptr<FrameShell> SecondFrame;
     std::shared_ptr<CalibData> Calib;
     std::shared_ptr<cv::RNG> randomGen;
 
@@ -149,8 +150,8 @@ public:
     AffLight thisToNext_aff;
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    DirectRefinement(std::shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &Pts3D, std::vector<bool> &Triangulated, std::shared_ptr<Frame> _FirstFrame,
-                     std::shared_ptr<Frame> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth);
+    DirectRefinement(std::shared_ptr<CalibData> _Calib, std::vector<cv::Point3f> &Pts3D, std::vector<bool> &Triangulated, std::shared_ptr<FrameShell> _FirstFrame,
+                     std::shared_ptr<FrameShell> _SecondFrame, SE3 &_Pose, std::vector<float> &_videpth);
     ~DirectRefinement();
     
 };

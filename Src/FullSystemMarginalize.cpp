@@ -7,20 +7,8 @@
 #include "Frame.h"
 #include "MapPoint.h"
 #include "Display.h"
-// #include <Eigen/LU>
-// #include <algorithm>
-// #include "IOWrapper/ImageDisplay.h"
-// #include "util/globalCalib.h"
-
-// #include <Eigen/SVD>
-// #include <Eigen/Eigenvalues>
-// #include "FullSystem/ResidualProjections.h"
 #include "ImmaturePoint.h"
-
 #include "EnergyFunctional.h"
-// #include "EnergyFunctionalStructs.h"
-
-// #include "IOWrapper/Output3DWrapper.h"
 
 #include "CoarseTracker.h"
 
@@ -33,28 +21,29 @@ void System::flagFramesForMarginalization()
 	{
 		for(int i=setting_maxFrames;i<(int)frameHessians.size();i++)
 		{
-			auto fh = frameHessians[i-setting_maxFrames];
-			fh->FlaggedForMarginalization = true;
+			auto &fh = frameHessians[i-setting_maxFrames];
+			fh->frame->FlaggedForMarginalization = true;
 		}
 		return;
 	}
 
 	int flagged = 0;
 	// marginalize all frames that have not enough points.
-	for(auto fh : frameHessians)
+	for(auto &fh : frameHessians)
 	{
 		int in = 0;
 		int out = 0;
-		for (auto &it : fh->pointHessians)
+		for (auto &it : fh->frame->pointHessians)
 		{
 			if(!it)
 				continue;
-			if(it->status == MapPoint::ACTIVE)
+			PtStatus status = it->getPointStatus();
+			if( status == ACTIVE)
 				in++;
-			else if (it->status == MapPoint::OUTLIER || it->status == MapPoint::MARGINALIZED)
+			else if (status == OUTLIER || status == MARGINALIZED)
 				out++;
 		}
-		for (auto &it2 : fh->ImmaturePoints)
+		for (auto &it2 : fh->frame->ImmaturePoints)
 		{
 			if(!it2)
 				continue;
@@ -63,12 +52,12 @@ void System::flagFramesForMarginalization()
 			in++;
 		}
 
-		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure, frameHessians.back()->aff_g2l(), fh->aff_g2l());
+		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure, frameHessians.back()->frame->efFrame->aff_g2l(), fh->frame->efFrame->aff_g2l());
 
 
 		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow) && ((int)frameHessians.size())-flagged > setting_minFrames)
 		{
-			fh->FlaggedForMarginalization = true;
+			fh->frame->FlaggedForMarginalization = true;
 			flagged++;
 		}
 	}
@@ -77,23 +66,23 @@ void System::flagFramesForMarginalization()
 	if((int)frameHessians.size()-flagged >= setting_maxFrames)
 	{
 		double smallestScore = 1;
-		std::shared_ptr<Frame> toMarginalize;
+		std::shared_ptr<FrameShell> toMarginalize;
 		auto latest = frameHessians.back();
 
 
-		for(auto fh : frameHessians)
+		for(auto &fh : frameHessians)
 		{
-			if(fh->id > latest->id-setting_minFrameAge || fh->id == 0) continue;
+			if(fh->KfId > latest->KfId-setting_minFrameAge || fh->KfId == 0) continue;
 			//if(fh==frameHessians.front() == 0) continue;
 
 			double distScore = 0;
-			for(FrameFramePrecalc &ffh : fh->targetPrecalc)
+			for(FrameFramePrecalc &ffh : fh->frame->targetPrecalc)
 			{
-				if(ffh.target.lock()->id > latest->id-setting_minFrameAge+1 || ffh.target.lock() == ffh.host.lock()) continue;
+				if(ffh.target->KfId > latest->KfId-setting_minFrameAge+1 || ffh.target == ffh.host) continue;
 				distScore += 1/(1e-5+ffh.distanceLL);
 
 			}
-			distScore *= -sqrtf(fh->targetPrecalc.back().distanceLL);
+			distScore *= -sqrtf(fh->frame->targetPrecalc.back().distanceLL);
 
 
 			if(distScore < smallestScore)
@@ -105,7 +94,7 @@ void System::flagFramesForMarginalization()
 
 //		printf("MARGINALIZE frame %d, as it is the closest (score %.2f)!\n",
 //				toMarginalize->frameID, smallestScore);
-		toMarginalize->FlaggedForMarginalization = true;
+		toMarginalize->frame->FlaggedForMarginalization = true;
 		flagged++;
 	}
 
@@ -118,7 +107,7 @@ void System::flagFramesForMarginalization()
 
 
 
-void System::marginalizeFrame(std::shared_ptr<Frame> frame)
+void System::marginalizeFrame(std::shared_ptr<FrameShell> frame)
 {
 	// marginalize or remove all this frames points.
 
@@ -129,37 +118,37 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 
 	// drop all observations of existing points in that frame.
 
-	for (auto fh : frameHessians)
+	for (auto &fh : frameHessians)
 	{
 		if (fh == frame)
 			continue;
 
-		for (auto ph : fh->pointHessians)
+		for (auto &ph : fh->frame->pointHessians)
 		{
 			if (ph)
 			{
-				if (ph->status == MapPoint::ACTIVE)
+				if (ph->getPointStatus() == ACTIVE)
 				{
 					size_t n = ph->residuals.size();
-					for (unsigned int i = 0, iend = ph->residuals.size(); i < iend; i++)
+					for (unsigned int i = 0; i < n; i++)
 					{
 						std::shared_ptr<PointFrameResidual> r = ph->residuals[i];
 						
-						if (r->target.lock() == frame)
+						if (r->target == frame)
 						{
 							if (ph->lastResiduals[0].first == r)
 								ph->lastResiduals[0].first.reset();
 							else if (ph->lastResiduals[1].first == r)
 								ph->lastResiduals[1].first.reset();
 
-							// if(r->host->frameID < r->target->frameID)
+							// if(r->host->KfId < r->target->KfId)
 							// 	statistics_numForceDroppedResFwd++;
 							// else
 							// 	statistics_numForceDroppedResBwd++;
 
-							ef->dropResidual(r);
-							// i--;
-							// n--;
+							ef->dropResidual(ph, r); //this should remove the only holding copy of the pointframeresidual
+							i--;
+							n--;
 							// deleteOut<PointFrameResidual>(ph->residuals, i);
 							break;
 						}
@@ -178,18 +167,18 @@ void System::marginalizeFrame(std::shared_ptr<Frame> frame)
 
 
 	frame->MarginalizedAt = frameHessians.back()->id;
-	frame->MovedByOpt = frame->w2c_leftEps().norm();
-	frame->ReduceToEssential(true);
+	frame->frame->MovedByOpt = frame->frame->efFrame->w2c_leftEps().norm();
+	frame->frame->ReduceToEssential();
 
 	if (DisplayHandler)
 	{
 		boost::unique_lock<boost::mutex> lock(DisplayHandler->KeyframesMutex); 
-		frame->NeedRefresh = true;
+		frame->frame->NeedRefresh = true;
 	}
 
-	deleteOutOrder<Frame>(frameHessians, frame);
+	deleteOutOrder<FrameShell>(frameHessians, frame);
 	for(unsigned int i=0;i<frameHessians.size();i++)
-		frameHessians[i]->idx = i;
+		frameHessians[i]->frame->idx = i;
 
 	setPrecalcValues();
 	ef->setAdjointsF(Calib);
