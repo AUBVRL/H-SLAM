@@ -370,6 +370,7 @@ double EnergyFunctional::calcLEnergyF_MT()
 
 void EnergyFunctional::insertResidual(shared_ptr<PointFrameResidual>& r, int i)
 {
+	r->takeData();
 	r->isLinearized = false;
 	r->isActiveAndIsGoodNEW = false;
 	r->idxInAll = i;//r->point->residuals.size(); //debug this!!
