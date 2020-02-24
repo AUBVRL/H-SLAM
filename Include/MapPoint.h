@@ -114,6 +114,20 @@ struct MapPoint
         efPoint = shared_ptr<MapPointOptimizationData>(new MapPointOptimizationData()); //remove this during reduce essential for all points of a keyframe.
     }
 
+    inline void Clear()
+    {
+        if(residuals.size()>0)
+            residuals.clear();
+
+        if (lastResiduals[0].first)
+            lastResiduals[0].first.reset();
+        if (lastResiduals[1].first)
+            lastResiduals[1].first.reset();
+
+        if (efPoint)
+            efPoint.reset();
+    }
+
     inline ~MapPoint() {}
 
     inline bool isOOB( const vector<shared_ptr<FrameShell>> &toMarg) const

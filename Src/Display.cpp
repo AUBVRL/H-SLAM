@@ -393,7 +393,7 @@ void KFDisplay::RefreshPC(std::shared_ptr<FrameShell> _In)
     float fyi = _In->frame->Calib->fyli();
     float cyi = _In->frame->Calib->cyli();
 
-    int numSparsePoints = _In->frame->pointHessians.size() + _In->frame->ImmaturePoints.size();
+    int numSparsePoints = _In->frame->pointHessians.size() + _In->frame->ImmaturePoints.size() + _In->frame->pointHessiansMarginalized.size();
     Vec3f* tmpVertexBuffer = new Vec3f[numSparsePoints*patternNum];
 	Vec3b* tmpColorBuffer = new Vec3b[numSparsePoints*patternNum];
 	int vertexBufferNumPoints=0;
@@ -421,13 +421,39 @@ void KFDisplay::RefreshPC(std::shared_ptr<FrameShell> _In)
 			tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
 
 
-            if (it->getPointStatus() == ACTIVE)
+            // if (it->getPointStatus() == ACTIVE)
                 tmpColorBuffer[vertexBufferNumPoints] = blue;
-            else if (it->getPointStatus() == MARGINALIZED)
-                tmpColorBuffer[vertexBufferNumPoints] = Vec3b(it->color[pnt], it->color[pnt], it->color[pnt]);
-            else if (it->getPointStatus() == OUTLIER)
-                tmpColorBuffer[vertexBufferNumPoints] = red;   
+            // else if (it->getPointStatus() == MARGINALIZED)
+            //     tmpColorBuffer[vertexBufferNumPoints] = Vec3b(it->color[pnt], it->color[pnt], it->color[pnt]);
+            // else if (it->getPointStatus() == OUTLIER)
+            //     tmpColorBuffer[vertexBufferNumPoints] = red;   
 
+            vertexBufferNumPoints++;
+		}
+    }
+
+     for(auto it:_In->frame->pointHessiansMarginalized) //this thread locks the shared_ptr in case it was removed elsewhere!
+    {
+        if(!it) continue;
+        // if(it->getPointStatus() == INACTIVE) continue;
+        if(it->idepth < 0) continue;
+        float depth = 1.0f / it->idepth;
+		float depth4 = depth*depth; depth4*= depth4;
+		float var = (1.0f / (it->idepth_hessian+0.01));
+        if(var * depth4 > my_scaledTH) continue;
+		if(var > my_absTH) continue;
+        if(it->maxRelBaseline < my_minRelBS) continue;
+        for(int pnt=0;pnt<patternNum;pnt++)
+		{
+			if(my_sparsifyFactor > 1 && rand()%my_sparsifyFactor != 0) continue;
+			int dx = patternP[pnt][0];
+			int dy = patternP[pnt][1];
+
+			tmpVertexBuffer[vertexBufferNumPoints][0] = ((it->u+dx)*fxi + cxi) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][1] = ((it->v+dy)*fyi + cyi) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
+
+            tmpColorBuffer[vertexBufferNumPoints] = Vec3b(it->color[pnt], it->color[pnt], it->color[pnt]);
             vertexBufferNumPoints++;
 		}
     }

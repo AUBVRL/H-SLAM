@@ -144,7 +144,7 @@ void EnergyFunctional::setDeltaF(shared_ptr<CalibData>& HCalib)
 		f->frame->efFrame->delta_prior = (f->frame->efFrame->get_state() - f->frame->efFrame->getPriorZero()).head<8>();
 
 		for(auto &p : f->frame->pointHessians)
-            if(p && p->efPoint) // p->getPointStatus() == ACTIVE
+            // if(p && p->efPoint) // p->getPointStatus() == ACTIVE
 			    p->efPoint->deltaF = p->idepth - p->efPoint->idepth_zero;
 	}
 
@@ -167,8 +167,7 @@ void EnergyFunctional::accumulateAF_MT(MatXX &H, VecX &b, bool MT)
 		accSSE_top_A->setZero(nFrames);
 		for(auto &f : frames)
 			for(auto &p : f->frame->pointHessians)
-                if(p && p->efPoint) //->getPointStatus() == ACTIVE
-				    accSSE_top_A->addPoint<0>(p,this);
+			    accSSE_top_A->addPoint<0>(p,this);
 
 		accSSE_top_A->stitchDoubleMT(red,H,b,this,false,false);
 		resInA = accSSE_top_A->nres[0];
@@ -191,8 +190,7 @@ void EnergyFunctional::accumulateLF_MT(MatXX &H, VecX &b, bool MT)
 		accSSE_top_L->setZero(nFrames);
 		for(auto &f : frames)
 			for(auto &p : f->frame->pointHessians)
-                if(p && p->efPoint) //->getPointStatus() == ACTIVE
-    				accSSE_top_L->addPoint<1>(p,this);
+				accSSE_top_L->addPoint<1>(p,this);
 		accSSE_top_L->stitchDoubleMT(red,H,b,this,true,false);
 		resInL = accSSE_top_L->nres[0];
 	}
@@ -216,8 +214,7 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 		accSSE_bot->setZero(nFrames);
 		for(auto &f : frames)
 			for(auto &p : f->frame->pointHessians)
-                if(p && p->efPoint) //p->getPointStatus() == ACTIVE
-    				accSSE_bot->addPoint(p, true);
+				accSSE_bot->addPoint(p, true);
 		accSSE_bot->stitchDoubleMT(red, H, b,this,false);
 	}
 }
@@ -371,12 +368,11 @@ double EnergyFunctional::calcLEnergyF_MT()
 }
 
 
-void EnergyFunctional::insertResidual(shared_ptr<MapPoint>& ph, shared_ptr<PointFrameResidual>& r)
+void EnergyFunctional::insertResidual(shared_ptr<PointFrameResidual>& r, int i)
 {
 	r->isLinearized = false;
 	r->isActiveAndIsGoodNEW = false;
-	
-	r->idxInAll = ph->residuals.size(); //debug this!!
+	r->idxInAll = i;//r->point->residuals.size(); //debug this!!
     connectivityMap[(((uint64_t)r->host->KfId) << 32) + ((uint64_t)r->target->KfId)][0]++;
 	nResiduals++;
 	return;
@@ -419,7 +415,8 @@ void EnergyFunctional::insertPoint(shared_ptr<MapPoint>& ph)
 	// EFPoint* efp = new EFPoint(ph, ph->host->efFrame);
 	// efp->idxInPoints = ph->host->efFrame->points.size();
 	// ph->host->efFrame->points.push_back(efp);
-
+	ph->efPoint->stateFlag = energyStatus::Good;
+	ph->efPoint->takeData(ph->hasDepthPrior, ph->idepth);
 	nPoints++;
 	// ph->efPoint = efp;
 	EFIndicesValid = false;
@@ -427,9 +424,9 @@ void EnergyFunctional::insertPoint(shared_ptr<MapPoint>& ph)
 }
 
 
-void EnergyFunctional::dropResidual(shared_ptr<MapPoint>& p, shared_ptr<PointFrameResidual> r)
+void EnergyFunctional::dropResidual(shared_ptr<PointFrameResidual> r)
 {
-	
+	shared_ptr<MapPoint> p = r->point;
 	// assert(r == p->residuals[r->idxInAll]);
      for (shared_ptr<PointFrameResidual> &t: p->residuals) {
                 if (t == r) {
@@ -438,6 +435,7 @@ void EnergyFunctional::dropResidual(shared_ptr<MapPoint>& p, shared_ptr<PointFra
                     break;
                 }
             }
+	
 	// p->residuals[r->idxInAll] = p->residuals.back();
 	// p->residuals[r->idxInAll]->idxInAll = r->idxInAll;
 	// p->residuals.pop_back();
@@ -450,6 +448,7 @@ void EnergyFunctional::dropResidual(shared_ptr<MapPoint>& p, shared_ptr<PointFra
 
     connectivityMap[(((uint64_t)r->host->KfId) << 32) + ((uint64_t)r->target->KfId)][0]--;
 	nResiduals--;
+	r->Clear();
 	return;
 }
 
@@ -552,13 +551,13 @@ void EnergyFunctional::marginalizePointsF()
 	allPointsToMarg.clear();
 	for(auto &f : frames)
 	{
-		for(int i=0;i<(int)f->frame->pointHessians.size();i++)
+		for(int i=0;i<(int)f->frame->pointHessiansMarginalized.size();i++)
 		{
-            auto &p = f->frame->pointHessians[i];
-            if(!p || !p->efPoint) //->getPointStatus() != ACTIVE
+            auto &p = f->frame->pointHessiansMarginalized[i];
+            if(!p->efPoint) //|| !p->efPoint) //->getPointStatus() != ACTIVE
                 continue;
 
-			if(p->efPoint-> stateFlag == energyStatus::toMarg)
+			if(p->efPoint->stateFlag == energyStatus::toMarg)
 			{
 				p->efPoint->priorF *= setting_idepthFixPriorMargFac;
 				for(auto &r : p->residuals)
@@ -612,12 +611,11 @@ void EnergyFunctional::dropPointsF()
 {
 	for(auto &f : frames)
 	{
-		for(int i=0;i<(int)f->frame->pointHessians.size();i++)
+		for(int i=0;i<(int)f->frame->pointHessiansOut.size();i++)
 		{
-			auto &p = f->frame->pointHessians[i];
-             if(!p || !p->efPoint) // ->getPointStatus()!= ACTIVE
-                continue;
-
+			auto &p = f->frame->pointHessiansOut[i];
+			if(!p->efPoint)
+				continue;
 			if(p->efPoint->stateFlag == energyStatus::toDrop)
 			{
 				removePoint(p);
@@ -637,11 +635,9 @@ void EnergyFunctional::removePoint(shared_ptr<MapPoint>& p)
         connectivityMap[(((uint64_t) r->host->KfId) << 32) + ((uint64_t) r->target->KfId)][0]--;
         nResiduals --;
     }
-
-    p->residuals.clear();
+	
     p->setPointStatus( p->efPoint->stateFlag == energyStatus::toDrop ? OUTLIER : MARGINALIZED );
-
-    p->efPoint.reset();
+	p->Clear();	
 
 	nPoints--;
 	EFIndicesValid = false;
@@ -829,8 +825,8 @@ void EnergyFunctional::makeIDX()
 	for(auto &f : frames)
 		for(auto &p : f->frame->pointHessians)
 		{
-            if(!p || !p->efPoint ) //p->getPointStatus() != ACTIVE
-                continue;
+            // if(!p || !p->efPoint ) //p->getPointStatus() != ACTIVE
+            //     continue;
 			allPoints.push_back(p);
 			for(auto &r : p->residuals)
 			{

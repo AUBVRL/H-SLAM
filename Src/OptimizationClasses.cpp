@@ -40,7 +40,7 @@ namespace FSLAM
 
 
 
-    double PointFrameResidual::linearize(shared_ptr<MapPoint> &point, shared_ptr<CalibData>& HCalib)
+    double PointFrameResidual::linearize(shared_ptr<CalibData>& HCalib)
     {
       state_NewEnergyWithOutlier = -1;
 
@@ -255,7 +255,7 @@ namespace FSLAM
       state_energy = state_NewEnergy;
     }
 
-    void PointFrameResidual::fixLinearizationF(shared_ptr<MapPoint>& point, shared_ptr<EnergyFunctional>& ef) {
+    void PointFrameResidual::fixLinearizationF(shared_ptr<EnergyFunctional>& ef) {
 
             Vec8f dp = ef->adHTdeltaF[hostIDX + ef->nFrames * targetIDX];
 

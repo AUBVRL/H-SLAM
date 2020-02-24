@@ -30,6 +30,7 @@ public:
     void CreateDirPyrs(std::vector<float>& Img, std::vector<Vec3f*> &DirPyr);
     void ReduceToEssential();
     bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+    void Extract(int id ,bool ForInit, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft);
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
 
 
@@ -43,8 +44,8 @@ public:
     std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
     
     std::vector<std::shared_ptr<MapPoint>> pointHessians;				// contains all ACTIVE points.
-	// std::vector<std::shared_ptr<MapPoint>> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
-	// std::vector<std::shared_ptr<MapPoint>> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
+	std::vector<std::shared_ptr<MapPoint>> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
+	std::vector<std::shared_ptr<MapPoint>> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
     std::vector<std::shared_ptr<ImmaturePoint>> ImmaturePoints;
 
     cv::Mat Descriptors;

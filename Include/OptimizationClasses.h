@@ -35,8 +35,10 @@ struct FrameFramePrecalc
 
     inline ~FrameFramePrecalc() 
 	{
-		host.reset();
-		target.reset();
+		if(host)
+			host.reset();
+		if(target)
+			target.reset();
 	}
     inline FrameFramePrecalc() { }
     void set(shared_ptr<FrameShell>& _host, shared_ptr<FrameShell>& _target, shared_ptr<CalibData>& HCalib);
@@ -88,7 +90,7 @@ public:
 
 	void setState(ResState s) {state_state = s;}
 
-	// shared_ptr<MapPoint> point;
+	shared_ptr<MapPoint> point;
 	shared_ptr<FrameShell> host;
 	shared_ptr<FrameShell> target;
 	shared_ptr<RawResidualJacobian> J;
@@ -103,21 +105,30 @@ public:
 	{
 		J = shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
 	}
-	PointFrameResidual(shared_ptr<FrameShell>& host_, shared_ptr<FrameShell> target_): host(host_), target(target_) //point(point_), shared_ptr<MapPoint> &point_,
+	PointFrameResidual(shared_ptr<MapPoint> point_, shared_ptr<FrameShell>& host_, shared_ptr<FrameShell> target_): point(point_), host(host_), target(target_) //point(point_), shared_ptr<MapPoint> &point_,
 	{
 		resetOOB();
 		J = shared_ptr<RawResidualJacobian>(new RawResidualJacobian);
 		isNew = true;
 
 	}
+
+	inline void Clear()
+	{
+		if(point)
+			point.reset();
+		if(host)
+			host.reset();
+		if(target)
+			target.reset();
+		if(J)
+			J.reset();
+	}
 	inline ~PointFrameResidual()
 	{
-		//point.reset();
-		host.reset();
-		target.reset();
-		J.reset();
+		Clear();
 	}
-	double linearize(shared_ptr<MapPoint> &point, std::shared_ptr<CalibData> &HCalib);
+	double linearize(std::shared_ptr<CalibData> &HCalib);
 
 
 	void resetOOB()
@@ -131,7 +142,7 @@ public:
 
 	
     inline bool isActive() const { return isActiveAndIsGoodNEW; }
-    void fixLinearizationF(shared_ptr<MapPoint>& point, shared_ptr<EnergyFunctional>& ef); 	// fix the jacobians
+    void fixLinearizationF(shared_ptr<EnergyFunctional>& ef); 	// fix the jacobians
 	int hostIDX = 0;
 	int targetIDX = 0;
 	int idxInAll;

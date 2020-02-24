@@ -49,7 +49,7 @@ public:
 	CoarseDistanceMap* coarseDistanceMap;
 
     vector<shared_ptr<FrameShell>> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
-	vector<pair<shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>> activeResiduals;
+	vector<shared_ptr<PointFrameResidual>> activeResiduals;
 	float currentMinActDist;
     
     boost::mutex trackMutex;
@@ -92,7 +92,7 @@ public:
 	void loadSateBackup();
 	double calcLEnergy();
 	double calcMEnergy();
-	void linearizeAll_Reductor(bool fixLinearization, vector< pair< shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>>* toRemove, int min, int max, Vec10* stats, int tid);
+	void linearizeAll_Reductor(bool fixLinearization,  vector<shared_ptr<PointFrameResidual>>* toRemove, int min, int max, Vec10* stats, int tid);
 	void activatePointsMT_Reductor(vector<shared_ptr<MapPoint>>* optimized, vector<shared_ptr<ImmaturePoint>>* toOptimize,int min, int max, Vec10* stats, int tid);
 	void applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid);
    	void printOptRes(const Vec3 &res, double resL, double resM, double resPrior, double LExact, float a, float b);

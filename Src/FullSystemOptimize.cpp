@@ -16,31 +16,31 @@ namespace FSLAM
 {
 
 
-void System::linearizeAll_Reductor(bool fixLinearization, vector<pair<shared_ptr<MapPoint>,shared_ptr<PointFrameResidual>>>* toRemove, int min, int max, Vec10* stats, int tid)
+void System::linearizeAll_Reductor(bool fixLinearization, vector<shared_ptr<PointFrameResidual>>* toRemove, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
 	{
-		auto r = activeResiduals[k];
-		(*stats)[0] += r.second->linearize(r.first, Calib);
+		auto &r = activeResiduals[k];
+		(*stats)[0] += r->linearize(Calib);
 
 		if(fixLinearization)
 		{
-			r.second->applyRes(true);
+			r->applyRes(true);
 
-			if(r.second->isActive())
+			if(r->isActive())
 			{
-				if(r.second->isNew)
+				if(r->isNew)
 				{
-					// auto p = r->point.lock();
-					Vec3f ptp_inf = r.second->host->frame->targetPrecalc[r.second->target->frame->idx].PRE_KRKiTll * Vec3f(r.first->u,r.first->v, 1);	// projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + r.second->host->frame->targetPrecalc[r.second->target->frame->idx].PRE_KtTll* r.first->idepth;	// projected point with real depth.
+					auto p = r->point;
+					Vec3f ptp_inf = r->host->frame->targetPrecalc[r->target->frame->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1);	// projected point assuming infinite depth.
+					Vec3f ptp = ptp_inf + r->host->frame->targetPrecalc[r->target->frame->idx].PRE_KtTll* p->idepth;	// projected point with real depth.
 					float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 
-					if(relBS > r.first->maxRelBaseline)
-						r.first->maxRelBaseline = relBS;
+					if(relBS > p->maxRelBaseline)
+						p->maxRelBaseline = relBS;
 
-					r.first->numGoodResiduals++;
+					p->numGoodResiduals++;
 				}
 			}
 			else
@@ -55,7 +55,7 @@ void System::linearizeAll_Reductor(bool fixLinearization, vector<pair<shared_ptr
 void System::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
-		activeResiduals[k].second->applyRes(true);
+		activeResiduals[k]->applyRes(true);
 }
 void System::setNewFrameEnergyTH()
 {
@@ -65,9 +65,9 @@ void System::setNewFrameEnergyTH()
 	shared_ptr<FrameShell> newFrame = frameHessians.back();
 
 	for(auto &r : activeResiduals)
-		if(r.second->state_NewEnergyWithOutlier >= 0 && r.second->target == newFrame)
+		if(r->state_NewEnergyWithOutlier >= 0 && r->target == newFrame)
 		{
-			allResVec.push_back(r.second->state_NewEnergyWithOutlier);
+			allResVec.push_back(r->state_NewEnergyWithOutlier);
 		}
 
 	if(allResVec.size()==0)
@@ -106,7 +106,7 @@ Vec3 System::linearizeAll(bool fixLinearization)
 	double num = 0;
 
 
-	vector<pair<shared_ptr<MapPoint>, shared_ptr<PointFrameResidual>>> toRemove[NUM_THREADS];
+	vector<shared_ptr<PointFrameResidual>> toRemove[NUM_THREADS];
 	for(int i=0;i<NUM_THREADS;i++) toRemove[i].clear();
 
 	if(multiThreading)
@@ -127,25 +127,33 @@ Vec3 System::linearizeAll(bool fixLinearization)
 	{
 		for(auto &r : activeResiduals)
 		{
-			auto &ph = r.first;
-			if(ph->lastResiduals[0].first == r.second)
-				ph->lastResiduals[0].second = r.second->state_state;
-			else if(ph->lastResiduals[1].first == r.second)
-				ph->lastResiduals[1].second = r.second->state_state;
+			auto &ph = r->point;
+			if(ph->lastResiduals[0].first == r)
+				ph->lastResiduals[0].second = r->state_state;
+			else if(ph->lastResiduals[1].first == r)
+				ph->lastResiduals[1].second = r->state_state;
 		}
 
 		for(int i=0;i<NUM_THREADS;i++)
 		{
 			for(auto r : toRemove[i])
 			{
-				auto &ph = r.first;
+				auto &ph = r->point;
 
-				if(ph->lastResiduals[0].first == r.second)
+				if(ph->lastResiduals[0].first == r)
 					ph->lastResiduals[0].first.reset();
-				else if (ph->lastResiduals[1].first == r.second)
+				else if (ph->lastResiduals[1].first == r)
 					ph->lastResiduals[1].first.reset();
 
-				ef->dropResidual(ph, r.second);
+				for(unsigned int k=0; k<ph->residuals.size();k++)
+					if(ph->residuals[k] == r)
+					{
+						ef->dropResidual(r);
+						// ph->residuals[k].reset();
+						// ph->residuals[k] = ph->residuals.back();
+						// ph->residuals.pop_back();
+						break;
+					}
 				
 			}
 		}
@@ -191,8 +199,6 @@ bool System::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float
 
 			for(auto &ph : fh->frame->pointHessians)
 			{
-				if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE
-					continue;
 				float step = ph->efPoint->step+0.5f*(ph->efPoint->step_backup);
 				ph->setIdepth(ph->efPoint->idepth_backup + step);
 				sumID += step*step;
@@ -216,8 +222,6 @@ bool System::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float
 
 			for(auto &ph : fh->frame->pointHessians)
 			{
-				if(!ph || !ph->efPoint) // ph->getPointStatus() != ACTIVE)
-					continue;
 				ph->setIdepth(ph->efPoint->idepth_backup + stepfacD*ph->efPoint->step);
 				sumID += ph->efPoint->step*ph->efPoint->step;
 				sumNID += fabsf(ph->efPoint->idepth_backup);
@@ -276,8 +280,6 @@ void System::backupState(bool backupLastStep)
 				fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
 				for(auto &ph : fh->frame->pointHessians)
 				{
-					if(!ph || !ph->efPoint)// ph->getPointStatus() != ACTIVE)
-						continue;
 					ph->efPoint->idepth_backup = ph->idepth;
 					ph->efPoint->step_backup = ph->efPoint->step;
 				}
@@ -293,8 +295,6 @@ void System::backupState(bool backupLastStep)
 				fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
 				for(auto &ph : fh->frame->pointHessians)
 				{
-					if(!ph || !ph->efPoint)//ph->getPointStatus() != ACTIVE)
-						continue;
 					ph->efPoint->idepth_backup = ph->idepth;
 					ph->efPoint->step_backup=0;
 				}
@@ -308,8 +308,7 @@ void System::backupState(bool backupLastStep)
 		{
 			fh->frame->efFrame->state_backup = fh->frame->efFrame->get_state();
 			for(auto &ph : fh->frame->pointHessians)
-				if(ph && ph->efPoint) //ph->getPointStatus() == ACTIVE)
-					ph->efPoint->idepth_backup = ph->idepth;
+				ph->efPoint->idepth_backup = ph->idepth;
 		}
 	}
 }
@@ -323,10 +322,7 @@ void System::loadSateBackup()
 		fh->frame->efFrame->setState(fh->frame->efFrame->state_backup);
 		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE)
-				continue;
 			ph->setIdepth(ph->efPoint->idepth_backup);
-
             ph->efPoint->setIdepthZero(ph->efPoint->idepth_backup);
 		}
 
@@ -378,14 +374,14 @@ float System::optimize(int mnumOptIts)
 	for(auto &fh : frameHessians)
 		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE)
-				continue;
+			// if(!ph || !ph->efPoint) //ph->getPointStatus() != ACTIVE)
+			// 	continue;
 			
 			for(auto &r : ph->residuals)
 			{
 				if(!r->isLinearized)
 				{
-					activeResiduals.push_back(make_pair(ph,r));
+					activeResiduals.push_back((r));
 					r->resetOOB();
 				}
 				else
@@ -581,21 +577,37 @@ void System::removeOutliers()
 	int numPointsDropped=0;
 	for(auto &fh : frameHessians)
 	{
-		for(auto &ph : fh->frame->pointHessians)
+		for(unsigned int i=0; i < fh->frame->pointHessians.size(); i++)
 		{
-			if(!ph || !ph->efPoint)  //->getPointStatus() != ACTIVE
+			std::shared_ptr<MapPoint>& ph = fh->frame->pointHessians[i];
+			if(!ph )
 				continue;
 			// if(ph->status!= MapPoint::ACTIVE)
 			// 	continue;
 			if(ph->residuals.size() == 0)
 			{
+				fh->frame->pointHessiansOut.push_back(ph);
 				ph->efPoint->stateFlag = energyStatus::toDrop;
+				fh->frame->pointHessians[i] = fh->frame->pointHessians.back();
+				fh->frame->pointHessians.pop_back();
+				i--;
 				// ph->setPointStatus(OUTLIER); //debug this
 				numPointsDropped++;
 			}
 		}
+
+		for (auto& ph: fh->frame->pointHessiansOut)
+		{
+			if(!ph || !ph->efPoint)
+				continue;
+			if(ph->efPoint->stateFlag == energyStatus::toDrop)
+				ef->removePoint(ph);		
+		}
 	}
-	ef->dropPointsF();
+
+	EFIndicesValid = false;
+	ef->makeIDX();
+	// ef->dropPointsF();
 }
 
 

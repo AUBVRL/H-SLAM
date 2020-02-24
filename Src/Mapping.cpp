@@ -41,17 +41,15 @@ void System::AddKeyframe(std::shared_ptr<FrameShell> fh)
     int numFwdResAdde = 0;
     for (auto &fh1 : frameHessians) // go through all active frames
     {
-        if (fh1 == fh)
-            continue;
+        if (fh1 == fh) continue;
         for (auto &ph : fh1->frame->pointHessians)
         {
-            if(!ph || ph->getPointStatus() != ACTIVE)
-                continue;
-            shared_ptr<PointFrameResidual> r = shared_ptr<PointFrameResidual>(new PointFrameResidual(fh1, fh));
+            // if(!ph || ph->getPointStatus() != ACTIVE)
+            //     continue;
+            shared_ptr<PointFrameResidual> r = shared_ptr<PointFrameResidual>(new PointFrameResidual(ph, fh1, fh));
             r->setState(ResState::IN);
-            
             ph->residuals.push_back(r);
-            ef->insertResidual(ph, r);
+            ef->insertResidual(r, ph->residuals.size());
             ph->lastResiduals[1] = ph->lastResiduals[0];
             ph->lastResiduals[0] = std::pair<std::shared_ptr<PointFrameResidual>, ResState>(r, ResState::IN);
             numFwdResAdde += 1;
@@ -188,6 +186,9 @@ void System::MappingThread()
                     frame->camToWorld = frame->trackingRef->camToWorld * frame->camToTrackingRef;
                     frame->frame->efFrame->setEvalPT_scaled(frame->camToWorld.inverse(), frame->aff_g2l);
                 }
+                
+                frame->frame->efFrame.reset();
+                frame->frame.reset();
                 frame.reset();
             }
         }
@@ -227,7 +228,10 @@ void System::makeNewTraces(std::shared_ptr<FrameShell> newFrame)
     // pixelSelector->allowFast = true;
     //int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
     // int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
-
+    newFrame->frame->Extract(newFrame->id, false, FrontEndThreadPoolLeft);
+    newFrame->frame->pointHessians.reserve(newFrame->frame->nFeatures);
+	newFrame->frame->pointHessiansMarginalized.reserve(newFrame->frame->nFeatures);
+	newFrame->frame->pointHessiansOut.reserve(newFrame->frame->nFeatures);
 
     for (int i = 0; i < newFrame->frame->nFeatures; ++i)
     {
@@ -237,7 +241,7 @@ void System::makeNewTraces(std::shared_ptr<FrameShell> newFrame)
         if (!std::isfinite(impt->energyTH))
             continue;
         else
-            newFrame->frame->ImmaturePoints[i] = impt;
+            newFrame->frame->ImmaturePoints.push_back(impt);
     }
 }
 
@@ -258,14 +262,15 @@ void System::flagPointsForRemoval()
         for (unsigned int i = 0; i < host->frame->pointHessians.size(); i++)
         {
             auto &ph = host->frame->pointHessians[i];
-            if (!ph || ph->getPointStatus() != ACTIVE)
+            if (!ph)
                 continue;
 
             if (ph->idepth < 0 || ph->residuals.size() == 0)
             {
                 ph->efPoint->stateFlag = energyStatus::toDrop;
                 ph->setPointStatus(OUTLIER);
-                // host->pointHessians[i] = 0;
+                host->frame->pointHessiansOut.push_back(ph);
+                host->frame->pointHessians[i] = nullptr;
                 flag_nores++;
             }
             else if (ph->isOOB(fhsToMargPoints) || host->frame->FlaggedForMarginalization)
@@ -278,12 +283,12 @@ void System::flagPointsForRemoval()
                     for (auto &r : ph->residuals)
                     {
                         r->resetOOB();
-                        r->linearize(ph, Calib);
+                        r->linearize(Calib);
                         r->isLinearized = false;
                         r->applyRes(true);
                         if (r->isActive())
                         {
-                            r->fixLinearizationF(ph, ef);
+                            r->fixLinearizationF(ef);
                             ngoodRes++;
                         }
                     }
@@ -292,30 +297,33 @@ void System::flagPointsForRemoval()
                         flag_inin++;
                         ph->efPoint->stateFlag = energyStatus::toMarg;
                         ph->setPointStatus(MARGINALIZED);
+                        host->frame->pointHessiansMarginalized.push_back(ph);
                     }
                     else
                     {
                         ph->efPoint->stateFlag = energyStatus::toDrop;
                         ph->setPointStatus(OUTLIER);
+                        host->frame->pointHessiansOut.push_back(ph);
                     }
                 }
                 else
                 {
                     ph->efPoint->stateFlag = energyStatus::toDrop;
                     ph->setPointStatus(OUTLIER);
+                    host->frame->pointHessiansOut.push_back(ph);
                 }
-                // host->pointHessians[i].reset();
+                host->frame->pointHessians[i].reset();
             }
         }
-        // for(int i=0;i<(int)host->pointHessians.size();i++)
-        // {
-        // 	if(host->pointHessians[i]==0)
-        // 	{
-        // 		host->pointHessians[i] = host->pointHessians.back();
-        // 		host->pointHessians.pop_back();
-        // 		i--;
-        // 	}
-        // }
+        for(int i=0;i<(int)host->frame->pointHessians.size();i++)
+        {
+        	if(!host->frame->pointHessians[i])
+        	{
+        		host->frame->pointHessians[i] = host->frame->pointHessians.back();
+        		host->frame->pointHessians.pop_back();
+        		i--;
+        	}
+        }
     }
 }
 
@@ -366,14 +374,13 @@ void System::activatePointsMT()
 		for(unsigned int i=0;i<host->frame->ImmaturePoints.size();i++)
 		{
 			std::shared_ptr<ImmaturePoint> &ph = host->frame->ImmaturePoints[i];
-            if(!ph)
-                continue;
 			ph->idxInImmaturePoints = i;
 
 			// delete points that have never been traced successfully, or that are outlier on the last trace.
 			if(!std::isfinite(ph->idepth_max) || ph->lastTraceStatus == IPS_OUTLIER)
 			{
 				ph.reset();
+                // host->frame->ImmaturePoints[i]= nullptr;
 				continue;
 			}
 
@@ -389,6 +396,7 @@ void System::activatePointsMT()
 				if(ph->host->frame->FlaggedForMarginalization || ph->lastTraceStatus == IPS_OOB)
 				{
 					ph.reset();
+                    // host->frame->ImmaturePoints[i]= nullptr;
 				}
 				continue;
 			}
@@ -413,6 +421,7 @@ void System::activatePointsMT()
 			else
 			{
 				ph.reset();
+                host->frame->ImmaturePoints[i]= nullptr;
 			}
 		}
 	}
@@ -437,13 +446,11 @@ void System::activatePointsMT()
 		if(newpoint != nullptr) //&& newpoint != (PointHessian*)((long)(-1))
 		{
 			newpoint->host->frame->ImmaturePoints[ph->idxInImmaturePoints].reset();
-			newpoint->host->frame->pointHessians[ph->idxInImmaturePoints] = newpoint;
+			newpoint->host->frame->pointHessians.push_back(newpoint);
 			ef->insertPoint(newpoint);
-			for(auto &r : newpoint->residuals)
-            {
-                ef->insertResidual(newpoint, r);
-            }
-				
+            for(int i =0; i < newpoint->residuals.size(); i++)
+                ef->insertResidual(newpoint->residuals[i], i);
+
 			ph.reset();
 		}
 		else if(!newpoint || ph->lastTraceStatus==IPS_OOB)
@@ -454,22 +461,22 @@ void System::activatePointsMT()
 		}
 		else
 		{
-			assert(newpoint = nullptr);
+			assert(newpoint == nullptr);
 		}
 	}
 
-	// for(auto host : frameHessians)
-	// {
-	// 	for(int i=0;i<(int)host->ImmaturePoints.size();i++)
-	// 	{
-	// 		if(host->ImmaturePoints[i]==0)
-	// 		{
-	// 			host->ImmaturePoints[i] = host->ImmaturePoints.back();
-	// 			host->ImmaturePoints.pop_back();
-	// 			i--;
-	// 		}
-	// 	}
-	// }
+	for(auto &host : frameHessians)
+	{
+		for(int i=0;i<(int)host->frame->ImmaturePoints.size();i++)
+		{
+			if(host->frame->ImmaturePoints[i]==0)
+			{
+				host->frame->ImmaturePoints[i] = host->frame->ImmaturePoints.back();
+				host->frame->ImmaturePoints.pop_back();
+				i--;
+			}
+		}
+	}
 }
 
 void System::activatePointsMT_Reductor( std::vector<std::shared_ptr<MapPoint>>* optimized, std::vector<std::shared_ptr<ImmaturePoint>>* toOptimize, int min, int max, Vec10* stats, int tid)

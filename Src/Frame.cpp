@@ -51,35 +51,6 @@ Frame::Frame(std::shared_ptr<ImageData> Img, int id, float ab_exposure, std::sha
     //for now I'm only extracting features from highest resolution image!!
     CreateDirPyrs(Img->fImgL, DirPyr);
     nFeatures = 0;
-    Detector->ExtractFeatures(IndPyr[0], DirPyr, id, absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
-    pointHessians.resize(nFeatures);
-    ImmaturePoints.resize(nFeatures);
-    //Assign Features to Grid
-    mnGridCols = std::ceil(Img->cvImgL.cols / 10);
-    mnGridRows = std::ceil(Img->cvImgL.rows / 10);
-    mnMinX = 0.0f; mnMaxX = Img->cvImgL.cols; mnMinY = 0.0f; mnMaxY = Img->cvImgL.rows;
-    mfGridElementWidthInv = static_cast<float>(mnGridCols) / static_cast<float>(mnMaxX - mnMinX);
-    mfGridElementHeightInv = static_cast<float>(mnGridRows) / static_cast<float>(mnMaxY - mnMinY);
-        
-    mGrid.resize(mnGridCols);
-    for (int i = 0; i < mnGridCols; ++i)
-    {
-        mGrid[i].resize(mnGridRows);
-        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
-            mGrid[i][j].reserve(5);
-    }
-    for (unsigned short int i = 0; i < nFeatures; ++i)
-    {
-        int nGridPosX, nGridPosY;
-        if (PosInGrid(mvKeys[i], nGridPosX, nGridPosY))
-            mGrid[nGridPosX][nGridPosY].push_back(i);
-    }
-    
-    for (int i = 0, iend = mGrid.size(); i < iend; ++i)
-        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
-            mGrid[i][j].shrink_to_fit();
-   
-    isReduced = false;
     efFrame = shared_ptr<FrameOptimizationData>(new FrameOptimizationData(id, ab_exposure));
 }
 
@@ -100,6 +71,34 @@ void Frame::CreateIndPyrs(cv::Mat& Img, std::vector<cv::Mat>& Pyr)
         else
             copyMakeBorder(Img, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, cv::BORDER_REFLECT_101);
     }
+}
+
+void Frame::Extract(int id ,bool ForInit, std::shared_ptr<IndexThreadReduce<Vec10>> FrontEndThreadPoolLeft)
+{
+    Detector->ExtractFeatures(IndPyr[0], DirPyr, id, absSquaredGrad,  mvKeys, Descriptors, nFeatures, (ForInit ? IndNumFeatures : IndNumFeatures), FrontEndThreadPoolLeft); 
+    // pointHessians.resize(nFeatures);
+    // ImmaturePoints.resize(nFeatures);
+    //Assign Features to Grid
+        
+    mGrid.resize(mnGridCols);
+    for (int i = 0; i < mnGridCols; ++i)
+    {
+        mGrid[i].resize(mnGridRows);
+        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
+            mGrid[i][j].reserve(5);
+    }
+    for (unsigned short int i = 0; i < nFeatures; ++i)
+    {
+        int nGridPosX, nGridPosY;
+        if (PosInGrid(mvKeys[i], nGridPosX, nGridPosY))
+            mGrid[nGridPosX][nGridPosY].push_back(i);
+    }
+    
+    for (int i = 0, iend = mGrid.size(); i < iend; ++i)
+        for (int j = 0, jend = mGrid[i].size(); j < jend; ++j)
+            mGrid[i][j].shrink_to_fit();
+   
+    isReduced = false;
 }
 
 void Frame::CreateDirPyrs(std::vector<float>& Img, std::vector<Vec3f*> &DirPyr)
@@ -200,33 +199,39 @@ void Frame::ReduceToEssential()
     
     ImmaturePoints.clear(); ImmaturePoints.shrink_to_fit();
 
-    mvKeys.resize(0); mvKeys.shrink_to_fit();   
-    mGrid.clear(); mGrid.shrink_to_fit();
-    Descriptors.release();
+    // mvKeys.resize(0); mvKeys.shrink_to_fit();   
+    // mGrid.clear(); mGrid.shrink_to_fit();
+    // Descriptors.release();
    
-    // pointHessians.resize(0); pointHessians.shrink_to_fit();
+   for (auto &it : pointHessians)
+        it.reset();
+    for (auto &it: pointHessiansOut)
+        it.reset();
+    for(auto &it: pointHessiansMarginalized)
+        if(it->efPoint)
+            it->Clear();
 
+    // for (auto &it : pointHessians)
+    // {
+    //     if (!it)
+    //         continue;
+    //     assert(it->getPointStatus() != ACTIVE);
 
-    for (auto &it : pointHessians)
-    {
-        if (!it)
-            continue;
-        assert(it->getPointStatus() != ACTIVE);
-
-        if (it->status != MARGINALIZED)
-            it.reset();
-        else
-        {
-            if (it->efPoint)
-                it->efPoint.reset();
-            for (auto &it2 : it->residuals)
-                if (it2)
-                    it2.reset();
-            if (it->lastResiduals)
-                if (it->lastResiduals->first)
-                    it->lastResiduals->first.reset();
-        }
-    }
+    //     if (it->status != MARGINALIZED)
+    //         it.reset();
+    //     else
+    //     {
+    //         if (it->efPoint)
+    //             it->efPoint.reset();
+    //         for (auto &it2 : it->residuals)
+    //             if (it2)
+    //                 it2.reset();
+    //         if (it->lastResiduals)
+    //             if (it->lastResiduals->first)
+    //                 it->lastResiduals->first.reset();
+    //     }
+    // }
+    
 
     Detector.reset();
 

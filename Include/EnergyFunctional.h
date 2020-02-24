@@ -38,11 +38,11 @@ public:
 	~EnergyFunctional();
 
 
-	void insertResidual(shared_ptr<MapPoint>& ph, shared_ptr<PointFrameResidual>& r);
+	void insertResidual(shared_ptr<PointFrameResidual>& r, int i);
 	void insertFrame(shared_ptr<FrameShell>& frame, shared_ptr<CalibData>& Hcalib);
 	void insertPoint(shared_ptr<MapPoint>& ph);
 
-	void dropResidual(shared_ptr<MapPoint>& ph, shared_ptr<PointFrameResidual> r);
+	void dropResidual(shared_ptr<PointFrameResidual> r);
 	void marginalizeFrame(shared_ptr<FrameShell>& fh);
 	void removePoint(shared_ptr<MapPoint>& ph);
 

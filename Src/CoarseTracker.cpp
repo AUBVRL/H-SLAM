@@ -111,7 +111,7 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<std::shared_ptr<FrameShell>>& 
 	{
 		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph || !ph->efPoint ) //->etPointStatus() != ACTIVE
+			if(!ph )//|| !ph->efPoint ) //->etPointStatus() != ACTIVE
 				continue;
 
 			if(ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN)
@@ -745,7 +745,7 @@ void CoarseDistanceMap::makeDistanceMap( std::vector<std::shared_ptr<FrameShell>
 
 		for(auto &ph : fh->frame->pointHessians)
 		{
-			if(!ph || !ph->efPoint) //getPointStatus()!= ACTIVE
+			if(!ph )//|| !ph->efPoint) //getPointStatus()!= ACTIVE
 				continue;
 
 			// assert(ph->getPointStatus() == ACTIVE);

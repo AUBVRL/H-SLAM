@@ -114,7 +114,7 @@ void System::ProcessNewFrame(std::shared_ptr<ImageData> DataIn)
     {   //Initialize..
         if(!cInitializer)
             cInitializer = std::shared_ptr<Initializer>(new Initializer(Calib, FrontEndThreadPoolLeft ,DisplayHandler));
-
+        CurrentFrame->frame->Extract(CurrentFrame->id, true, FrontEndThreadPoolLeft);
         if(cInitializer->Initialize(CurrentFrame))
         {
             InitFromInitializer(cInitializer);
@@ -241,7 +241,9 @@ void System::ProcessNonKeyframe(std::shared_ptr<FrameShell> fh)
 
     if(fh->frame->efFrame)
         fh->frame->efFrame.reset();
-    fh->frame.reset(); //end of life for a regular frame! keep only its shell
+    if(fh->frame)
+        fh->frame.reset();
+    fh.reset();
 }
 
 void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
@@ -257,7 +259,8 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
     setPrecalcValues();
 
     
-    firstFrame->frame->pointHessians.resize(firstFrame->frame->nFeatures, nullptr);
+    // firstFrame->frame->pointHessians.resize(firstFrame->frame->nFeatures, nullptr);
+    firstFrame->frame->pointHessians.reserve(firstFrame->frame->nFeatures);
 
     for (int i = 0; i < firstFrame->frame->nFeatures; ++i)
     {
@@ -282,7 +285,7 @@ void System::InitFromInitializer(std::shared_ptr<Initializer> _cInit)
         ph->hasDepthPrior = true;
         ph->setPointStatus(ACTIVE);
 
-        firstFrame->frame->pointHessians[i] = ph;
+        firstFrame->frame->pointHessians.push_back(ph);
         ef->insertPoint(ph);
     }
 

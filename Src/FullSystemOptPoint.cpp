@@ -12,6 +12,7 @@
 #include "ImmaturePoint.h"
 #include "MapPoint.h"
 #include "OptimizationClasses.h"
+#include "EnergyFunctional.h"
 #include "Frame.h"
 // #include "math.h"
 
@@ -149,7 +150,7 @@ std::shared_ptr<MapPoint> System::optimizeImmaturePoint(std::shared_ptr<Immature
 	for(int i=0;i<nres;i++)
 		if(residuals[i]->state_state == ResState::IN)
 		{
-			std::shared_ptr<PointFrameResidual> r = std::shared_ptr<PointFrameResidual>(new PointFrameResidual(p->host, residuals[i]->target));
+			std::shared_ptr<PointFrameResidual> r = std::shared_ptr<PointFrameResidual>(new PointFrameResidual(p, p->host, residuals[i]->target));
 			r->state_NewEnergy = r->state_energy = 0;
 			r->state_NewState = ResState::OUT;
 			r->setState(ResState::IN);
