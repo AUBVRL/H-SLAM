@@ -56,8 +56,8 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, vector<Vec3f*>&DirPyr, int
     else
     {
         int numPointsTotal = PixSelector->makeMaps(DirPyr, id, GradPyr, selectionMap, 2000); //NumFeatures
-        for (int y = HALF_PATCH_SIZE + 1; y < height - HALF_PATCH_SIZE - 2; y++) //patternPadding
-            for (int x = HALF_PATCH_SIZE + 1; x < width - HALF_PATCH_SIZE - 2; x++)
+        for (int y = HALF_PATCH_SIZE + 4; y < height - HALF_PATCH_SIZE - 4; y++) //patternPadding +1 and -2
+            for (int x = HALF_PATCH_SIZE + 4; x < width - HALF_PATCH_SIZE - 4; x++) //+1 and -2
             {
                 int i = x + y * width;
                 if (selectionMap[i] == 0)

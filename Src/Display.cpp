@@ -157,7 +157,7 @@ void GUI::ProcessInput()
     if (Pushed(*ShowPanel)) {Nopanel->Show(false); panel->Show(true);}
     if (Pushed(*HidePanel)) {Nopanel->Show(true); panel->Show(false); }
     if (Pushed(*RecordScreen))
-        DisplayBase().RecordOnRender("ffmpeg:[fps=30,bps=8388608,flip=true,unique_filename]//screencap.avi");
+        DisplayBase().RecordOnRender("ffmpeg:[fps=30,bps=45388608,flip=true,unique_filename]//screencap.avi"); //8388608
 }
 
 void GUI::UploadPoints(std::vector<float> Points)
