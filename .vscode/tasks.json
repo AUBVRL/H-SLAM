@@ -1,0 +1,49 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "SLAM",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/bin/MySLAM",
+            "args": [
+                "-datasetName=TumMono", //Euroc, TumMono, TartanAir, Kitti, Live
+
+                "-imagePath=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip",
+                // "-imagePath=/mnt/Drive/VSLAM_Datasets/EuroC/MH_01_easy.zip",
+                // "-imagePath=/mnt/Drive/VSLAM_Datasets/TartanAir/MonocularTrackTest/MH000/", //TartanAir
+
+
+                "-intrinsics=${workspaceFolder}/misc/Intrinsics/TumMono_25to26-28to32-35to50.yaml",
+                // "-intrinsics=${workspaceFolder}/Intrinsics/Euroc.yaml",
+                // "-intrinsics=${workspaceFolder}/Intrinsics/TartanAir.yaml", //TartanAir
+
+
+        
+                "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
+                //Optional inputs
+
+                "-timeStamps=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/times.txt",
+                // "-timeStamps=${workspaceFolder}/Intrinsics/eurocTimeStamps/MH01.txt",
+
+                "-vignetteModel=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/vignette.png",
+                "-gammaModel=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/pcalib.txt",
+                "-startIndex=0",
+                "-endIndex=999999",
+                "-onlPhotoCalib=False",
+                "-quiet=True",
+                "-disableGUI=False",
+                "-playbackSpeed=0.0",
+            ],
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                //   "__NV_PRIME_RENDER_OFFLOAD": "1",
+                //   "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+                //   "__GL_SYNC_TO_VBLANK": "0"
+                }
+             }
+        }
+    ]
+}

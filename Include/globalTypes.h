@@ -116,13 +116,13 @@ class Timer: std::chrono::high_resolution_clock
 		Timer(string _name) : name(_name){};
 		void startTime()
 		{
-			start_time =  std::chrono::high_resolution_clock::now();
+			start_time =  now();
 		}
 		void endTime(bool print = false)
 		{
 			vtime.emplace_back(std::chrono::duration_cast<std::chrono::milliseconds>(now() - start_time).count());
 			if (print)
-				std::cout << name << " " << std::accumulate(vtime.begin(), vtime.end(), 0)<<std::endl;
+				std::cout << name << " " << (float)std::accumulate(vtime.begin(), vtime.end(), 0)/vtime.size()<<std::endl;
 		}
 };
 

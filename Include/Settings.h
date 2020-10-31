@@ -9,6 +9,11 @@ namespace DBoW3
 
 namespace SLAM
 {
+//timers
+
+extern Timer TrackTime;
+extern Timer MappingTime;
+
 
 extern int WidthOri;
 extern int HeightOri;

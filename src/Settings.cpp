@@ -4,6 +4,10 @@
 
 namespace SLAM
 {
+    //timers
+    Timer TrackTime("frameRate time");
+    Timer MappingTime("Keyframe time");
+
     DBoW3::Vocabulary Vocab;
     //feature Detector params (settings here are overriden by explicitly changing the input to software)
     // int IndPyrLevels = 1;
@@ -41,7 +45,7 @@ namespace SLAM
     float setting_kfGlobalWeight = 1; // general weight on threshold, the larger the more KF's are taken (e.g., 2 = double the amount of KF's).
     float setting_maxAffineWeight = 2;
 
-    bool SequentialOperation = true;
+    bool SequentialOperation = false;
 
     //Display options
     bool DisplayOn = true;

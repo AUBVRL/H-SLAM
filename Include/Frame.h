@@ -72,6 +72,9 @@ public:
     shared_ptr<CalibData> Calib;
     shared_ptr<photoUndistorter> phoUndist;
     shared_ptr<FrameOptimizationData> efFrame; //CLEAR THIS ONCE KeyFRAME IS MARGINALIZED in reducetoessential!!!
+
+    mutable std::mutex _mtx;
+
 };
 
 struct FrameShell

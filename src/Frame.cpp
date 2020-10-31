@@ -183,25 +183,33 @@ void Frame::ReduceToEssential()
         return;
     isReduced = true;
     Image.release();
-    ImmaturePoints.clear(); ImmaturePoints.shrink_to_fit();
 
-    // mvKeys.resize(0); mvKeys.shrink_to_fit();   
-    // mGrid.clear(); mGrid.shrink_to_fit();
-    // Descriptors.release();
-   
-   for (auto &it : pointHessians)
-        it.reset();
-    for (auto &it: pointHessiansOut)
-        it.reset();
-    for(auto &it: pointHessiansMarginalized)
-        if(it->efPoint)
-            it->Clear();
+    {
+        std::lock_guard<std::mutex> l(_mtx);
+        ImmaturePoints.clear();
+        ImmaturePoints.shrink_to_fit();
 
-    pointHessians.clear(); pointHessians.shrink_to_fit();
-    pointHessiansOut.clear(); pointHessiansOut.shrink_to_fit();
-    // pointHessiansMarginalized.clear(); 
-    // pointHessiansMarginalized.shrink_to_fit();
+        // mvKeys.resize(0); mvKeys.shrink_to_fit();
+        // mGrid.clear(); mGrid.shrink_to_fit();
+        // Descriptors.release();
 
+        for (auto &it : pointHessians)
+            it.reset();
+        for (auto &it : pointHessiansOut)
+            it.reset();
+        for (auto &it : pointHessiansMarginalized)
+            if (it->efPoint)
+                it->Clear();
+
+        pointHessians.clear();
+        pointHessians.shrink_to_fit();
+        pointHessiansOut.clear();
+        pointHessiansOut.shrink_to_fit();
+        // pointHessiansMarginalized.clear();
+        // pointHessiansMarginalized.shrink_to_fit();
+
+        NeedRefresh = true;
+    }
     // for (auto &it : pointHessians)
     // {
     //     if (!it)

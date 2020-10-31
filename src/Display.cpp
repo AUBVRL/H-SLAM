@@ -436,6 +436,8 @@ void KFDisplay::RefreshPC(std::shared_ptr<FrameShell> _In)
 	int vertexBufferNumPoints=0;
 
     //Update MapPoints to draw.
+    std::lock_guard<std::mutex> l(_In->frame->_mtx);
+
     for(auto it:_In->frame->pointHessians) //this thread locks the shared_ptr in case it was removed elsewhere!
     {
         if(!it) continue;

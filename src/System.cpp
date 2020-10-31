@@ -70,6 +70,7 @@ namespace SLAM
 
     void System::ProcessFrame(shared_ptr<ImageData> dataIn)
     {
+        TrackTime.startTime();
         bool needNewKf = false;
         shared_ptr<FrameShell> CurrentFrame = shared_ptr<FrameShell>(new FrameShell(dataIn, geomCalib, pUndist, false)); // FrontEndThreadPoolRight    
         CurrentFrame->frame->Extract(detector, CurrentFrame->id, true, frontEndThreadPool);
@@ -152,7 +153,7 @@ namespace SLAM
         // cv::namedWindow("test", cv::WINDOW_KEEPRATIO);
         // cv::imshow("test", Output);
         // cv::waitKey(1);
-
+        TrackTime.endTime(true);
         return;
     }
 
