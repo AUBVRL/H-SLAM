@@ -62,7 +62,11 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "bitset": "cpp",
+        "unordered_set": "cpp",
+        "iomanip": "cpp",
+        "typeindex": "cpp"
     },
     "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

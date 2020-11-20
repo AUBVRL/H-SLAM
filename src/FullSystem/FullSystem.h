@@ -82,8 +82,8 @@ template<typename T> inline void deleteOutOrder(std::vector<T*> &v, const T* ele
 	v.pop_back();
 
 	delete element;
+	element = nullptr;
 }
-
 
 inline bool eigenTestNan(const MatXX &m, std::string msg)
 {

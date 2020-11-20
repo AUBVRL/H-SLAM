@@ -31,7 +31,17 @@ namespace HSLAM
 {
 
 DBoW3::Vocabulary Vocab;
+int mnGridCols = 64;
+int mnGridRows = 48;
+float mnMinX = 0;
+float mnMaxX = 640;
+float mnMinY = 0;
+float mnMaxY = 480;
+float mfGridElementWidthInv = (float)mnGridCols/(float)(mnMaxX-mnMinX);
+float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
 
+
+int EDGE_THRESHOLD = 19; //15?
 
 
 int pyrLevelsUsed = PYR_LEVELS;

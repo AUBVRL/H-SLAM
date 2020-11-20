@@ -18,7 +18,7 @@
                 "quiet=1",
                 "nolog=1",
                 "reverse=0",
-                "nogui=1",
+                "nogui=0",
                 "nomt=0",
                 "prefetch=0",
                 "start=0",

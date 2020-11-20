@@ -165,10 +165,15 @@ FullSystem::~FullSystem()
 	delete[] selectionMap;
 
 	for(FrameShell* s : allFrameHistory)
+	{
 		delete s;
+		s = nullptr;
+	}
 	for(FrameHessian* fh : unmappedTrackedFrames)
+	{
 		delete fh;
-
+		fh = nullptr;
+	}
 	delete coarseDistanceMap;
 	delete coarseTracker;
 	delete coarseTracker_forNewKF;
@@ -552,7 +557,7 @@ void FullSystem::activatePointsMT()
 //				immature_invalid_deleted++;
 				// remove point.
 				delete ph;
-				host->immaturePoints[i]=0;
+				host->immaturePoints[i] = nullptr;
 				continue;
 			}
 
@@ -574,7 +579,7 @@ void FullSystem::activatePointsMT()
 				{
 //					immature_notReady_deleted++;
 					delete ph;
-					host->immaturePoints[i]=0;
+					host->immaturePoints[i] = nullptr;
 				}
 //				immature_notReady_skipped++;
 				continue;
@@ -600,7 +605,7 @@ void FullSystem::activatePointsMT()
 			else
 			{
 				delete ph;
-				host->immaturePoints[i]=0;
+				host->immaturePoints[i] = nullptr;
 			}
 		}
 	}
@@ -636,7 +641,7 @@ void FullSystem::activatePointsMT()
 		else if(newpoint == (PointHessian*)((long)(-1)) || ph->lastTraceStatus==IPS_OOB)
 		{
 			delete ph;
-			ph->host->immaturePoints[ph->idxInImmaturePoints]=0;
+			ph->host->immaturePoints[ph->idxInImmaturePoints] = nullptr;
 		}
 		else
 		{
@@ -778,7 +783,10 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
 	FrameShell* shell = new FrameShell();
-	shell->camToWorld = SE3(); 		// no lock required, as fh is not used anywhere yet.
+
+	shell->frame = std::make_shared<Frame>(image->image, &Hcalib, fh, shell);
+
+	shell->camToWorld = SE3(); // no lock required, as fh is not used anywhere yet.
 	shell->aff_g2l = AffLight(0,0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
@@ -814,6 +822,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 			// if still initializing
 			fh->shell->poseValid = false;
 			delete fh;
+			fh = nullptr;
 		}
 		return;
 	}
@@ -958,8 +967,8 @@ void FullSystem::mappingLoop()
 					fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 				}
 				delete fh;
+				fh = nullptr;
 			}
-
 		}
 		else
 		{
@@ -1005,6 +1014,7 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 
 	traceNewCoarse(fh);
 	delete fh;
+	fh = nullptr;
 }
 
 void FullSystem::makeKeyFrame( FrameHessian* fh)
@@ -1208,8 +1218,11 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		Pnt* point = coarseInitializer->points[0]+i;
 		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f,point->v+0.5f,firstFrame,point->my_type, &Hcalib);
 
-		if(!std::isfinite(pt->energyTH)) { delete pt; continue; }
-
+		if(!std::isfinite(pt->energyTH)) { 
+			delete pt;
+			pt = nullptr;
+			continue;
+		}
 
 		pt->idepth_max=pt->idepth_min=1;
 		PointHessian* ph = new PointHessian(pt, &Hcalib);

@@ -607,6 +607,7 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 	makeIDX();
 	delete fh;
+	fh = nullptr;
 }
 
 
