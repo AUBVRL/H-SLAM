@@ -1,0 +1,574 @@
+#ifndef __GlobalTypes__
+#define __GlobalTypes__
+#pragma once
+
+using namespace std;
+
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <memory>
+#include <Eigen/Core>
+#include <Eigen/StdVector>
+#include <opencv2/core/mat.hpp>
+#include "sophus/se3.hpp"
+#include "sophus/sim3.hpp"
+#include <iostream>
+
+//standard Thread headers
+#include <deque>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+
+#include <numeric>
+#include <chrono>
+
+
+// Check windows
+#if _WIN32 || _WIN64
+#if _WIN64
+#define Env64
+#else
+#define Env32
+#endif
+#endif
+
+// Check GCC
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define Env64
+#else
+#define Env32
+#endif
+#endif
+
+#define ChosenPattern 8
+#define SCALE_IDEPTH 1.0f // scales internal value to idepth.
+#define SCALE_XI_ROT 1.0f
+#define SCALE_XI_TRANS 0.5f
+#define SCALE_F 50.0f
+#define SCALE_C 50.0f
+#define SCALE_W 1.0f
+#define SCALE_A 10.0f
+#define SCALE_B 1000.0f
+
+#define SCALE_IDEPTH_INVERSE (1.0f / SCALE_IDEPTH)
+#define SCALE_XI_ROT_INVERSE (1.0f / SCALE_XI_ROT)
+#define SCALE_XI_TRANS_INVERSE (1.0f / SCALE_XI_TRANS)
+#define SCALE_F_INVERSE (1.0f / SCALE_F)
+#define SCALE_C_INVERSE (1.0f / SCALE_C)
+#define SCALE_W_INVERSE (1.0f / SCALE_W)
+#define SCALE_A_INVERSE (1.0f / SCALE_A)
+#define SCALE_B_INVERSE (1.0f / SCALE_B)
+
+#define SOLVER_SVD (int)1
+#define SOLVER_ORTHOGONALIZE_SYSTEM (int)2
+#define SOLVER_ORTHOGONALIZE_POINTMARG (int)4
+#define SOLVER_ORTHOGONALIZE_FULL (int)8
+#define SOLVER_SVD_CUT7 (int)16
+#define SOLVER_REMOVE_POSEPRIOR (int)32
+#define SOLVER_USE_GN (int)64
+#define SOLVER_FIX_LAMBDA (int)128
+#define SOLVER_ORTHOGONALIZE_X (int)256
+#define SOLVER_MOMENTUM (int)512
+#define SOLVER_STEPMOMENTUM (int)1024
+#define SOLVER_ORTHOGONALIZE_X_LATER (int)2048
+
+#if ThreadCount             //Number of thread is set from cmake, cant use for some built in std::thread to detect number of cores!
+#define NUM_THREADS (ThreadCount) // const int NUM_THREADS = boost::thread::hardware_concurrency();
+#else
+#define NUM_THREADS (6)
+#endif
+
+namespace SLAM
+{
+enum Dataset {Tum_mono = 0, Euroc, Kitti, TartanAir, Live, Emptyd};
+
+enum FeatureType {ORB = 0, DSO=2, MixORBDSO=3};
+enum ResState {IN=0, OOB=1, OUT=2};
+enum PtStatus {ACTIVE = 0, OUTLIER = 1, INACTIVE = 2, MARGINALIZED = 3}; //for pointhessians
+enum energyStatus {Good =0, toDrop = 1, toMarg = 2}; // for energy function representation of pointhessians
+
+struct ImageData
+{
+	public:
+    	cv::Mat cvImg;
+
+    	double timestamp;
+    	float Exposure;
+    	std::vector<float> fImg;
+    
+    	ImageData(int width, int height)
+    {
+        int size = width * height;
+        fImg.resize(size);
+    }
+    ~ImageData() {}
+};
+
+class Timer: std::chrono::high_resolution_clock
+{
+	public:
+		std::vector<float> vtime;
+		time_point start_time;
+		string name;
+		Timer(string _name) : name(_name){};
+		void startTime()
+		{
+			start_time =  now();
+		}
+		void endTime(bool print = false)
+		{
+			vtime.emplace_back(std::chrono::duration_cast<std::chrono::milliseconds>(now() - start_time).count());
+			if (print)
+				std::cout << name << " " << (float)std::accumulate(vtime.begin(), vtime.end(), 0)/vtime.size()<<std::endl;
+		}
+};
+
+const std::vector<std::vector<std::vector<int>>> staticPattern {
+
+        {{0,0}, 	  {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},	// .
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{0,-1},	  {-1,0},	   {0,0},	    {1,0},	     {0,1}, 	  {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},	// +
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{-1,-1},	  {1,1},	   {0,0},	    {-1,1},	     {1,-1}, 	  {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},	// x
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{-1,-1},	  {-1,0},	   {-1,1},		{-1,0},		 {0,0},		  {0,1},	   {1,-1},		{1,0},		 {1,1},       {-100,-100},	// full-tight
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{0,-2},	  {-1,-1},	   {1,-1},		{-2,0},		 {0,0},		  {2,0},	   {-1,1},		{1,1},		 {0,2},       {-100,-100},	// full-spread-9
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{0,-2},	  {-1,-1},	   {1,-1},		{-2,0},		 {0,0},		  {2,0},	   {-1,1},		{1,1},		 {0,2},       {-2,-2},   // full-spread-13
+		 {-2,2},      {2,-2},      {2,2},       {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{-2,-2},     {-2,-1}, {-2,-0}, {-2,1}, {-2,2}, {-1,-2}, {-1,-1}, {-1,-0}, {-1,1}, {-1,2}, 										// full-25
+		 {-0,-2},     {-0,-1}, {-0,-0}, {-0,1}, {-0,2}, {+1,-2}, {+1,-1}, {+1,-0}, {+1,1}, {+1,2},
+		 {+2,-2}, 	  {+2,-1}, {+2,-0}, {+2,1}, {+2,2}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{0,-2},	  {-1,-1},	   {1,-1},		{-2,0},		 {0,0},		  {2,0},	   {-1,1},		{1,1},		 {0,2},       {-2,-2},   // full-spread-21
+		 {-2,2},      {2,-2},      {2,2},       {-3,-1},     {-3,1},      {3,-1}, 	   {3,1},       {1,-3},      {-1,-3},     {1,3},
+		 {-1,3},      {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{0,-2},	  {-1,-1},	   {1,-1},		{-2,0},		 {0,0},		  {2,0},	   {-1,1},		{0,2},		 {-100,-100}, {-100,-100},	// 8 for SSE efficiency
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100},
+		 {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}, {-100,-100}},
+
+		{{-4,-4},     {-4,-2}, {-4,-0}, {-4,2}, {-4,4}, {-2,-4}, {-2,-2}, {-2,-0}, {-2,2}, {-2,4}, 										// full-45-SPREAD
+		 {-0,-4},     {-0,-2}, {-0,-0}, {-0,2}, {-0,4}, {+2,-4}, {+2,-2}, {+2,-0}, {+2,2}, {+2,4},
+		 {+4,-4}, 	  {+4,-2}, {+4,-0}, {+4,2}, {+4,4}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200},
+		 {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}, {-200,-200}}
+         
+         };
+
+const int staticPatternNum[10] = {
+	1,
+	5,
+	5,
+	9,
+	9,
+	13,
+	25,
+	21,
+	8,
+	25};
+
+const int staticPatternPadding[10] = {
+	1,
+	1,
+	1,
+	1,
+	2,
+	2,
+	2,
+	3,
+	2,
+	4};
+
+
+typedef Sophus::SE3d SE3;
+typedef Sophus::SO3d SO3;
+typedef Sophus::Sim3d Sim3;
+
+const int CPARS = 4; // number of camera calibration parameters
+					 //feature pattern settings
+const int patternNum = staticPatternNum[ChosenPattern];
+const int MAX_RES_PER_POINT = patternNum; // number of residuals in each point, see dso's paper for the pattern
+const std::vector<std::vector<int>> patternP = staticPattern[ChosenPattern];
+const int patternPadding = staticPatternPadding[ChosenPattern];
+// double matricies
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
+typedef Eigen::Matrix<double, CPARS, CPARS> MatCC;
+typedef Eigen::Matrix<double, CPARS, 10> MatC10;
+typedef Eigen::Matrix<double, 10, 10> Mat1010;
+typedef Eigen::Matrix<double, 13, 13> Mat1313;
+typedef Eigen::Matrix<double, 8, 10> Mat810;
+typedef Eigen::Matrix<double, 8, 3> Mat83;
+typedef Eigen::Matrix<double, 6, 6> Mat66;
+typedef Eigen::Matrix<double, 5, 3> Mat53;
+typedef Eigen::Matrix<double, 4, 3> Mat43;
+typedef Eigen::Matrix<double, 4, 2> Mat42;
+typedef Eigen::Matrix<double, 3, 3> Mat33;
+typedef Eigen::Matrix<double, 2, 2> Mat22;
+typedef Eigen::Matrix<double, 8, CPARS> Mat8C;
+typedef Eigen::Matrix<double, CPARS, 8> MatC8;
+typedef Eigen::Matrix<double, 8, 8> Mat88;
+typedef Eigen::Matrix<double, 7, 7> Mat77;
+typedef Eigen::Matrix<double, 4, 9> Mat49;
+typedef Eigen::Matrix<double, 8, 9> Mat89;
+typedef Eigen::Matrix<double, 9, 4> Mat94;
+typedef Eigen::Matrix<double, 9, 8> Mat98;
+typedef Eigen::Matrix<double, 8, 1> Mat81;
+typedef Eigen::Matrix<double, 1, 8> Mat18;
+typedef Eigen::Matrix<double, 9, 1> Mat91;
+typedef Eigen::Matrix<double, 1, 9> Mat19;
+typedef Eigen::Matrix<double, 8, 4> Mat84;
+typedef Eigen::Matrix<double, 4, 8> Mat48;
+typedef Eigen::Matrix<double, 4, 4> Mat44;
+typedef Eigen::Matrix<double, 14, 14> Mat1414;
+typedef Eigen::Matrix<double, 8 + CPARS + 1, 8 + CPARS + 1> MatPCPC;
+
+// float matricies
+typedef Eigen::Matrix<float, 3, 3> Mat33f;
+typedef Eigen::Matrix<float, 10, 3> Mat103f;
+typedef Eigen::Matrix<float, 2, 2> Mat22f;
+typedef Eigen::Matrix<float, 3, 1> Vec3f;
+typedef Eigen::Matrix<float, 2, 1> Vec2f;
+typedef Eigen::Matrix<float, 6, 1> Vec6f;
+typedef Eigen::Matrix<float, 8, CPARS> Mat8Cf;
+typedef Eigen::Matrix<float, CPARS, 8> MatC8f;
+typedef Eigen::Matrix<float, 1, 8> Mat18f;
+typedef Eigen::Matrix<float, 6, 6> Mat66f;
+typedef Eigen::Matrix<float, 8, 8> Mat88f;
+typedef Eigen::Matrix<float, 8, 4> Mat84f;
+typedef Eigen::Matrix<float, 6, 6> Mat66f;
+typedef Eigen::Matrix<float, 4, 4> Mat44f;
+typedef Eigen::Matrix<float, 12, 12> Mat1212f;
+typedef Eigen::Matrix<float, 13, 13> Mat1313f;
+typedef Eigen::Matrix<float, 10, 10> Mat1010f;
+typedef Eigen::Matrix<float, 9, 9> Mat99f;
+typedef Eigen::Matrix<float, 4, 2> Mat42f;
+typedef Eigen::Matrix<float, 6, 2> Mat62f;
+typedef Eigen::Matrix<float, 1, 2> Mat12f;
+typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> MatXXf;
+typedef Eigen::Matrix<float, 8 + CPARS + 1, 8 + CPARS + 1> MatPCPCf;
+typedef Eigen::Matrix<float, 14, 14> Mat1414f;
+
+// double vectors
+typedef Eigen::Matrix<double, CPARS, 1> VecC;
+typedef Eigen::Matrix<double, 14, 1> Vec14;
+typedef Eigen::Matrix<double, 13, 1> Vec13;
+typedef Eigen::Matrix<double, 10, 1> Vec10;
+typedef Eigen::Matrix<double, 9, 1> Vec9;
+typedef Eigen::Matrix<double, 8, 1> Vec8;
+typedef Eigen::Matrix<double, 7, 1> Vec7;
+typedef Eigen::Matrix<double, 6, 1> Vec6;
+typedef Eigen::Matrix<double, 5, 1> Vec5;
+typedef Eigen::Matrix<double, 4, 1> Vec4;
+typedef Eigen::Matrix<double, 3, 1> Vec3;
+typedef Eigen::Matrix<double, 2, 1> Vec2;
+typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
+typedef Eigen::Matrix<double, 8 + CPARS + 1, 1> VecPC;
+
+// float vectors
+typedef Eigen::Matrix<float, CPARS, 1> VecCf;
+typedef Eigen::Matrix<float, MAX_RES_PER_POINT, 1> VecNRf;
+typedef Eigen::Matrix<float, 12, 1> Vec12f;
+typedef Eigen::Matrix<float, 8, 1> Vec8f;
+typedef Eigen::Matrix<float, 10, 1> Vec10f;
+typedef Eigen::Matrix<float, 4, 1> Vec4f;
+typedef Eigen::Matrix<float, 12, 1> Vec12f;
+typedef Eigen::Matrix<float, 13, 1> Vec13f;
+typedef Eigen::Matrix<float, 9, 1> Vec9f;
+typedef Eigen::Matrix<float, Eigen::Dynamic, 1> VecXf;
+typedef Eigen::Matrix<float, 8 + CPARS + 1, 1> VecPCf;
+typedef Eigen::Matrix<float, 14, 1> Vec14f;
+
+// unsigned char vectors
+typedef Eigen::Matrix<unsigned char, 3, 1> Vec3b;
+
+// Vector of Eigen vectors
+typedef std::vector<Vec2, Eigen::aligned_allocator<Vec2>> VecVec2;
+typedef std::vector<Vec3, Eigen::aligned_allocator<Vec3>> VecVec3;
+typedef std::vector<Vec2f, Eigen::aligned_allocator<Vec2f>> VecVec2f;
+typedef std::vector<Vec3f, Eigen::aligned_allocator<Vec3f>> VecVec3f;
+
+struct AffLight
+{
+	AffLight(double a_, double b_) : a(a_), b(b_) {};
+	AffLight() : a(0), b(0) {};
+
+	// Affine Parameters:
+	double a,b;	// I_frame = exp(a)*I_global + b. // I_global = exp(-a)*(I_frame - b).
+
+	static Vec2 fromToVecExposure(float exposureF, float exposureT, AffLight g2F, AffLight g2T)
+	{
+		if(exposureF==0 || exposureT==0)
+		{
+			exposureT = exposureF = 1;
+			//printf("got exposure value of 0! please choose the correct model.\n");
+			//assert(setting_brightnessTransferFunc < 2);
+		}
+
+		double a = exp(g2T.a-g2F.a) * exposureT / exposureF;
+		double b = g2T.b - a*g2F.b;
+		return Vec2(a,b);
+	}
+
+	Vec2 vec()
+	{
+		return Vec2(a,b);
+	}
+};
+
+// EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33BiLin(const Vec3f* const mat, const float x, const float y, const int width)
+
+{
+	int ix = (int)x;
+	int iy = (int)y;
+	const Eigen::Vector3f* bp = mat +  ix+iy*width;
+
+	float tl = (*(bp))[0];
+	float tr = (*(bp+1))[0];
+	float bl = (*(bp+width))[0];
+	float br = (*(bp+width+1))[0];
+
+	float dx = x - ix;
+	float dy = y - iy;
+	float topInt = dx * tr + (1-dx) * tl;
+	float botInt = dx * br + (1-dx) * bl;
+	float leftInt = dy * bl + (1-dy) * tl;
+	float rightInt = dy * br + (1-dy) * tr;
+
+	return Eigen::Vector3f( dx * rightInt + (1-dx) * leftInt, rightInt-leftInt, botInt-topInt);
+}
+
+EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Vec3f* mat, const float x, const float y, const int width)
+{
+	int ix = (int)x;
+	int iy = (int)y;
+	float dx = x - ix;
+	float dy = y - iy;
+	float dxdy = dx*dy;
+	const Eigen::Vector3f* bp = mat +  ix+iy*width;
+
+
+	return dxdy * *(const Eigen::Vector3f*)(bp+1+width) + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+width) + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1) + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
+}
+
+EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Vec3f* mat, const float x, const float y, const int width)
+{
+	int ix = (int)x;
+	int iy = (int)y;
+	float dx = x - ix;
+	float dy = y - iy;
+	float dxdy = dx*dy;
+	const Eigen::Vector3f* bp = mat + ix+iy*width;
+
+
+	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0] + (dy-dxdy) * (*(const Eigen::Vector3f*)(bp+width))[0] + (dx-dxdy) * (*(const Eigen::Vector3f*)(bp+1))[0] + (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
+}
+
+inline Vec3b makeRainbow3B(float id)
+{
+	if(!(id > 0))
+		return Vec3b(255,255,255);
+
+	int icP = id;
+	float ifP = id-icP;
+	icP = icP%3;
+	if(icP == 0) return Vec3b(255*(1-ifP), 255*ifP,     0);
+	if(icP == 1) return Vec3b(0,           255*(1-ifP), 255*ifP);
+	if(icP == 2) return Vec3b(255*ifP,     0,           255*(1-ifP));
+	return Vec3b(255,255,255);
+}
+
+inline void setPixel9(cv::Mat& Img, const int &u, const int &v, Vec3b& val)
+{
+	Img.at<cv::Vec3b>(u+1,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u+1,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u+1,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v-1) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v) = cv::Vec3b(val[0], val[1], val[2]);
+	Img.at<cv::Vec3b>(u-1,v+1) = cv::Vec3b(val[0], val[1], val[2]);
+
+}
+
+inline int DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+{
+    int dist = 0;
+#ifdef __SSE2__
+
+#ifdef Env64
+    const unsigned long long int *pa = a.ptr<unsigned long long int>();
+    const unsigned long long int *pb = b.ptr<unsigned long long int>();
+
+    for (int i = 0; i < 4; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb; //can't do this
+        dist += _mm_popcnt_u64(v);
+    }
+    return dist;
+#else
+    const int *pa = a.ptr<int32_t>();
+    const int *pb = b.ptr<int32_t>();
+    for (int i = 0; i < 8; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb; //can't do this
+        dist += _mm_popcnt_u32(v);
+    }
+    return dist;
+#endif
+
+#else
+    const int *pa = a.ptr<int32_t>();
+    const int *pb = b.ptr<int32_t>();
+
+    for (int i = 0; i < 8; i++, pa++, pb++)
+    {
+        unsigned int v = *pa ^ *pb;
+        v = v - ((v >> 1) & 0x55555555);
+        v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+        dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
+    }
+    return dist;
+
+#endif
+}
+
+inline void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
+{
+    int max1 = 0, max2 = 0, max3= 0;
+
+    for (int i = 0; i < L; i++)
+    {
+        const int s = histo[i].size();
+        if (s > max1)
+        {
+            max3 = max2; max2 = max1; max1 = s;
+            ind3 = ind2; ind2 = ind1; ind1 = i;
+        }
+        else if (s > max2)
+        {
+            max3 = max2; max2 = s;
+            ind3 = ind2; ind2 = i;
+        }
+        else if (s > max3)
+        {max3 = s; ind3 = i;}
+    }
+
+    if (max2 < 0.1f * (float)max1)
+        {ind2 = -1; ind3 = -1;}
+    else if (max3 < 0.1f * (float)max1)
+        ind3 = -1;
+    
+}
+
+template<typename T> inline void deleteOut(std::vector<T*> &v, const int i)
+{
+	delete v[i];
+	v[i] = v.back();
+	v.pop_back();
+}
+template<typename T> inline void deleteOutPt(std::vector<T*> &v, const T* i)
+{
+	delete i;
+
+	for(unsigned int k=0;k<v.size();k++)
+		if(v[k] == i)
+		{
+			v[k] = v.back();
+			v.pop_back();
+		}
+}
+
+template<typename T> inline void deleteOutOrder(std::vector<std::shared_ptr<T>> &v, std::shared_ptr<T> element)
+{
+	int i=-1;
+	for(unsigned int k=0, kend = v.size(); k < kend; ++k)
+	{
+		if(v[k] == element)
+		{
+			i=k;
+			break;
+		}
+	}
+	assert(i!=-1);
+
+	for(unsigned int k=i+1; k<v.size();k++)
+		v[k-1] = v[k];
+	v.pop_back();
+
+	element.reset();
+}
+
+template <typename T> inline void deleteOut(std::vector<std::shared_ptr<T>> &v, const std::shared_ptr<T> &e)
+{
+	for (std::shared_ptr<T> &t : v)
+	{
+		if (t == e)
+		{
+			t = v.back();
+			v.pop_back();
+			break;
+		}
+	}
+}
+
+#ifdef MSVC
+#include <Windows.h>
+#include <stdint.h> // portable: uint64_t   MSVC: __int64 
+#include <time.h>
+
+typedef struct timeval {
+    long tv_sec;
+    long tv_usec;
+} timeval;
+
+int gettimeofday(struct timeval * tp, struct timezone * tzp)
+{
+ 
+    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+
+    SYSTEMTIME  system_time;
+    FILETIME    file_time;
+    uint64_t    time;
+
+    GetSystemTime( &system_time );
+    SystemTimeToFileTime( &system_time, &file_time );
+    time =  ((uint64_t)file_time.dwLowDateTime )      ;
+    time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+    tp->tv_sec  = (long) ((time - EPOCH) / 10000000L);
+    tp->tv_usec = (long) (system_time.wMilliseconds * 1000);
+    return 0;
+}
+#else
+#include <sys/time.h>
+#endif
+
+} // namespace SLAM
+#endif

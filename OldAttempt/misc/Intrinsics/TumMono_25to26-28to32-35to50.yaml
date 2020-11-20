@@ -1,0 +1,22 @@
+%YAML:1.0
+
+# Camera Parameters.
+#===================
+Calibration.model: "Atan"
+
+Input.width: 1280
+Input.height: 1024
+
+Calib.process: "crop"
+
+Output.width: 640
+Output.height: 480
+
+Camera.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data:[0.535719308086809, 0.0, 0.493248545285398, 0.0, 0.669566858850269, 0.500408664348414, 0.0, 0.0, 1.0]
+
+Camera.dist: 0.897966326944875
+

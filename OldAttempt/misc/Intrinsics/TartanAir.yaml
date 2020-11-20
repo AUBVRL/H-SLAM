@@ -1,0 +1,21 @@
+%YAML:1.0
+
+# Camera Parameters.
+#===================
+
+Calibration.model: "Pinhole" 
+
+Input.width: 640
+Input.height: 480
+
+Calib.process: "crop"
+
+Output.width: 640
+Output.height: 480
+
+Camera.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data:[320, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
+
