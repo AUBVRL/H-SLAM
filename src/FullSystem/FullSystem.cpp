@@ -16,6 +16,8 @@
 #include "FullSystem/CoarseTracker.h"
 #include "FullSystem/CoarseInitializer.h"
 
+#include "Indirect/Frame.h"
+
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 
@@ -171,6 +173,8 @@ FullSystem::~FullSystem()
 	}
 	for(FrameHessian* fh : unmappedTrackedFrames)
 	{
+		if (fh->shell->frame)
+			fh->shell->frame.reset();
 		delete fh;
 		fh = nullptr;
 	}
@@ -779,13 +783,14 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
-
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
 	FrameShell* shell = new FrameShell();
 
-	shell->frame = std::make_shared<Frame>(image->image, &Hcalib, fh, shell);
+	
+	shell->frame = std::make_shared<Frame>(image->PhoUncalibImage, &Hcalib, fh, shell);
 
+	
 	shell->camToWorld = SE3(); // no lock required, as fh is not used anywhere yet.
 	shell->aff_g2l = AffLight(0,0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
@@ -821,6 +826,8 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		{
 			// if still initializing
 			fh->shell->poseValid = false;
+			if(fh->shell->frame)
+				fh->shell->frame.reset();
 			delete fh;
 			fh = nullptr;
 		}
@@ -966,6 +973,9 @@ void FullSystem::mappingLoop()
 					fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
 					fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 				}
+
+				if(fh->shell->frame)
+					fh->shell->frame.reset();
 				delete fh;
 				fh = nullptr;
 			}
@@ -1013,6 +1023,9 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 	}
 
 	traceNewCoarse(fh);
+
+	if(fh->shell->frame)
+		fh->shell->frame.reset();
 	delete fh;
 	fh = nullptr;
 }

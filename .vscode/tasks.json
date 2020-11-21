@@ -6,7 +6,7 @@
         {
             "label": "HSLAM",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/dso_dataset",
+            "command": "${workspaceFolder}/build/bin/HSLAM",
             "args": [
                 "files=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/images.zip",
                 "calib=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_50/camera.txt",

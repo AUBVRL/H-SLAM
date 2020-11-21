@@ -1,28 +1,3 @@
-/**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
-
 #pragma once
 #include "util/settings.h"
 #include "util/NumType.h"
@@ -310,6 +285,13 @@ EIGEN_ALWAYS_INLINE Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector
 	        + (dy-dxdy) * *(const Eigen::Vector2f*)(bp+width)
 	        + (dx-dxdy) * *(const Eigen::Vector2f*)(bp+1)
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector2f*)(bp);
+}
+
+template<typename T>
+void releaseVec(std::vector<T>& vec) {
+	vec.clear();
+	std::vector<T>().swap(vec);
+	return;
 }
 
 

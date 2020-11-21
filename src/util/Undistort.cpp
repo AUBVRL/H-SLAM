@@ -1,29 +1,3 @@
-/**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
-
-
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -36,6 +10,7 @@
 #include "IOWrapper/ImageRW.h"
 #include "util/Undistort.h"
 
+#include <algorithm>
 
 namespace HSLAM
 {
@@ -51,6 +26,7 @@ PhotometricUndistorter::PhotometricUndistorter(
 		std::string file,
 		std::string noiseImage,
 		std::string vignetteImage,
+		Undistort* geomUndist,
 		int w_, int h_)
 {
 	valid=false;
@@ -58,7 +34,7 @@ PhotometricUndistorter::PhotometricUndistorter(
 	vignetteMapInv=0;
 	w = w_;
 	h = h_;
-	output = new ImageAndExposure(w,h);
+	// output = new ImageAndExposure(w,h);
 	if(file=="" || vignetteImage=="")
 	{
 		printf("NO PHOTOMETRIC Calibration!\n");
@@ -119,69 +95,46 @@ PhotometricUndistorter::PhotometricUndistorter(
 	printf("Reading Vignette Image from %s\n",vignetteImage.c_str());
 	MinimalImage<unsigned short>* vm16 = IOWrap::readImageBW_16U(vignetteImage.c_str());
 	MinimalImageB* vm8 = IOWrap::readImageBW_8U(vignetteImage.c_str());
-	vignetteMap = new float[w*h];
-	vignetteMapInv = new float[w*h];
+	
+	float* vignetteIn = nullptr;
 
-	if(vm16 != 0)
-	{
-		if(vm16->w != w ||vm16->h != h)
-		{
-			printf("PhotometricUndistorter: Invalid vignette image size! got %d x %d, expected %d x %d\n",
-					vm16->w, vm16->h, w, h);
-			if(vm16!=0) delete vm16;
-			if(vm8!=0) delete vm8;
-			return;
-		}
-
-		float maxV=0;
-		for(int i=0;i<w*h;i++)
-			if(vm16->at(i) > maxV) maxV = vm16->at(i);
-
-		for(int i=0;i<w*h;i++)
-			vignetteMap[i] = vm16->at(i) / maxV;
-	}
-	else if(vm8 != 0)
-	{
-		if(vm8->w != w ||vm8->h != h)
-		{
-			printf("PhotometricUndistorter: Invalid vignette image size! got %d x %d, expected %d x %d\n",
-					vm8->w, vm8->h, w, h);
-			if(vm16!=0) delete vm16;
-			if(vm8!=0) delete vm8;
-			return;
-		}
-
-		float maxV=0;
-		for(int i=0;i<w*h;i++)
-			if(vm8->at(i) > maxV) maxV = vm8->at(i);
-
-		for(int i=0;i<w*h;i++)
-			vignetteMap[i] = vm8->at(i) / maxV;
-	}
+	if (vm16 != 0)
+		vignetteIn = geomUndist->geometricallyUnDistortVignette(vm16);
+	else if (vm8 != 0)
+			vignetteIn = geomUndist->geometricallyUnDistortVignette(vm8);
 	else
 	{
-		printf("PhotometricUndistorter: Invalid vignette image\n");
-		if(vm16!=0) delete vm16;
-		if(vm8!=0) delete vm8;
-		return;
+		printf("could not load Vignette Image from %s! exiting\n", vignetteImage.c_str());
+		exit(1);
 	}
 
 	if(vm16!=0) delete vm16;
 	if(vm8!=0) delete vm8;
 
+	vignetteMap = new float[w*h];
+	vignetteMapInv = new float[w*h];
+
+	float maxV=0;
+	for(int i=0, size = w*h; i<size; ++i)
+		if(vignetteIn[i] > maxV) maxV = vignetteIn[i];
 
 	for(int i=0;i<w*h;i++)
+	{
+		vignetteMap[i] = vignetteIn[i] / maxV;
 		vignetteMapInv[i] = 1.0f / vignetteMap[i];
+	}
 
+	if(vignetteIn) delete[] vignetteIn;
 
 	printf("Successfully read photometric calibration!\n");
 	valid = true;
 }
+
 PhotometricUndistorter::~PhotometricUndistorter()
 {
 	if(vignetteMap != 0) delete[] vignetteMap;
 	if(vignetteMapInv != 0) delete[] vignetteMapInv;
-	delete output;
+	//delete output;
 }
 
 
@@ -210,8 +163,8 @@ void PhotometricUndistorter::unMapFloatImage(float* image)
 	}
 }
 
-template<typename T>
-void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, float factor)
+// template<typename T>
+void PhotometricUndistorter::processFrame(float* image_in, ImageAndExposure* output, float exposure_time, float factor)
 {
 	int wh=w*h;
     float* data = output->image;
@@ -232,7 +185,7 @@ void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, floa
 	{
 		for(int i=0; i<wh;i++)
 		{
-			data[i] = G[image_in[i]];
+			data[i] = G[static_cast<unsigned char>(image_in[i])];			
 		}
 
 		if(setting_photometricCalibration==2)
@@ -250,8 +203,8 @@ void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, floa
 		output->exposure_time = 1;
 
 }
-template void PhotometricUndistorter::processFrame<unsigned char>(unsigned char* image_in, float exposure_time, float factor);
-template void PhotometricUndistorter::processFrame<unsigned short>(unsigned short* image_in, float exposure_time, float factor);
+// template void PhotometricUndistorter::processFrame<unsigned char>(unsigned char* image_in, float exposure_time, float factor);
+// template void PhotometricUndistorter::processFrame<unsigned short>(unsigned short* image_in, float exposure_time, float factor);
 
 
 
@@ -379,8 +332,88 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
 
 void Undistort::loadPhotometricCalibration(std::string file, std::string noiseImage, std::string vignetteImage)
 {
-	photometricUndist = new PhotometricUndistorter(file, noiseImage, vignetteImage,getOriginalSize()[0], getOriginalSize()[1]);
+	photometricUndist = new PhotometricUndistorter(file, noiseImage, vignetteImage, this, w, h); //getOriginalSize()[0], getOriginalSize()[1]
 }
+
+template<typename T>
+float* Undistort::geometricallyUnDistortVignette(const MinimalImage<T>* image_raw)
+{
+	if(image_raw->w != wOrg || image_raw->h != hOrg)
+	{
+		printf("PhotometricUndistorter: Invalid vignette image size! got %d x %d, expected %d x %d Exiting.\n",
+					image_raw->w, image_raw->h, w, h);
+		exit(1);
+	}
+
+	float* out_data = new float[w*h];
+	T* in_data = image_raw->data;
+
+	for(int idx = w*h-1;idx>=0;idx--)
+	{
+		// get interp. values
+		float xx = remapX[idx];
+		float yy = remapY[idx];
+
+		if(xx<0)
+			out_data[idx] = 0;
+		else
+		{
+			// get integer and rational parts
+			int xxi = xx;
+			int yyi = yy;
+			xx -= xxi;
+			yy -= yyi;
+			float xxyy = xx*yy;
+
+			// get array base pointer
+			const T* src = in_data + xxi + yyi * wOrg;
+
+			// interpolate (bilinear)
+			out_data[idx] =  xxyy * src[1+wOrg]
+								+ (yy-xxyy) * src[wOrg]
+								+ (xx-xxyy) * src[1]
+								+ (1-xx-yy+xxyy) * src[0];
+		}
+	}
+	return out_data;
+}
+
+float* Undistort::geometricallyUnDistortVignette(const MinimalImageB* image_raw)
+{
+	float* out_data = new float[w*h];
+	unsigned char* in_data = image_raw->data;
+
+	for(int idx = w*h-1;idx>=0;idx--)
+	{
+		// get interp. values
+		float xx = remapX[idx];
+		float yy = remapY[idx];
+
+		if(xx<0)
+			out_data[idx] = 0;
+		else
+		{
+			// get integer and rational parts
+			int xxi = xx;
+			int yyi = yy;
+			xx -= xxi;
+			yy -= yyi;
+			float xxyy = xx*yy;
+
+			// get array base pointer
+			const unsigned char* src = in_data + xxi + yyi * wOrg;
+
+			// interpolate (bilinear)
+			out_data[idx] =  xxyy * src[1+wOrg]
+								+ (yy-xxyy) * src[wOrg]
+								+ (xx-xxyy) * src[1]
+								+ (1-xx-yy+xxyy) * src[0];
+		}
+	}
+
+	return out_data;
+}
+
 
 template<typename T>
 ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float exposure, double timestamp, float factor) const
@@ -391,14 +424,13 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 		exit(1);
 	}
 
-	photometricUndist->processFrame<T>(image_raw->data, exposure, factor);
 	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
-	photometricUndist->output->copyMetaTo(*result);
+
 
 	if (!passthrough)
 	{
-		float* out_data = result->image;
-		float* in_data = photometricUndist->output->image;
+		float* out_data = result->PhoUncalibImage;
+		T *in_data = image_raw->data; //photometricUndist->output->image;
 
 		float* noiseMapX=0;
 		float* noiseMapY=0;
@@ -454,7 +486,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 				float xxyy = xx*yy;
 
 				// get array base pointer
-				const float* src = in_data + xxi + yyi * wOrg;
+				const T* src = in_data + xxi + yyi * wOrg;
 
 				// interpolate (bilinear)
 				out_data[idx] =  xxyy * src[1+wOrg]
@@ -473,8 +505,13 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 	}
 	else
 	{
-		memcpy(result->image, photometricUndist->output->image, sizeof(float)*w*h);
+		for (int i = 0, size = w * h; i < size; ++i)
+			result->PhoUncalibImage[i] = image_raw->data[i];
+		// memcpy(result->PhoUncalibImage, image_raw->data, sizeof(float)*w*h);
 	}
+
+	photometricUndist->processFrame(result->PhoUncalibImage, result, exposure, factor);
+	// photometricUndist->output->copyMetaTo(*result);
 
 	applyBlurNoise(result->image);
 

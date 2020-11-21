@@ -31,6 +31,7 @@ namespace HSLAM
 {
 
 DBoW3::Vocabulary Vocab;
+int gridSize = 10;
 int mnGridCols = 64;
 int mnGridRows = 48;
 float mnMinX = 0;

@@ -1,27 +1,3 @@
-/**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
 #pragma once
 
 #include "Eigen/Core"
@@ -29,6 +5,8 @@
 #include "sophus/se3.hpp"
 #include <memory>
 #include <vector>
+#include <chrono>
+#include <numeric>
 
 namespace HSLAM
 {
@@ -192,5 +170,46 @@ struct AffLight
 	}
 };
 
+class Timer: std::chrono::high_resolution_clock
+{
+	public:
+		std::vector<float> vtime;
+		time_point start_time;
+		std::string name;
+		Timer(std::string _name) : name(_name){};
+		void startTime()
+		{
+			start_time =  now();
+		}
+		void endTime(bool print = false)
+		{
+			vtime.emplace_back(std::chrono::duration_cast<std::chrono::microseconds>(now() - start_time).count()/1000.0f);
+			if (print)
+				printf("%s %f \n", name.c_str(), (float)std::accumulate(vtime.begin(), vtime.end(), 0.0f)/vtime.size());
+		}
+};
+
+
+
+class ushort2 
+{
+	public:
+		unsigned short x;
+		unsigned short y;
+};
+
+class keypoint
+{
+	public:
+		ushort2 pt;
+		float angle;
+		float response;
+		keypoint(unsigned short _u, unsigned short _v, float _angle = -1.0f, float _response = 0.0f) : angle(_angle), response(_response)
+		{
+			pt.x = _u;
+			pt.y = _v;
+		};
+		~keypoint(){};
+};
 }
 

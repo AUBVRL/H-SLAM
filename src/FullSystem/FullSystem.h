@@ -20,7 +20,6 @@
 
 
 
-
 namespace HSLAM
 {
 namespace IOWrap

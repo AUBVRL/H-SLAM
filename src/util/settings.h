@@ -9,6 +9,7 @@ namespace HSLAM
 {
 
 extern DBoW3::Vocabulary Vocab;
+extern int gridSize;
 extern int mnGridCols, mnGridRows;
 extern float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
 extern int EDGE_THRESHOLD;
