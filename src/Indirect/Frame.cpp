@@ -2,6 +2,7 @@
 #include "FullSystem/HessianBlocks.h"
 #include "util/globalCalib.h"
 #include "util/globalFuncs.h"
+#include "Indirect/Detector.h"
 
 #include "opencv2/highgui.hpp"
 
@@ -10,18 +11,19 @@ namespace HSLAM
 
     using namespace std;
 
-    Frame::Frame(float *Img, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs) : nFeatures(0), isReduced(false), NeedRefresh(NeedRefresh), HCalib(_HCalib), fh(_fh), fs(_fs)
+    Frame::Frame(float *Img, shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs) : nFeatures(0), isReduced(false), NeedRefresh(NeedRefresh), HCalib(_HCalib), fh(_fh), fs(_fs)
     {
         cv::Mat(hG[0], wG[0], CV_32FC1, Img).convertTo(Image, CV_8U);
-
-        Extract();
-        // CreateIndPyrs(Img->cvImgL, IndPyr);
-        //for now I'm only extracting features from highest resolution image!!
+        Occupancy = cv::Mat(hG[0], wG[0], CV_8U, cv::Scalar(0));
+        detector->ExtractFeatures(Image, Occupancy, mvKeys, Descriptors, nFeatures, indFeaturesToExtract);
+        assignFeaturesToGrid();
+        // ComputeBoVW();
 
     }
     Frame::~Frame()
     {
         Image.release();
+        Occupancy.release();
         releaseVec(mvKeys);
         releaseVec(mGrid);
         Descriptors.release();
@@ -34,6 +36,7 @@ namespace HSLAM
         isReduced = true;
         {
             Image.release();
+            Occupancy.release();
             NeedRefresh = true;
         }
         return;
@@ -41,7 +44,6 @@ namespace HSLAM
 
     void Frame::assignFeaturesToGrid()
     {
- 
         mGrid.resize(mnGridCols * mnGridRows);
         for (unsigned short i = 0; i < nFeatures; ++i)
         {
@@ -54,7 +56,7 @@ namespace HSLAM
         return;
     }
 
-    bool Frame::PosInGrid(const keypoint &kp, int &posX, int &posY)
+    bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
     {
         posX = std::round((kp.pt.x) * mfGridElementWidthInv);
         posY = std::round((kp.pt.y) * mfGridElementHeightInv);
@@ -62,23 +64,7 @@ namespace HSLAM
             return false;
         return true;
     }
-    
-    // void Frame::Extract(shared_ptr<FeatureDetector> _Detector, int id, bool ForInit, shared_ptr<IndexThreadReduce<Vec10>> ThreadPool)
-    void Frame::Extract()
-    {
-        // _Detector->ExtractFeatures(Image, featType, DirPyr, id, absSquaredGrad, mvKeys,
-        //                            Descriptors, nFeatures, (ForInit ? featuresToExtract : featuresToExtract), ThreadPool);
-        // for (int i = 0; i < 2000; ++i)
-        //     mvKeys.push_back(keypoint(320, 320));
-            //Assign Features to Grid
 
-        
-        // assignFeaturesToGrid();
-        
-
-
-        // ComputeBoVW();
-    }
 
     std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
     {
@@ -108,7 +94,7 @@ namespace HSLAM
                 const std::vector<unsigned short int> vCell = mGrid[iy * mnGridCols + ix];
                 for (size_t j = 0, jend = vCell.size(); j < jend; ++j)
                 {
-                    const keypoint &kpUn = mvKeys[vCell[j]];
+                    const cv::KeyPoint &kpUn = mvKeys[vCell[j]];
                     const float distx = kpUn.pt.x - x;
                     const float disty = kpUn.pt.y - y;
 

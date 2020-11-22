@@ -408,13 +408,7 @@ int main( int argc, char** argv )
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed==0);
 
-
-
-
-
-
-
-    IOWrap::PangolinDSOViewer* viewer = 0;
+	IOWrap::PangolinDSOViewer* viewer = 0;
 	if(!disableAllDisplay)
     {
         viewer = new IOWrap::PangolinDSOViewer(wG[0],hG[0], false);

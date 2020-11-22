@@ -17,11 +17,11 @@ namespace HSLAM
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         
 
-        Frame(float* Img, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs);
+        Frame(float* Img, std::shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs);
         ~Frame();
       
         void ReduceToEssential();
-        bool PosInGrid(const keypoint &kp, int &posX, int &posY);
+        bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
         // void Extract(std::shared_ptr<FeatureDetector> _Detector, int id, bool ForInit, std::shared_ptr<IndexThreadReduce<Vec10>> ThreadPool);
         void Extract();
 
@@ -30,8 +30,9 @@ namespace HSLAM
         void assignFeaturesToGrid();
 
         cv::Mat Image;
+        cv::Mat Occupancy;
         std::vector<std::vector<unsigned short int>> mGrid;
-        std::vector<keypoint> mvKeys;
+        std::vector<cv::KeyPoint> mvKeys;
 
         // std::vector<MapPoint> Mps;
 

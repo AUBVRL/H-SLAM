@@ -18,8 +18,12 @@ namespace HSLAM
 
 
 #define MAX_RES_PER_POINT 8
-#define NUM_THREADS 6
 
+#ifdef ThreadCount
+#define NUM_THREADS ThreadCount //6
+#else
+#define NUM_THREADS 6
+#endif
 
 #define todouble(x) (x).cast<double>()
 
@@ -189,27 +193,5 @@ class Timer: std::chrono::high_resolution_clock
 		}
 };
 
-
-
-class ushort2 
-{
-	public:
-		unsigned short x;
-		unsigned short y;
-};
-
-class keypoint
-{
-	public:
-		ushort2 pt;
-		float angle;
-		float response;
-		keypoint(unsigned short _u, unsigned short _v, float _angle = -1.0f, float _response = 0.0f) : angle(_angle), response(_response)
-		{
-			pt.x = _u;
-			pt.y = _v;
-		};
-		~keypoint(){};
-};
 }
 

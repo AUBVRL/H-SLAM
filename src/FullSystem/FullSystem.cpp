@@ -17,6 +17,10 @@
 #include "FullSystem/CoarseInitializer.h"
 
 #include "Indirect/Frame.h"
+#include "Indirect/Detector.h"
+
+#include <opencv2/highgui.hpp>
+#include <opencv2/features2d.hpp>
 
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
@@ -109,6 +113,8 @@ FullSystem::FullSystem()
 	coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
 	pixelSelector = new PixelSelector(wG[0], hG[0]);
 
+	detector = std::make_shared<FeatureDetector>();
+
 	statistics_lastNumOptIts=0;
 	statistics_numDroppedPoints=0;
 	statistics_numActivatedPoints=0;
@@ -184,6 +190,7 @@ FullSystem::~FullSystem()
 	delete coarseInitializer;
 	delete pixelSelector;
 	delete ef;
+	detector.reset();
 }
 
 void FullSystem::setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH)
@@ -600,7 +607,7 @@ void FullSystem::activatePointsMT()
 
 				float dist = coarseDistanceMap->fwdWarpedIDDistFinal[u+wG[1]*v] + (ptp[0]-floorf((float)(ptp[0])));
 
-				if(dist>=currentMinActDist* ph->my_type)
+				if(dist>=currentMinActDist* ((ph->my_type <= 4) ? ph->my_type : 1))
 				{
 					coarseDistanceMap->addIntoDistFinal(u,v);
 					toOptimize.push_back(ph);
@@ -788,9 +795,16 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	FrameShell* shell = new FrameShell();
 
 	
-	shell->frame = std::make_shared<Frame>(image->PhoUncalibImage, &Hcalib, fh, shell);
-
+	shell->frame = std::make_shared<Frame>(image->PhoUncalibImage, detector, &Hcalib, fh, shell);
 	
+	// std::cout << shell->frame->nFeatures << std::endl;
+	// cv::Mat Output;
+	// shell->frame->Image.convertTo(Output, CV_8UC3);
+	// cv::drawKeypoints(Output, shell->frame->mvKeys, Output, cv::Scalar(0, 255, 0));
+	// cv::namedWindow("test2", cv::WINDOW_KEEPRATIO);
+	// cv::imshow("test2", Output);
+	// cv::waitKey(1);
+
 	shell->camToWorld = SE3(); // no lock required, as fh is not used anywhere yet.
 	shell->aff_g2l = AffLight(0,0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
@@ -1226,9 +1240,13 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
-		if(rand()/(float)RAND_MAX > keepPercentage) continue;
+		
 
 		Pnt* point = coarseInitializer->points[0]+i;
+		if(point->my_type <= 4)
+			if(rand()/(float)RAND_MAX > keepPercentage) 
+				continue;
+		
 		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f,point->v+0.5f,firstFrame,point->my_type, &Hcalib);
 
 		if(!std::isfinite(pt->energyTH)) { 
@@ -1301,8 +1319,9 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 		else newFrame->immaturePoints.push_back(impt);
 
 	}
-	//printf("MADE %d IMMATURE POINTS!\n", (int)newFrame->immaturePoints.size());
 
+	newFrame->shell->frame->ReduceToEssential();
+	//printf("MADE %d IMMATURE POINTS!\n", (int)newFrame->immaturePoints.size());
 }
 
 

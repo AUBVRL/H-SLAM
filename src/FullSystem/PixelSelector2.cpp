@@ -10,6 +10,9 @@
 #include "FullSystem/HessianBlocks.h"
 #include "util/globalFuncs.h"
 
+#include "util/FrameShell.h"
+#include "Indirect/Frame.h"
+
 namespace HSLAM
 {
 
@@ -311,7 +314,14 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 	float dw2 = dw1*dw1;
 
 
-	int n3=0, n2=0, n4=0;
+	int n3=0, n2=0, n4=0, n1=0;
+	auto frame = fh->shell->frame;
+	for (int i = 0; i < frame->nFeatures; ++i)
+	{
+		int idx = frame->mvKeys[i].pt.x + frame->mvKeys[i].pt.y * wG[0];
+		map_out[idx] = i+5; //this allows to track indirect features within the map_out struct (they start at idx 5)
+	}
+
 	for(int y4=0;y4<h;y4+=(4*pot)) for(int x4=0;x4<w;x4+=(4*pot))
 	{
 		int my3 = std::min((4*pot), h-y4);
@@ -343,8 +353,10 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 					int yf = y1+y234;
 
 					if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
+					if( map_out[idx]>4 )
+						{ bestVal2 = 1e10; bestIdx2 = idx; bestIdx3 = -2; bestIdx4=-2;}
 
-
+					if(bestIdx3==-2) continue;
 					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];
 					float pixelTH1 = pixelTH0*dw1;
 					float pixelTH2 = pixelTH1*dw2;
@@ -388,7 +400,8 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 
 				if(bestIdx2>0)
 				{
-					map_out[bestIdx2] = 1;
+					if( map_out[bestIdx2] <= 4 )
+						map_out[bestIdx2] = 1;
 					bestVal3 = 1e10;
 					n2++;
 				}

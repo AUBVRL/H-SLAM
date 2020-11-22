@@ -14,6 +14,11 @@ extern int mnGridCols, mnGridRows;
 extern float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
 extern int EDGE_THRESHOLD;
 
+extern int minThFAST;
+extern int minIndDist;
+extern int minDirDist;
+extern int indFeaturesToExtract;
+
 #define SOLVER_SVD (int)1
 #define SOLVER_ORTHOGONALIZE_SYSTEM (int)2
 #define SOLVER_ORTHOGONALIZE_POINTMARG (int)4

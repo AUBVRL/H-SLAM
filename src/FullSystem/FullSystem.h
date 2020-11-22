@@ -37,6 +37,8 @@ struct ImmaturePointTemporaryResidual;
 class ImageAndExposure;
 class CoarseDistanceMap;
 
+class FeatureDetector;
+
 class EnergyFunctional;
 
 template<typename T> inline void deleteOut(std::vector<T*> &v, const int i)
@@ -140,9 +142,7 @@ public:
 	void setGammaFunction(float* BInv);
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
-
-
-
+	std::shared_ptr<FeatureDetector> detector;
 
 
 private:
