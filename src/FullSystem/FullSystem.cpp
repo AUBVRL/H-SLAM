@@ -1341,7 +1341,8 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 
 	}
 
-	newFrame->shell->frame->ReduceToEssential();
+	if(newFrame->shell->frame)
+		newFrame->shell->frame->ReduceToEssential();
 	//printf("MADE %d IMMATURE POINTS!\n", (int)newFrame->immaturePoints.size());
 }
 

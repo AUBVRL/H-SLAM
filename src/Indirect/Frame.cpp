@@ -37,7 +37,7 @@ namespace HSLAM
         {
             Image.release();
             Occupancy.release();
-            NeedRefresh = true;
+            // NeedRefresh = true;
         }
         return;
     }

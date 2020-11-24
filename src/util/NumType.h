@@ -19,11 +19,11 @@ namespace HSLAM
 
 #define MAX_RES_PER_POINT 8
 
-#ifdef ThreadCount
-#define NUM_THREADS ThreadCount //6
-#else
+// #ifdef ThreadCount
+// #define NUM_THREADS ThreadCount //6
+// #else
 #define NUM_THREADS 6
-#endif
+// #endif
 
 #define todouble(x) (x).cast<double>()
 
