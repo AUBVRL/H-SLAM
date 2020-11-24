@@ -2,6 +2,7 @@
 
 #include "util/NumType.h"
 #include "algorithm"
+#include <boost/thread.hpp>
 
 namespace HSLAM
 {
@@ -15,13 +16,12 @@ namespace HSLAM
 		int id;			  // INTERNAL ID, starting at zero.
 		int incoming_id;  // ID passed into DSO
 		double timestamp; // timestamp passed into DSO.
+		
 
-		// set once after tracking
-		SE3 camToTrackingRef;
-		FrameShell *trackingRef;
+		int trackingRefId;
 
 		// constantly adapted.
-		SE3 camToWorld; // Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+		
 		AffLight aff_g2l;
 		bool poseValid;
 
@@ -40,14 +40,42 @@ namespace HSLAM
 			id = 0;
 			poseValid = true;
 			camToWorld = SE3();
+			aff_g2l = AffLight(0,0);
+			worldToCamOpti = Sim3();
 			timestamp = 0;
 			marginalizedAt = -1;
 			movedByOpt = 0;
 			statistics_outlierResOnThis = statistics_goodResOnThis = 0;
-			trackingRef = 0;
-			camToTrackingRef = SE3();
+			trackingRefId = 0;
 			isKeyframe = false;
 		}
+
+		SE3 getPose() {
+            boost::lock_guard<boost::mutex> l(shellPoseMutex);
+            return camToWorld;
+        }
+
+        void setPose(const SE3 &_Twc) {
+            boost::lock_guard<boost::mutex> l(shellPoseMutex);
+            camToWorld = _Twc;
+        }
+
+		// get and write the optimized pose by loop closing
+        Sim3 getPoseOpti() {
+            boost::lock_guard<boost::mutex> l(shellPoseMutex);
+            return worldToCamOpti;
+        }
+
+        void setPoseOpti(const Sim3 &Scw) {
+            boost::lock_guard<boost::mutex> l(shellPoseMutex);
+            worldToCamOpti = Scw;
+        }
+		
+
+		private:
+			boost::mutex shellPoseMutex;
+			SE3 camToWorld; // Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+			Sim3 worldToCamOpti; //camToWorld.inverse
 };
 
 

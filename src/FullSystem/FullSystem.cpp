@@ -227,10 +227,39 @@ void FullSystem::setGammaFunction(float* BInv)
 
 
 
-void FullSystem::printResult(std::string file)
+void FullSystem::printResult(std::string file, bool printSim)
 {
 	boost::unique_lock<boost::mutex> lock(trackMutex);
-	boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+	// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+	
+	SE3 Twc;
+	if(printSim)
+	{
+		std::ofstream myfile(file + "_loop");
+		myfile.open (file.c_str());
+		myfile << std::setprecision(15);
+
+		Sim3 Swc;
+		for (FrameShell *s : allFrameHistory)
+		{
+			if(!s->poseValid) 
+			continue;
+
+			if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
+				continue;
+			
+			Swc = s->getPoseOpti().inverse();
+			Twc = SE3(Swc.rotationMatrix(), Swc.translation());
+
+			myfile << s->timestamp <<
+			" " << Twc.translation().transpose()<<
+			" " << Twc.so3().unit_quaternion().x()<<
+			" " << Twc.so3().unit_quaternion().y()<<
+			" " << Twc.so3().unit_quaternion().z()<<
+			" " << Twc.so3().unit_quaternion().w() << "\n";
+		}
+		myfile.close();
+	}
 
 	std::ofstream myfile;
 	myfile.open (file.c_str());
@@ -238,16 +267,19 @@ void FullSystem::printResult(std::string file)
 
 	for(FrameShell* s : allFrameHistory)
 	{
-		if(!s->poseValid) continue;
+		if(!s->poseValid) 
+			continue;
 
-		if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) continue;
+		if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
+			continue;
+		Twc = s->getPose();
 
 		myfile << s->timestamp <<
-			" " << s->camToWorld.translation().transpose()<<
-			" " << s->camToWorld.so3().unit_quaternion().x()<<
-			" " << s->camToWorld.so3().unit_quaternion().y()<<
-			" " << s->camToWorld.so3().unit_quaternion().z()<<
-			" " << s->camToWorld.so3().unit_quaternion().w() << "\n";
+			" " << Twc.translation().transpose()<<
+			" " << Twc.so3().unit_quaternion().x()<<
+			" " << Twc.so3().unit_quaternion().y()<<
+			" " << Twc.so3().unit_quaternion().z()<<
+			" " << Twc.so3().unit_quaternion().w() << "\n";
 	}
 	myfile.close();
 }
@@ -278,9 +310,9 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		SE3 slast_2_sprelast;
 		SE3 lastF_2_slast;
 		{	// lock on global pose consistency!
-			boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-			slast_2_sprelast = sprelast->camToWorld.inverse() * slast->camToWorld;
-			lastF_2_slast = slast->camToWorld.inverse() * lastF->shell->camToWorld;
+			// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+			slast_2_sprelast = sprelast->getPose().inverse() * slast->getPose();
+			lastF_2_slast = slast->getPose().inverse() * lastF->shell->getPose();
 			aff_last_2_l = slast->aff_g2l;
 		}
 		SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
@@ -414,11 +446,11 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	lastCoarseRMSE = achievedRes;
 
 	// no lock required, as fh is not used anywhere yet.
-	fh->shell->camToTrackingRef = lastF_2_fh.inverse();
-	fh->shell->trackingRef = lastF->shell;
-	fh->shell->aff_g2l = aff_g2l;
-	fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
 
+	fh->shell->trackingRefId = lastF->shell->id;
+	
+	fh->shell->aff_g2l = aff_g2l;
+	fh->shell->setPose(lastF->shell->getPose() * lastF_2_fh.inverse());
 
 	if(coarseTracker->firstCoarseRMSE < 0)
 		coarseTracker->firstCoarseRMSE = achievedRes[0];
@@ -434,7 +466,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 						<< fh->shell->id << " "
 						<< fh->shell->timestamp << " "
 						<< fh->ab_exposure << " "
-						<< fh->shell->camToWorld.log().transpose() << " "
+						<< fh->shell->getPose().log().transpose() << " "
 						<< aff_g2l.a << " "
 						<< aff_g2l.b << " "
 						<< achievedRes[0] << " "
@@ -805,8 +837,6 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	// cv::imshow("test2", Output);
 	// cv::waitKey(1);
 
-	shell->camToWorld = SE3(); // no lock required, as fh is not used anywhere yet.
-	shell->aff_g2l = AffLight(0,0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
     shell->incoming_id = id;
@@ -929,7 +959,7 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 	{
 		boost::unique_lock<boost::mutex> lock(trackMapSyncMutex);
 		unmappedTrackedFrames.push_back(fh);
-		if(needKF) needNewKFAfter=fh->shell->trackingRef->id;
+		if(needKF) needNewKFAfter=fh->shell->trackingRefId;
 		trackedFrameSignal.notify_all();
 
 		while(coarseTracker_forNewKF->refFrameID == -1 && coarseTracker->refFrameID == -1 )
@@ -982,10 +1012,8 @@ void FullSystem::mappingLoop()
 				FrameHessian* fh = unmappedTrackedFrames.front();
 				unmappedTrackedFrames.pop_front();
 				{
-					boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-					assert(fh->shell->trackingRef != 0);
-					fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-					fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+					// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+					fh->setEvalPT_scaled(fh->shell->getPose().inverse(),fh->shell->aff_g2l);
 				}
 
 				if(fh->shell->frame)
@@ -1030,10 +1058,8 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 {
 	// needs to be set by mapping thread. no lock required since we are in mapping thread.
 	{
-		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		assert(fh->shell->trackingRef != 0);
-		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+		fh->setEvalPT_scaled(fh->shell->getPose().inverse(),fh->shell->aff_g2l);
 	}
 
 	traceNewCoarse(fh);
@@ -1048,10 +1074,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
 	// needs to be set by mapping thread
 	{
-		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		assert(fh->shell->trackingRef != 0);
-		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+		fh->setEvalPT_scaled(fh->shell->getPose().inverse(),fh->shell->aff_g2l);
 	}
 
 	traceNewCoarse(fh);
@@ -1277,18 +1301,15 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	// really no lock required, as we are initializing.
 	{
-		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		firstFrame->shell->camToWorld = SE3();
+		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
+		firstFrame->shell->setPose(SE3());
 		firstFrame->shell->aff_g2l = AffLight(0,0);
-		firstFrame->setEvalPT_scaled(firstFrame->shell->camToWorld.inverse(),firstFrame->shell->aff_g2l);
-		firstFrame->shell->trackingRef=0;
-		firstFrame->shell->camToTrackingRef = SE3();
+		firstFrame->setEvalPT_scaled(firstFrame->shell->getPose().inverse(),firstFrame->shell->aff_g2l);
+		
 
-		newFrame->shell->camToWorld = firstToNew.inverse();
+		newFrame->shell->setPose(firstToNew.inverse());
 		newFrame->shell->aff_g2l = AffLight(0,0);
-		newFrame->setEvalPT_scaled(newFrame->shell->camToWorld.inverse(),newFrame->shell->aff_g2l);
-		newFrame->shell->trackingRef = firstFrame->shell;
-		newFrame->shell->camToTrackingRef = firstToNew.inverse();
+		newFrame->setEvalPT_scaled(newFrame->shell->getPose().inverse(),newFrame->shell->aff_g2l);
 
 	}
 

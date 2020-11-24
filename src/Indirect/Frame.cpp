@@ -3,7 +3,7 @@
 #include "util/globalCalib.h"
 #include "util/globalFuncs.h"
 #include "Indirect/Detector.h"
-
+#include "Indirect/MapPoint.h"
 #include "opencv2/highgui.hpp"
 
 namespace HSLAM

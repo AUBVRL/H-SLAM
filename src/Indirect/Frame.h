@@ -7,6 +7,7 @@ namespace HSLAM
     class CalibHessian;
     class FeatureDetector;
     class FrameShell;
+    class MapPoint;
     struct FrameHessian;
 
     template <typename Type> class IndexThreadReduce;
@@ -34,7 +35,7 @@ namespace HSLAM
         std::vector<std::vector<unsigned short int>> mGrid;
         std::vector<cv::KeyPoint> mvKeys;
 
-        // std::vector<MapPoint> Mps;
+        std::vector<MapPoint> Mps;
 
         cv::Mat Descriptors;
         //BoW

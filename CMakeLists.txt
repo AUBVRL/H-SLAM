@@ -67,6 +67,8 @@ set(SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Frame.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Detector.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/MapPoint.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/Matcher.cpp
 )
 
 

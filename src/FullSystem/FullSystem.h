@@ -124,7 +124,7 @@ public:
 
 	float optimize(int mnumOptIts);
 
-	void printResult(std::string file);
+	void printResult(std::string file, bool printSim = false);
 
 	void debugPlot(std::string name);
 

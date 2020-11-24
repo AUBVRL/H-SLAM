@@ -78,7 +78,7 @@ void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 	fyi = 1/fy;
 	cxi = -cx / fx;
 	cyi = -cy / fy;
-	camToWorld = frame->camToWorld;
+	camToWorld = frame->getPose();
 	needRefresh=true;
 }
 

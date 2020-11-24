@@ -88,7 +88,7 @@ public:
 	bool active;
 	SE3 camToWorld;
 
-    inline bool operator < (const KeyFrameDisplay& other) const
+	inline bool operator < (const KeyFrameDisplay& other) const
     {
         return (id < other.id);
     }

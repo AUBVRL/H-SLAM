@@ -1,5 +1,5 @@
 #pragma once
-
+#include <opencv2/core.hpp>
 #include "Eigen/Core"
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
