@@ -17,8 +17,8 @@ namespace HSLAM
         Occupancy = cv::Mat(hG[0], wG[0], CV_8U, cv::Scalar(0));
         detector->ExtractFeatures(Image, Occupancy, mvKeys, Descriptors, nFeatures, indFeaturesToExtract);
         assignFeaturesToGrid();
+        mvpMapPoints.resize(nFeatures, nullptr);
         // ComputeBoVW();
-
     }
     Frame::~Frame()
     {
@@ -55,6 +55,21 @@ namespace HSLAM
 
         return;
     }
+
+
+        void Frame::addMapPoint(std::shared_ptr<MapPoint>& Mp )
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            mvpMapPoints[Mp->index] = Mp;
+            return;
+        }
+
+        void Frame::addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index )
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            mvpMapPoints[index] = Mp;
+            return;
+        }
 
     bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
     {
@@ -113,7 +128,7 @@ namespace HSLAM
         {
             vector<cv::Mat> vDesc;
             vDesc.reserve(Descriptors.rows);
-            for (int j = 0; j < Descriptors.rows; j++)
+            for (int j = 0; j < Descriptors.rows; ++j)
                 vDesc.push_back(Descriptors.row(j));
             Vocab.transform(vDesc, mBowVec, mFeatVec, 4);
         }

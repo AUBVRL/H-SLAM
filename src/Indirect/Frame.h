@@ -1,6 +1,7 @@
 #pragma once
 #include "util/settings.h"
 #include "util/NumType.h"
+#include <boost/thread.hpp>
 
 namespace HSLAM
 {
@@ -23,19 +24,32 @@ namespace HSLAM
       
         void ReduceToEssential();
         bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
-        // void Extract(std::shared_ptr<FeatureDetector> _Detector, int id, bool ForInit, std::shared_ptr<IndexThreadReduce<Vec10>> ThreadPool);
-        void Extract();
 
         std::vector<size_t> GetFeaturesInArea(const float &x, const float &y, const float &r) const;
         void ComputeBoVW();
         void assignFeaturesToGrid();
+        
+        inline std::shared_ptr<MapPoint> getMapPoint(int idx)
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return mvpMapPoints[idx];
+        }
+
+        inline std::vector<std::shared_ptr<MapPoint>> getMapPointsV()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return mvpMapPoints;
+        }
+
+        void addMapPoint(std::shared_ptr<MapPoint>& Mp);
+        void addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index);
 
         cv::Mat Image;
         cv::Mat Occupancy;
         std::vector<std::vector<unsigned short int>> mGrid;
         std::vector<cv::KeyPoint> mvKeys;
 
-        std::vector<MapPoint> Mps;
+        std::vector<std::shared_ptr<MapPoint>> mvpMapPoints;
 
         cv::Mat Descriptors;
         //BoW
@@ -50,6 +64,10 @@ namespace HSLAM
         CalibHessian *HCalib;
         FrameHessian *fh;
         FrameShell *fs;
+
+        private:
+   			boost::mutex _mtx;
+
     };
 
 } // namespace HSLAM

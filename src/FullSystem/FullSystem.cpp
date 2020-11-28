@@ -18,6 +18,8 @@
 
 #include "Indirect/Frame.h"
 #include "Indirect/Detector.h"
+#include "Indirect/MapPoint.h"
+
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
@@ -168,6 +170,7 @@ FullSystem::~FullSystem()
 		DiagonalLog->close(); delete DiagonalLog;
 		variancesLog->close(); delete variancesLog;
 		nullspacesLog->close(); delete nullspacesLog;
+
 	}
 
 	delete[] selectionMap;
@@ -229,6 +232,29 @@ void FullSystem::setGammaFunction(float* BInv)
 
 void FullSystem::printResult(std::string file, bool printSim)
 {
+	int removed = 0;
+	int marginalized = 0;
+	int active = 0;
+	int immature = 0;
+
+	for (auto it : allKeyFramesHistory)
+	{
+		auto kfPts = it->frame->getMapPointsV();
+		for (int i = 0, iend = kfPts.size(); i < iend; ++i)
+			if (kfPts[i])
+			{
+				auto status = kfPts[i]->getDirStatus(); //active, marginalized, removed
+				if (status == MapPoint::active)
+					active += 1;
+				else if (status == MapPoint::marginalized)
+					marginalized += 1;
+				else if (status == MapPoint::removed)
+					removed += 1;
+			}
+		}
+
+	std::cout<<"imm: "<< immature<<" active: "<< active<< " marginlized: "<< marginalized<< " removed: "<< removed<<std::endl;
+
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 	// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 	
@@ -600,7 +626,7 @@ void FullSystem::activatePointsMT()
 //				immature_invalid_deleted++;
 				// remove point.
 				delete ph;
-				host->immaturePoints[i] = nullptr;
+				host->immaturePoints[i] = 0;
 				continue;
 			}
 
@@ -622,7 +648,7 @@ void FullSystem::activatePointsMT()
 				{
 //					immature_notReady_deleted++;
 					delete ph;
-					host->immaturePoints[i] = nullptr;
+					host->immaturePoints[i] = 0;
 				}
 //				immature_notReady_skipped++;
 				continue;
@@ -648,7 +674,7 @@ void FullSystem::activatePointsMT()
 			else
 			{
 				delete ph;
-				host->immaturePoints[i] = nullptr;
+				host->immaturePoints[i] = 0;
 			}
 		}
 	}
@@ -675,6 +701,14 @@ void FullSystem::activatePointsMT()
 		{
 			newpoint->host->immaturePoints[ph->idxInImmaturePoints]=0;
 			newpoint->host->pointHessians.push_back(newpoint);
+			
+			if (newpoint->my_type > 4)
+			{
+				std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(newpoint);
+				newpoint->host->shell->frame->addMapPoint(pMP);
+				newpoint->Mp = pMP;
+			}
+
 			ef->insertPoint(newpoint);
 			for(PointFrameResidual* r : newpoint->residuals)
 				ef->insertResidual(r);
@@ -752,7 +786,9 @@ void FullSystem::flagPointsForRemoval()
 			{
 				host->pointHessiansOut.push_back(ph);
 				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
-				host->pointHessians[i]=0;
+				if(!ph->Mp.expired())
+					ph->Mp.lock()->setDirStatus(MapPoint::removed);
+				host->pointHessians[i] = 0;
 				flag_nores++;
 			}
 			else if(ph->isOOB(fhsToKeepPoints, fhsToMargPoints) || host->flaggedForMarginalization)
@@ -779,11 +815,16 @@ void FullSystem::flagPointsForRemoval()
 						flag_inin++;
 						ph->efPoint->stateFlag = EFPointStatus::PS_MARGINALIZE;
 						host->pointHessiansMarginalized.push_back(ph);
+						
+						if(!ph->Mp.expired())
+							ph->Mp.lock()->setDirStatus(MapPoint::marginalized);
 					}
 					else
 					{
 						ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
 						host->pointHessiansOut.push_back(ph);
+						if(!ph->Mp.expired())
+							ph->Mp.lock()->setDirStatus(MapPoint::removed);
 					}
 
 
@@ -792,6 +833,8 @@ void FullSystem::flagPointsForRemoval()
 				{
 					host->pointHessiansOut.push_back(ph);
 					ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
+					if(!ph->Mp.expired())
+						ph->Mp.lock()->setDirStatus(MapPoint::removed);
 
 
 					//printf("drop point in frame %d (%d goodRes, %d activeRes)\n", ph->host->idx, ph->numGoodResiduals, (int)ph->residuals.size());
@@ -1291,6 +1334,13 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 		firstFrame->pointHessians.push_back(ph);
 		ef->insertPoint(ph);
+
+		if (ph->my_type > 4)
+		{
+			std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(ph);
+			ph->host->shell->frame->addMapPoint(pMP);
+			ph->Mp = pMP;
+		}
 	}
 
 
@@ -1336,7 +1386,9 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 		if(selectionMap[i]==0) continue;
 
 		ImmaturePoint* impt = new ImmaturePoint(x,y,newFrame, selectionMap[i], &Hcalib);
-		if(!std::isfinite(impt->energyTH)) delete impt;
+
+		if (!std::isfinite(impt->energyTH))
+			delete impt;
 		else newFrame->immaturePoints.push_back(impt);
 
 	}

@@ -7,6 +7,7 @@
 #include <vector>
 #include <chrono>
 #include <numeric>
+#include <set>
 
 namespace HSLAM
 {
@@ -141,7 +142,14 @@ typedef Eigen::Matrix<double,14,14> Mat1414;
 typedef Eigen::Matrix<double,14,1> Vec14;
 
 
-
+/// Returns the 3D cross product Skew symmetric matrix of a given 3D vector.
+template<class Derived>
+inline Eigen::Matrix<typename Derived::Scalar, 3, 3> Skew(
+    const Eigen::MatrixBase<Derived> & vec) {
+  EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 3);
+  return (Eigen::Matrix<typename Derived::Scalar, 3, 3>() << 0.0, -vec[2], vec[1],
+      vec[2], 0.0, -vec[0], -vec[1], vec[0], 0.0).finished();
+}
 
 
 

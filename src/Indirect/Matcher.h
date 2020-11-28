@@ -20,6 +20,10 @@
 
 namespace HSLAM
 {
+    class MapPoint;
+    class Frame;
+    class FrameShell;
+
     class Matcher
     {
     private:
@@ -78,6 +82,11 @@ namespace HSLAM
 
         ~Matcher() {}
 
+        int SearchByBoW(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vpMatches12);
+        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t> > &vMatchedPairs);
+        int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist);
+
+        bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, Mat33f &F12);
 
         inline static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
         {

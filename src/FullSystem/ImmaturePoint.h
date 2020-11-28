@@ -7,6 +7,7 @@
 namespace HSLAM
 {
 
+class MapPoint;
 
 struct ImmaturePointTemporaryResidual
 {
@@ -38,7 +39,7 @@ public:
 
 
 
-
+	std::weak_ptr<MapPoint> Mp;
 
 	Mat22f gradH;
 	Vec2f gradH_ev;

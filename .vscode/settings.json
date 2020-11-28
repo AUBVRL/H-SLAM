@@ -66,7 +66,9 @@
         "bitset": "cpp",
         "unordered_set": "cpp",
         "iomanip": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "matrixfunctions": "cpp",
+        "*.ipp": "cpp"
     },
     "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

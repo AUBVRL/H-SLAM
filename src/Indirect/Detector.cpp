@@ -63,10 +63,12 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, cv::Mat &Occupancy, std::v
                 continue;
             
             int index = FASTselection[i].pt.y * wG[0] + FASTselection[i].pt.x;
+
             if(Occupancy.data[index] == 255)
                 continue;
+                
             cv::rectangle( Occupancy, FASTselection[i].pt - minIndDistPt, FASTselection[i].pt + minIndDistPt, 255, -1, 8 );
-            cv::rectangle( Occupancy, FASTselection[i].pt - minDirDistPt, FASTselection[i].pt + minDirDistPt, 125, -1, 8 );
+           
             mvKeys.push_back(FASTselection[i]);
         }
 

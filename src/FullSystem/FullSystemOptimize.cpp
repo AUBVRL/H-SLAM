@@ -16,7 +16,7 @@
 #include <cmath>
 
 #include <algorithm>
-
+#include "Indirect/MapPoint.h"
 namespace HSLAM
 {
 
@@ -617,6 +617,8 @@ void FullSystem::removeOutliers()
 			{
 				fh->pointHessiansOut.push_back(ph);
 				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
+				if(!ph->Mp.expired())
+					ph->Mp.lock()->setDirStatus(MapPoint::removed);
 				fh->pointHessians[i] = fh->pointHessians.back();
 				fh->pointHessians.pop_back();
 				i--;

@@ -15,6 +15,7 @@
 namespace HSLAM
 {
 
+class MapPoint;
 
 inline Vec2 affFromTo(const Vec2 &from, const Vec2 &to)	// contains affine parameters as XtoWorld.
 {
@@ -317,7 +318,19 @@ struct CalibHessian
     inline float& cxli() {return value_scaledi[2];}
     inline float& cyli() {return value_scaledi[3];}
 
+	inline Mat33f getCalibMatrix()
+	{
+		Mat33f calib;
+		calib << value_scaledf[0], 0.0f, value_scaledf[2], 0.0f, value_scaledf[1], value_scaledf[3], 0.0f, 0.0f, 1.0f;
+		return calib;
+	}
 
+	inline Mat33f getInvCalibMatrix()
+	{
+		Mat33f invcalib;
+		invcalib << value_scaledi[0], 0.0f, value_scaledi[2], 0.0f, value_scaledi[1], value_scaledi[3], 0.0f, 0.0f, 1.0f;
+		return invcalib;
+	}
 
 	inline void setValue(const VecC &value)
 	{
@@ -408,7 +421,7 @@ struct PointHessian
 	float idepth_hessian;
 	float maxRelBaseline;
 	int numGoodResiduals;
-
+	std::weak_ptr<MapPoint> Mp;
 	enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB, MARGINALIZED};
 	PtStatus status;
 
