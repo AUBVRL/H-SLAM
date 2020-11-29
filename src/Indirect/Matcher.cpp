@@ -44,7 +44,7 @@ namespace HSLAM
                 if (!pMP->isBad() && !sAlreadyFound.count(pMP))
                 {
                     //Project
-                    Vec3f x3Dw = pMP->getWorldPosewPose(currPose); //GetWorldPos();
+                    Vec3f x3Dw = pMP->getWorldPose(); //GetWorldPos();
                     Vec3f x3Dc = Rcw.cast<float>() * x3Dw + tcw.cast<float>();
 
                     const float xc = x3Dc(0);
@@ -110,7 +110,7 @@ namespace HSLAM
 
                         if (mbCheckOrientation)
                         {
-                            float rot = pKF->mvKeys[i].angle - CurrentFrame->mvKeys[bestIdx2].angle;
+                            float rot = pMP->angle - CurrentFrame->mvKeys[bestIdx2].angle; // pKF->mvKeys[i].angle
                             if (rot < 0.0)
                                 rot += 360.0f;
                             int bin = round(rot * factor);

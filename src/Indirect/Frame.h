@@ -41,6 +41,18 @@ namespace HSLAM
             return mvpMapPoints;
         }
 
+        inline void EraseMapPointMatch(const size_t &idx)
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            mvpMapPoints[idx].reset();
+        }
+
+        inline void ReplaceMapPointMatch(const size_t &idx, std::shared_ptr<MapPoint> pMP)
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            mvpMapPoints[idx] = pMP;
+        }
+
         void addMapPoint(std::shared_ptr<MapPoint>& Mp);
         void addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index);
 

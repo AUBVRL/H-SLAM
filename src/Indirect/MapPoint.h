@@ -16,11 +16,16 @@ namespace HSLAM
     private:
         mutable boost::mutex _mtx;
         std::map<std::shared_ptr<Frame>, size_t> mObservations; // Keyframes observing the point and associated index in keyframe
-        cv::Mat mNormalVector;// Mean viewing direction
+        Vec3f mNormalVector;// Mean viewing direction
         cv::Mat mDescriptor; // Best descriptor to fast matching
         int nObs;
         int mnFound;
         int mnVisible;
+        
+        Vec3f worldPose;
+       
+        float idepth;
+        float idepthH;
 
     public:
 
@@ -31,19 +36,23 @@ namespace HSLAM
         PointHessian* ph;
         size_t id;  // the mappoint descriptor comes from the sourceId descriptor matrix.
         float index; //index of the point in the original keyframe = immPt.type-5
-        float idepth;
-        float idepthH;
+        Vec2f pt;
+        float angle;
+        bool mbBad;
+
         enum mpDirStatus {active =0, marginalized, removed } status;
 
         void EraseObservation(std::shared_ptr<Frame> &pKF);
         void SetBadFlag();
-        bool isBad();
+
        
-        // void Replace(MapPoint *pMP);
+        void Replace(std::shared_ptr<MapPoint> pMP);
         // MapPoint *GetReplaced();
         void UpdateNormalAndDepth();
-        Vec3f getWorldPosewPose(SE3& pose);
+        // Vec3f getWorldPosewPose(SE3& pose);
         Vec3f getWorldPose();
+
+        void updateGlobalPose();
 
 
         void ComputeDistinctiveDescriptors();
@@ -54,6 +63,8 @@ namespace HSLAM
             boost::lock_guard<boost::mutex> l(_mtx);
             ph = _ph;
         }
+
+        void updateDepth();
 
 
         inline mpDirStatus getDirStatus()
@@ -84,10 +95,10 @@ namespace HSLAM
         }
 
 
-        inline cv::Mat GetNormal()
+        inline Vec3f GetNormal()
         {
             boost::lock_guard<boost::mutex> l(_mtx);
-            return mNormalVector.clone();
+            return mNormalVector;
         }
 
 
@@ -102,6 +113,13 @@ namespace HSLAM
         {
             boost::lock_guard<boost::mutex> l(_mtx); //diff lock?
             return mObservations;
+        }
+
+
+        inline bool isBad()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx); //pose and diff lock?
+            return mbBad;
         }
 
 
@@ -167,8 +185,8 @@ namespace HSLAM
         inline void setDescriptor(cv::Mat _descriptor)
         {
             boost::lock_guard<boost::mutex> l(_mtx); //diff lock?
-            if(_descriptor.empty())
-                return;
+            // if(_descriptor.empty())
+            //     return;
             mDescriptor = _descriptor.clone();
         }
 

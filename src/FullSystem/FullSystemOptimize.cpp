@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include "Indirect/MapPoint.h"
+#include "Indirect/Frame.h"
 namespace HSLAM
 {
 
@@ -564,6 +565,21 @@ float FullSystem::optimize(int mnumOptIts)
 		{
 			fh->shell->setPose(fh->PRE_camToWorld);
 			fh->shell->aff_g2l = fh->aff_g2l();
+
+			auto Mps = fh->shell->frame->getMapPointsV();
+			
+			for (auto &it: Mps)
+			{
+				if(it)
+				{
+					if(it->ph) // if ph still exists update the depth values
+						it->updateDepth();
+
+					if (it->sourceFrame == fh->shell->frame) // if this is the origin of the mapPoint update the points' 3D pose
+						it->updateGlobalPose();
+				}
+					
+			}
 		}
 	}
 
