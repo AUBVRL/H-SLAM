@@ -116,6 +116,7 @@ FullSystem::FullSystem()
 	pixelSelector = new PixelSelector(wG[0], hG[0]);
 
 	detector = std::make_shared<FeatureDetector>();
+	globalMap = std::make_shared<Map>();
 
 	statistics_lastNumOptIts=0;
 	statistics_numDroppedPoints=0;
@@ -194,6 +195,7 @@ FullSystem::~FullSystem()
 	delete pixelSelector;
 	delete ef;
 	detector.reset();
+	globalMap.reset();
 }
 
 void FullSystem::setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH)
@@ -274,7 +276,7 @@ void FullSystem::printResult(std::string file, bool printSim)
 			if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
 				continue;
 			
-			Swc = s->getPoseOpti().inverse();
+			Swc = s->getPoseOptiInv();
 			Twc = SE3(Swc.rotationMatrix(), Swc.translation());
 
 			myfile << s->timestamp <<
@@ -1118,7 +1120,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	// needs to be set by mapping thread
 	{
 		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		fh->setEvalPT_scaled(fh->shell->getPose().inverse(),fh->shell->aff_g2l);
+		fh->setEvalPT_scaled(fh->shell->getPoseInverse(),fh->shell->aff_g2l);
+		fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
 	}
 
 	traceNewCoarse(fh);
@@ -1132,6 +1135,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	// =========================== add New Frame to Hessian Struct. =========================
 	fh->idx = frameHessians.size();
 	frameHessians.push_back(fh);
+	fh->shell->KfId = allKeyFramesHistory.back()->KfId + 1;
 	fh->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(fh->shell);
 	ef->insertFrame(fh, &Hcalib);
@@ -1278,6 +1282,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	firstFrame->idx = frameHessians.size();
 	frameHessians.push_back(firstFrame);
 	firstFrame->frameID = allKeyFramesHistory.size();
+	firstFrame->shell->KfId = 0;
 	allKeyFramesHistory.push_back(firstFrame->shell);
 	ef->insertFrame(firstFrame, &Hcalib);
 	setPrecalcValues();

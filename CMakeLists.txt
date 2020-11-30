@@ -69,6 +69,7 @@ set(SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/Indirect/Detector.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/MapPoint.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Matcher.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/Map.cpp
 )
 
 

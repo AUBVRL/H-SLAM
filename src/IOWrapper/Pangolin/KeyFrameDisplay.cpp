@@ -52,7 +52,7 @@ KeyFrameDisplay::KeyFrameDisplay()
 
 	id = 0;
 	active= true;
-	camToWorld = SE3();
+	camToWorld = Sim3();
 
 	needRefresh=true;
 
@@ -61,8 +61,8 @@ KeyFrameDisplay::KeyFrameDisplay()
 	my_displayMode = 1;
 	my_minRelBS = 0;
 	my_sparsifyFactor = 1;
-
-	numGLBufferPoints=0;
+	originFrame = nullptr;
+	numGLBufferPoints = 0;
 	bufferValid = false;
 }
 void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
@@ -78,8 +78,9 @@ void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 	fyi = 1/fy;
 	cxi = -cx / fx;
 	cyi = -cy / fy;
-	camToWorld = frame->getPose();
+	camToWorld = frame->getPoseOptiInv();
 	needRefresh=true;
+	originFrame = frame;
 }
 
 void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
@@ -160,7 +161,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 	}
 	assert(numSparsePoints <= npoints);
 
-	camToWorld = fh->PRE_camToWorld;
+	camToWorld = fh->shell->getPoseOptiInv(); //PRE_camToWorld;
 	needRefresh=true;
 }
 
@@ -318,12 +319,17 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 
 
 
-void KeyFrameDisplay::drawCam(float lineWidth, float* color, float sizeFactor)
+void KeyFrameDisplay::drawCam(float lineWidth, float* color, float sizeFactor,  bool drawOrig)
 {
 	if(width == 0)
 		return;
 
-	float sz=sizeFactor;
+	if (drawOrig && originFrame)
+		camToWorld = Sim3(originFrame->getPose().matrix());
+	else if (drawOrig == false)
+		camToWorld = originFrame->getPoseOptiInv();
+
+	float sz = sizeFactor;
 
 	glPushMatrix();
 

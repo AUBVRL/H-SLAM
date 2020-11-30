@@ -24,7 +24,7 @@ namespace HSLAM
 
         pt = Vec2f(ph->u, ph->v);
         angle = sourceFrame->mvKeys[index].angle;
-        
+
         auto calib = sourceFrame->HCalib;
         worldPose = sourceFrame->fs->getPose().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
 
@@ -50,7 +50,7 @@ namespace HSLAM
         // idepth = ph->idepth;
         // idepthH = ph->idepth_hessian;
         auto calib = sourceFrame->HCalib;
-        worldPose = sourceFrame->fs->getPose().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
+        worldPose = sourceFrame->fs->getPoseOptiInv().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
 
     }
 

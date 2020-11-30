@@ -81,12 +81,14 @@ public:
 	bool refreshPC(bool canRefresh, float scaledTH, float absTH, int mode, float minBS, int sparsity);
 
 	// renders cam & pointcloud.
-	void drawCam(float lineWidth = 1, float* color = 0, float sizeFactor=1);
+	void drawCam(float lineWidth = 1, float* color = 0, float sizeFactor=1, bool drawOrig=true);
 	void drawPC(float pointSize);
+	
+	FrameShell* originFrame;
 
 	int id;
 	bool active;
-	SE3 camToWorld;
+	Sim3 camToWorld;
 
 	inline bool operator < (const KeyFrameDisplay& other) const
     {

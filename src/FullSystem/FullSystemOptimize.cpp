@@ -564,6 +564,7 @@ float FullSystem::optimize(int mnumOptIts)
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->shell->setPose(fh->PRE_camToWorld);
+			fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
 			fh->shell->aff_g2l = fh->aff_g2l();
 
 			auto Mps = fh->shell->frame->getMapPointsV();

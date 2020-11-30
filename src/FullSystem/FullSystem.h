@@ -18,7 +18,7 @@
 
 #include <math.h>
 
-
+#include "Indirect/Map.h"
 
 namespace HSLAM
 {
@@ -143,7 +143,7 @@ public:
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
 	std::shared_ptr<FeatureDetector> detector;
-
+	std::shared_ptr<Map> globalMap;
 
 private:
 
