@@ -19,6 +19,8 @@
 #include "Indirect/Frame.h"
 #include "Indirect/Detector.h"
 #include "Indirect/MapPoint.h"
+#include "Indirect/Map.h"
+#include "Indirect/Matcher.h"
 
 
 #include <opencv2/highgui.hpp>
@@ -117,6 +119,7 @@ FullSystem::FullSystem()
 
 	detector = std::make_shared<FeatureDetector>();
 	globalMap = std::make_shared<Map>();
+	matcher = std::make_shared<Matcher>();
 
 	statistics_lastNumOptIts=0;
 	statistics_numDroppedPoints=0;
@@ -706,7 +709,7 @@ void FullSystem::activatePointsMT()
 			
 			if (newpoint->my_type > 4)
 			{
-				std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(newpoint);
+				std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(newpoint, globalMap);
 				newpoint->host->shell->frame->addMapPoint(pMP);
 				newpoint->Mp = pMP;
 			}
@@ -1126,6 +1129,11 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	traceNewCoarse(fh);
 
+	static Timer mapperTime("Ind MapTime");
+	mapperTime.startTime();
+	IndirectMapper(fh->shell->frame);
+	mapperTime.endTime(true);
+
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// =========================== Flag Frames to be Marginalized. =========================
@@ -1258,6 +1266,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
     }
 
 
+	updateLocalKeyframes(fh->shell->frame);
+	updateLocalPoints(fh->shell->frame);
 
 	// =========================== Marginalize Frames =========================
 
@@ -1283,6 +1293,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	frameHessians.push_back(firstFrame);
 	firstFrame->frameID = allKeyFramesHistory.size();
 	firstFrame->shell->KfId = 0;
+	newFrame->shell->KfId = 1;
 	allKeyFramesHistory.push_back(firstFrame->shell);
 	ef->insertFrame(firstFrame, &Hcalib);
 	setPrecalcValues();
@@ -1342,13 +1353,13 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 		if (ph->my_type > 4)
 		{
-			std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(ph);
+			std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(ph, globalMap);
 			ph->host->shell->frame->addMapPoint(pMP);
 			ph->Mp = pMP;
+			pMP->AddObservation(firstFrame->shell->frame,pMP->index);
+			globalMap->AddMapPoint(pMP);
 		}
 	}
-
-
 
 	SE3 firstToNew = coarseInitializer->thisToNext;
 	firstToNew.translation() /= rescaleFactor;
@@ -1368,7 +1379,24 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	}
 
-	initialized=true;
+	firstFrame->shell->frame->mpReferenceKF = firstFrame->shell->frame;
+	firstFrame->shell->frame->ComputeBoVW();
+	globalMap->AddKeyFrame(firstFrame->shell->frame);
+	globalMap->mvpKeyFrameOrigins.push_back(firstFrame->shell->frame);
+	mnLastKeyFrameId = newFrame->shell->KfId;
+	mpLastKeyFrame = newFrame->shell->frame;
+	mvpLocalKeyFrames.push_back(newFrame->shell->frame);
+	mvpLocalMapPoints=globalMap->GetAllMapPoints();
+	mpReferenceKF = newFrame->shell->frame;
+	newFrame->shell->frame->mpReferenceKF = newFrame->shell->frame;
+	mLastFrame = newFrame->shell->frame;
+	globalMap->SetReferenceMapPoints(mvpLocalMapPoints);
+	
+
+
+	int nmatches = SearchLocalPoints(newFrame->shell->frame, 5, 0.9);
+
+	initialized = true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
 }
 
@@ -1398,8 +1426,6 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 
 	}
 
-	if(newFrame->shell->frame)
-		newFrame->shell->frame->ReduceToEssential();
 	//printf("MADE %d IMMATURE POINTS!\n", (int)newFrame->immaturePoints.size());
 }
 
@@ -1588,7 +1614,289 @@ void FullSystem::printEvalLine()
 }
 
 
+void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
+{
+	
+	frame->ComputeBoVW(); //possibly move this to loop closure?
+
+	for(size_t i=0, iend = frame->tMapPoints.size(); i < iend; ++i)
+    {
+		std::shared_ptr<MapPoint> Mp = frame->tMapPoints[i]; 
+		if (Mp)
+		{	if(Mp->isBad())
+				continue;
+			if (!Mp->isInKeyframe(frame))
+			{
+				frame->addMapPointMatch(Mp, i);
+				Mp->AddObservation(frame, i);
+				Mp->ComputeDistinctiveDescriptors();
+				Mp->UpdateNormalAndDepth();
+			}
+			// else // this can only happen for new stereo points inserted by the Tracking
+			// {
+			// 	mlpRecentAddedMapPoints.push_back(MP);
+			// }
+		}
+	}
+
+	//a frame then holds a weak pointer to itself to make sure its pose is absolute wrt to itself and used to 'this' in updateconnections
+	//
+	frame->mpReferenceKF = frame; 
+	frame->UpdateConnections();
+	if (frame->fs->KfId == 1) //this is the second keyframe being added to the map: need to update first kf connections.
+		for (auto it: globalMap->mvpKeyFrameOrigins)
+			it->UpdateConnections();
+
+	globalMap->AddKeyFrame(frame);
+	mpReferenceKF = frame;
+	
+	mnLastKeyFrameId = frame->fs->KfId;
+    mpLastKeyFrame = frame;
+}
+
+int FullSystem::SearchLocalPoints(std::shared_ptr<Frame> frame, int th, float nnratio)
+{
+	int nmatches = 0;
+	// Do not search map points already matched
+	for (std::vector<std::shared_ptr<MapPoint>>::iterator vit = frame->tMapPoints.begin(), vend = frame->tMapPoints.end(); vit != vend; vit++)
+	{
+		std::shared_ptr<MapPoint> pMP = *vit;
+		if (pMP)
+		{
+			if (pMP->isBad())
+			{
+				*vit = static_cast<std::shared_ptr<MapPoint>>(NULL);
+			}
+			else
+			{
+				nmatches += 1; //might need to remove this ?
+				pMP->increaseVisible();
+				pMP->mnLastFrameSeen = frame->fs->KfId;
+				pMP->mbTrackInView = false;
+			}
+		}
+	}
+
+	int nToMatch = 0;
+
+	boost::unique_lock<boost::mutex> lock(localMapMtx);
+
+	// Project points in frame and check its visibility
+	for (std::vector<std::shared_ptr<MapPoint>>::iterator vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; vit++)
+	{
+		std::shared_ptr<MapPoint> pMP = *vit;
+		if (pMP->mnLastFrameSeen == frame->fs->KfId)
+			continue;
+		if (pMP->isBad())
+			continue;
+		// Project (this fills MapPoint variables for matching)
+		if (frame->isInFrustum(pMP, 0.5))
+		{
+			pMP->increaseVisible();
+			nToMatch++;
+		}
+	}
+
+	if (nToMatch > 0)
+	{
+		// If the camera has been relocalised recently, perform a coarser search
+		// if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
+		// 	th = 5;
+		nmatches += matcher->SearchLocalMapByProjection(frame, mvpLocalMapPoints, th, nnratio);
+	}
+	return nmatches;
+}
+
+bool FullSystem::TrackLocalMap(std::shared_ptr<Frame> frame)
+{
+
+	SearchLocalPoints(frame);
+
+	// Optimize Pose
+	// Optimizer::PoseOptimization(&mCurrentFrame);
+	int mnMatchesInliers = 0;
+
+	// Update MapPoints Statistics
+	for (int i = 0; i < frame->nFeatures; ++i)
+	{
+		if (frame->tMapPoints[i])
+		{
+			if (!frame->mvbOutlier[i])
+			{
+				frame->tMapPoints[i]->increaseFound();
+		
+					if (frame->tMapPoints[i]->getNObservations() > 0)
+						mnMatchesInliers++;
+			}
+		}
+	}
+
+	// Decide if the tracking was succesful
+	// More restrictive if there was a relocalization recently
+	// if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames && mnMatchesInliers < 50)
+	// 	return false;
+
+	if (mnMatchesInliers < 30)
+		return false;
+	else
+		return true;
+}
+
+void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
+{	
+	//Update Local Keyframes
+	// Each map point vote for the keyframes in which it has been observed
+	std::map<std::shared_ptr<Frame>, int> keyframeCounter;
+	auto mapPoint = frame->getMapPointsV();
+
+	for (int i = 0; i < frame->nFeatures; ++i)
+	{
+		if (mapPoint[i])
+		{
+			std::shared_ptr<MapPoint> pMP = frame->tMapPoints[i];
+			if (!pMP->isBad())
+			{
+				const std::map<std::shared_ptr<Frame>, size_t> observations = pMP->GetObservations();
+				for (std::map<std::shared_ptr<Frame>, size_t>::const_iterator it = observations.begin(), itend = observations.end(); it != itend; it++)
+					keyframeCounter[it->first]++;
+			}
+			// else
+			// {
+			// 	frame->tMapPoints[i] = nullptr;
+			// }
+		}
+	}
+
+	if (keyframeCounter.empty())
+		return;
 
 
+	int max = 0;
+	std::shared_ptr<Frame> pKFmax;
 
+	mvpLocalKeyFrames.clear();
+	mvpLocalKeyFrames.reserve(3 * keyframeCounter.size());
+
+	// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
+	for (std::map<std::shared_ptr<Frame>, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
+	{
+		std::shared_ptr<Frame> pKF = it->first;
+
+		// if (pKF->isBad())
+		// 	continue;
+
+		if (it->second > max)
+		{
+			max = it->second;
+			pKFmax = pKF;
+		}
+
+		mvpLocalKeyFrames.push_back(it->first);
+		pKF->mnTrackReferenceForFrame = frame->fs->KfId;
+	}
+
+	// Include also some not-already-included keyframes that are neighbors to already-included keyframes
+	for (std::vector<std::shared_ptr<Frame>>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
+	{
+		// Limit the number of keyframes
+		if (mvpLocalKeyFrames.size() > 80)
+			break;
+
+		std::shared_ptr<Frame> pKF = *itKF;
+
+		const std::vector<std::shared_ptr<Frame>> vNeighs = pKF->GetBestCovisibilityKeyFrames(10);
+
+		for (std::vector<std::shared_ptr<Frame>>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
+		{
+			std::shared_ptr<Frame> pNeighKF = *itNeighKF;
+			// if (!pNeighKF->isBad())
+			// {
+			if (pNeighKF->mnTrackReferenceForFrame != frame->fs->KfId)
+			{
+				mvpLocalKeyFrames.push_back(pNeighKF);
+				pNeighKF->mnTrackReferenceForFrame = frame->fs->KfId;
+				break;
+			}
+			// }
+		}
+
+		const std::set<std::shared_ptr<Frame>> spChilds = pKF->GetChilds();
+		for (std::set<std::shared_ptr<Frame>>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
+		{
+			std::shared_ptr<Frame> pChildKF = *sit;
+			// if (!pChildKF->isBad())
+			// {
+			if (pChildKF->mnTrackReferenceForFrame != frame->fs->KfId)
+			{
+				mvpLocalKeyFrames.push_back(pChildKF);
+				pChildKF->mnTrackReferenceForFrame = frame->fs->KfId;
+				break;
+			}
+			// }
+		}
+
+		std::shared_ptr<Frame> pParent = pKF->GetParent();
+		if (pParent)
+		{
+			if (pParent->mnTrackReferenceForFrame != frame->fs->KfId)
+			{
+				mvpLocalKeyFrames.push_back(pParent);
+				pParent->mnTrackReferenceForFrame = frame->fs->KfId;
+				break;
+			}
+		}
+	}
+
+	if (pKFmax)
+	{
+		mpReferenceKF = pKFmax;
+		frame->mpReferenceKF = mpReferenceKF;
+	}
+}
+
+void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
+{
+	globalMap->SetReferenceMapPoints(mvpLocalMapPoints);
+	// Update local MapPoints:
+	boost::unique_lock<boost::mutex> lock(localMapMtx);
+
+	mvpLocalMapPoints.clear();
+
+	for (std::vector<std::shared_ptr<Frame>>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
+	{
+		std::shared_ptr<Frame> pKF = *itKF;
+		const std::vector<std::shared_ptr<MapPoint>> vpMPs = pKF->getMapPointsV();
+
+		for (std::vector<std::shared_ptr<MapPoint>>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+		{
+			std::shared_ptr<MapPoint> pMP = *itMP;
+			if (!pMP)
+				continue;
+			if (pMP->mnTrackReferenceForFrame == frame->fs->KfId)
+				continue;
+			if (!pMP->isBad())
+			{
+				mvpLocalMapPoints.push_back(pMP);
+				pMP->mnTrackReferenceForFrame = frame->fs->KfId;
+			}
+		}
+	}
+}
+
+void FullSystem::CheckReplacedInLastFrame()
+{
+	for (int i = 0; i < mLastFrame->nFeatures; ++i)
+	{
+		std::shared_ptr<MapPoint> pMP = mLastFrame->tMapPoints[i];
+
+		if (pMP)
+		{
+			std::shared_ptr<MapPoint> pRep = pMP->GetReplaced();
+			if (pRep)
+			{
+				mLastFrame->tMapPoints[i] = pRep;
+			}
+		}
+	}
+}
 }

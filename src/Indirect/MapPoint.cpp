@@ -2,7 +2,7 @@
 #include "Indirect/Frame.h"
 #include "FullSystem/HessianBlocks.h"
 #include "Indirect/Matcher.h"
-
+#include "Indirect/Map.h"
 #include "util/FrameShell.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 
@@ -11,9 +11,10 @@ namespace HSLAM
     using namespace std;
     size_t MapPoint::idCounter = 0;
 
-    MapPoint::MapPoint(PointHessian *_ph)
+    MapPoint::MapPoint(PointHessian *_ph, std::shared_ptr<Map> _globalMap)
     {
-        assert(ph->my_type > 4);
+        assert(_ph->my_type > 4);
+        globalMap = _globalMap;
         ph = _ph;
         sourceFrame = ph->host->shell->frame;
         index = ph->my_type - 5;
@@ -21,18 +22,27 @@ namespace HSLAM
         mnVisible = 1;
         mnFound = 1;
         mbBad = false;
+        
 
         pt = Vec2f(ph->u, ph->v);
         angle = sourceFrame->mvKeys[index].angle;
 
         auto calib = sourceFrame->HCalib;
-        worldPose = sourceFrame->fs->getPose().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
 
-        mNormalVector = Vec3f::Zero();
-
+        sourceFrame->Descriptors.row(index).copyTo(mDescriptor);
+        mnLastFrameSeen = 0;
+        mnTrackReferenceForFrame = 0;
         status = mpDirStatus::active;
         idepth = ph->idepth;
         idepthH = ph->idepth_hessian;
+        
+        worldPose = sourceFrame->fs->getPose().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
+
+        // normal vector pointing towards the first frame
+        Vec3f Owi = sourceFrame->fs->getCameraCenter().cast<float>();
+        Vec3f normali = worldPose - Owi;
+        mNormalVector = normali / normali.norm();
+
         // OIdepth=pointhessian->idepth_zero_scaled;
         // OWeight = sqrt(1e-3/(pointhessian->efPoint->HdiF+1e-12));
 
@@ -41,6 +51,12 @@ namespace HSLAM
         id = idCounter;
         idCounter++;
         
+    }
+
+    
+    shared_ptr<MapPoint> MapPoint::getPtr()
+    {
+         return shared_from_this();
     }
 
 
@@ -246,7 +262,7 @@ namespace HSLAM
             pKF->EraseMapPointMatch(mit->second); 
         }
 
-        // mpMap->EraseMapPoint(this);
+        globalMap.lock()->EraseMapPoint(getPtr());
     }
 
     void MapPoint::Replace(shared_ptr<MapPoint> pMP)
@@ -263,7 +279,7 @@ namespace HSLAM
             mbBad = true;
             nvisible = mnVisible;
             nfound = mnFound;
-            // mpReplaced = pMP;
+            mpReplaced = pMP;
         }
 
         for (map<shared_ptr<Frame>, size_t>::iterator mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
@@ -285,7 +301,7 @@ namespace HSLAM
         pMP->increaseVisible(nvisible);
         pMP->ComputeDistinctiveDescriptors();
 
-        // mpMap->EraseMapPoint(this);
+        globalMap.lock()->EraseMapPoint(getPtr());
     }
 
 } // namespace HSLAM

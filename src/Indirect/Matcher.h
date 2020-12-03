@@ -74,6 +74,7 @@ namespace HSLAM
         }
 
     public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         inline Matcher(float nnratio = 0.6, bool checkOri = true)
         {
             mfNNratio = nnratio;
@@ -85,8 +86,11 @@ namespace HSLAM
         int SearchByBoW(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vpMatches12);
         int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t> > &vMatchedPairs);
         int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist);
-
+        int SearchLocalMapByProjection(std::shared_ptr<Frame> F, std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, float th, float nnratio);
         bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, Mat33f &F12);
+
+        int Fuse(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, float th, std::vector<std::shared_ptr<MapPoint>> &vpReplacePoint);
+        int Fuse(std::shared_ptr<Frame> pKF, const std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, const float th);
 
         inline static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
         {

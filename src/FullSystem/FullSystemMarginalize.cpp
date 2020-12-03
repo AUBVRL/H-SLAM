@@ -19,6 +19,8 @@
 
 #include "FullSystem/CoarseTracker.h"
 
+#include "Indirect/Frame.h"
+
 namespace HSLAM
 {
 
@@ -171,6 +173,9 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 
 	frame->shell->marginalizedAt = frameHessians.back()->shell->id;
 	frame->shell->movedByOpt = frame->w2c_leftEps().norm();
+
+	if(frame->shell->frame)
+		frame->shell->frame->ReduceToEssential();
 
 	deleteOutOrder<FrameHessian>(frameHessians, frame);
 	for(unsigned int i=0;i<frameHessians.size();i++)

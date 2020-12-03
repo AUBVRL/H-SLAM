@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include "util/settings.h"
+#include "util/NumType.h"
 
 namespace HSLAM
 {
@@ -27,7 +28,7 @@ namespace HSLAM
         boost::mutex mMutexMap;
 
     public:
-        
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         Map();
 
         ~Map() {}
@@ -58,6 +59,7 @@ namespace HSLAM
     class KeyFrameDatabase
     {
     public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         KeyFrameDatabase();
 
         void add(std::shared_ptr<Frame> pKF);

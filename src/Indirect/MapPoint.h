@@ -8,10 +8,11 @@ namespace HSLAM
     class PointHessian;
     class PointHessian;
     class Frame;
+    class Map;
 
-    class MapPoint
+    class MapPoint : public std::enable_shared_from_this<MapPoint>
     {
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+        
 
     private:
         mutable boost::mutex _mtx;
@@ -26,10 +27,13 @@ namespace HSLAM
        
         float idepth;
         float idepthH;
+        std::shared_ptr<MapPoint> mpReplaced;
+
+        
 
     public:
-
-        MapPoint(PointHessian *_ph);
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+        MapPoint(PointHessian *_ph, std::shared_ptr<Map> _globalMap);
         ~MapPoint() {}
 
         std::shared_ptr<Frame> sourceFrame;
@@ -40,6 +44,17 @@ namespace HSLAM
         float angle;
         bool mbBad;
 
+        std::shared_ptr<MapPoint> getPtr();
+        std::weak_ptr<Map> globalMap;
+
+        //Tracking data
+        bool mbTrackInView;
+        float mTrackProjX;
+        float mTrackProjY;
+        float mTrackViewCos;
+        long unsigned int mnTrackReferenceForFrame;
+        long unsigned int mnLastFrameSeen;
+        
         enum mpDirStatus {active =0, marginalized, removed } status;
 
         void EraseObservation(std::shared_ptr<Frame> &pKF);
@@ -47,7 +62,14 @@ namespace HSLAM
 
        
         void Replace(std::shared_ptr<MapPoint> pMP);
-        // MapPoint *GetReplaced();
+        
+        
+        inline std::shared_ptr<MapPoint> GetReplaced()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return mpReplaced;
+        }
+
         void UpdateNormalAndDepth();
         // Vec3f getWorldPosewPose(SE3& pose);
         Vec3f getWorldPose();
@@ -154,7 +176,7 @@ namespace HSLAM
         }
 
 
-        inline void increaseFound(int n)
+        inline void increaseFound(int n=1)
         {
             boost::lock_guard<boost::mutex> l(_mtx); //diff lock?
             mnFound+=n;

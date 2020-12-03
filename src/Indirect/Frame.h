@@ -13,7 +13,7 @@ namespace HSLAM
 
     template <typename Type> class IndexThreadReduce;
 
-    class Frame : std::enable_shared_from_this<Frame> //structure that contains all the data needed for keyframes
+    class Frame 
     {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -41,6 +41,8 @@ namespace HSLAM
             return mvpMapPoints;
         }
 
+        std::set<std::shared_ptr<MapPoint>> getMapPointsS(); 
+        
         inline void EraseMapPointMatch(const size_t &idx)
         {
             boost::lock_guard<boost::mutex> l(_mtx);
@@ -62,7 +64,7 @@ namespace HSLAM
 
         void addMapPoint(std::shared_ptr<MapPoint>& Mp);
         void addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index);
-
+        bool isInFrustum(std::shared_ptr<MapPoint> pMP, float viewingCosLimit);
 
         void AddConnection(std::shared_ptr<Frame> pKF, const int &weight);
         void UpdateBestCovisibles();
@@ -91,7 +93,13 @@ namespace HSLAM
         std::vector<std::vector<unsigned short int>> mGrid;
         std::vector<cv::KeyPoint> mvKeys;
 
-        std::vector<std::shared_ptr<MapPoint>> mvpMapPoints;
+        std::vector<std::shared_ptr<MapPoint>> mvpMapPoints; //used to store all matches + generated mapPoints
+        
+        
+        std::vector<std::shared_ptr<MapPoint>> tMapPoints; //used to store current frame matches (can be reset after a keyframe is created)
+        std::vector<bool> mvbOutlier; //can also be reset after keyframe is created
+        long unsigned int mnTrackReferenceForFrame;
+        std::weak_ptr<Frame> mpReferenceKF;
 
         cv::Mat Descriptors;
         //BoW

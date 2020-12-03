@@ -12,6 +12,7 @@ class PixelSelector;
 class FeatureDetector
 {
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     FeatureDetector();
     ~FeatureDetector();
     // void ComputeThreeMaxima(std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);

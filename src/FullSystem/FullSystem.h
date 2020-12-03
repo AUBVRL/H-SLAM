@@ -18,7 +18,6 @@
 
 #include <math.h>
 
-#include "Indirect/Map.h"
 
 namespace HSLAM
 {
@@ -40,6 +39,9 @@ class CoarseDistanceMap;
 class FeatureDetector;
 
 class EnergyFunctional;
+
+class Map;
+class Matcher;
 
 template<typename T> inline void deleteOut(std::vector<T*> &v, const int i)
 {
@@ -142,8 +144,6 @@ public:
 	void setGammaFunction(float* BInv);
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
-	std::shared_ptr<FeatureDetector> detector;
-	std::shared_ptr<Map> globalMap;
 
 private:
 
@@ -298,6 +298,28 @@ private:
 	bool needToKetchupMapping;
 
 	int lastRefStopID;
+
+
+
+	void IndirectMapper(std::shared_ptr<Frame> frame);
+	bool TrackLocalMap(std::shared_ptr<Frame> frame);
+
+	void updateLocalKeyframes(std::shared_ptr<Frame> frame);
+	void updateLocalPoints(std::shared_ptr<Frame> frame);
+	void CheckReplacedInLastFrame();
+	int SearchLocalPoints(std::shared_ptr<Frame> frame, int th = 1, float nnratio = 0.8);
+
+	std::shared_ptr<Matcher> matcher;
+	std::shared_ptr<FeatureDetector> detector;
+	std::shared_ptr<Map> globalMap;
+
+	size_t mnLastKeyFrameId;
+	std::shared_ptr<Frame> mpLastKeyFrame;
+	std::vector<std::shared_ptr<MapPoint>> mvpLocalMapPoints;
+	std::vector<std::shared_ptr<Frame>> mvpLocalKeyFrames;
+	std::shared_ptr<Frame> mpReferenceKF;
+	std::shared_ptr<Frame> mLastFrame;
+	boost::mutex localMapMtx;
 };
 }
 

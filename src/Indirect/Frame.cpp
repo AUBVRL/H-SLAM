@@ -19,6 +19,9 @@ namespace HSLAM
         detector->ExtractFeatures(Image, Occupancy, mvKeys, Descriptors, nFeatures, indFeaturesToExtract);
         assignFeaturesToGrid();
         mvpMapPoints.resize(nFeatures, nullptr);
+        tMapPoints.resize(nFeatures, nullptr);
+        mvbOutlier.resize(nFeatures, false);
+        mnTrackReferenceForFrame = 0;
         mbFirstConnection = true;
         mnLoopQuery =0;
         mnLoopWords = 0;
@@ -41,6 +44,8 @@ namespace HSLAM
         {
             Image.release();
             Occupancy.release();
+            releaseVec(tMapPoints);
+            releaseVec(mvbOutlier);
             // NeedRefresh = true;
         }
         return;
@@ -63,6 +68,7 @@ namespace HSLAM
 
         void Frame::addMapPoint(std::shared_ptr<MapPoint>& Mp )
         {
+            //should only be used when creating a new map point from a pointHessian.
             boost::lock_guard<boost::mutex> l(_mtx);
             mvpMapPoints[Mp->index] = Mp;
             return;
@@ -70,8 +76,10 @@ namespace HSLAM
 
         void Frame::addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index )
         {
+            //should only be used when adding a mappoint match.
             boost::lock_guard<boost::mutex> l(_mtx);
-            mvpMapPoints[index] = Mp;
+            if(!mvpMapPoints[index])
+                mvpMapPoints[index] = Mp;
             return;
         }
 
@@ -126,6 +134,84 @@ namespace HSLAM
         return vIndices;
     }
 
+    bool Frame::isInFrustum(shared_ptr<MapPoint> pMP, float viewingCosLimit)
+    {
+        pMP->mbTrackInView = false;
+
+        // 3D in absolute coordinates
+        Vec3f P = pMP->getWorldPose();
+       
+
+        // 3D in camera coordinates
+        const Vec3f Pc =  fs->getPoseInverse().cast<float>() * P ;
+        const float &PcX = Pc(0);
+        const float &PcY = Pc(1);
+        const float &PcZ = Pc(2);
+
+        // Check positive depth
+        if (PcZ < 0.0f)
+            return false;
+
+        // Project in image and check it is not outside
+        const float invz = 1.0f / PcZ;
+        const float u = HCalib->fxl() * PcX * invz + HCalib->cxl();
+        const float v = HCalib->fyl() * PcY * invz + HCalib->cyl();
+
+        if (u < mnMinX || u > mnMaxX)
+            return false;
+        if (v < mnMinY || v > mnMaxY)
+            return false;
+
+        // // Check distance is in the scale invariance region of the MapPoint
+        // const float maxDistance = pMP->GetMaxDistanceInvariance();
+        // const float minDistance = pMP->GetMinDistanceInvariance();
+        const Vec3f PO = P - fs->getCameraCenter().cast<float>();
+        const float dist = PO.norm();
+
+        // if (dist < minDistance || dist > maxDistance)
+        //     return false;
+
+        // Check viewing angle
+        Vec3f Pn = pMP->GetNormal();
+
+        const float viewCos = PO.dot(Pn) / dist;
+
+        std::cout << viewCos << std::endl;
+        if (viewCos < viewingCosLimit)
+            return false;
+
+        
+        // Predict scale in the image
+        // const int nPredictedLevel = pMP->PredictScale(dist, this);
+
+        // Data used by the tracking
+        pMP->mbTrackInView = true;
+        pMP->mTrackProjX = u;
+        // pMP->mTrackProjXR = u - mbf * invz;
+        pMP->mTrackProjY = v;
+        // pMP->mnTrackScaleLevel = nPredictedLevel;
+        pMP->mTrackViewCos = viewCos;
+
+        return true;
+    }
+
+
+    std::set<std::shared_ptr<MapPoint>> Frame::getMapPointsS()
+    {
+        boost::lock_guard<boost::mutex> l(_mtx);
+        std::set<std::shared_ptr<MapPoint>> s;
+        for (size_t i = 0, iend = mvpMapPoints.size(); i < iend; ++i)
+        {
+            if (!mvpMapPoints[i])
+                continue;
+            std::shared_ptr<MapPoint> pMP = mvpMapPoints[i];
+            if (!pMP->isBad())
+                s.insert(pMP);
+        }
+        return s;
+    }
+
+
     void Frame::ComputeBoVW()
     {
         if (mBowVec.empty())
@@ -140,7 +226,8 @@ namespace HSLAM
 
     void Frame::EraseMapPointMatch(shared_ptr<MapPoint> pMP)
     {
-        int idx = pMP->getIndexInKF(shared_from_this());
+        assert(!mpReferenceKF.expired());
+        int idx = pMP->getIndexInKF(mpReferenceKF.lock());
         if (idx >= 0)
         {
             boost::lock_guard<boost::mutex> l(_mtx);
@@ -172,7 +259,9 @@ namespace HSLAM
 
     void Frame::UpdateConnections()
     {
-        map<shared_ptr<Frame> , int> KFcounter;
+        assert(!mpReferenceKF.expired()); //check that we have set the mpreferencekf to point to the keyframe itself.
+        std::shared_ptr<Frame> ptrThis = mpReferenceKF.lock();
+        map<shared_ptr<Frame>, int> KFcounter;
 
         vector<shared_ptr<MapPoint>> vpMP = getMapPointsV();
 
@@ -208,7 +297,7 @@ namespace HSLAM
         shared_ptr<Frame> pKFmax = NULL;
         int th = 15;
 
-        vector<pair<int, shared_ptr<Frame> >> vPairs;
+        vector<pair<int, shared_ptr<Frame>>> vPairs;
         vPairs.reserve(KFcounter.size());
         for (map<shared_ptr<Frame> , int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
         {
@@ -220,14 +309,15 @@ namespace HSLAM
             if (mit->second >= th)
             {
                 vPairs.push_back(make_pair(mit->second, mit->first));
-                (mit->first)->AddConnection(shared_from_this(), mit->second);
+                
+                (mit->first)->AddConnection(ptrThis, mit->second);
             }
         }
 
         if (vPairs.empty())
         {
             vPairs.push_back(make_pair(nmax, pKFmax));
-            pKFmax->AddConnection(shared_from_this(), nmax);
+            pKFmax->AddConnection(ptrThis, nmax);
         }
 
         sort(vPairs.begin(), vPairs.end());
@@ -249,7 +339,7 @@ namespace HSLAM
             if (mbFirstConnection && fs->KfId != 0)
             {
                 mpParent = mvpOrderedConnectedKeyFrames.front();
-                mpParent->AddChild(shared_from_this());
+                mpParent->AddChild(ptrThis);
                 mbFirstConnection = false;
             }
         }
@@ -335,9 +425,10 @@ namespace HSLAM
 
     void Frame::ChangeParent(std::shared_ptr<Frame> pKF)
     {
+        assert(!mpReferenceKF.expired());
         boost::lock_guard<boost::mutex> l(mMutexConnections);
         mpParent = pKF;
-        pKF->AddChild(shared_from_this());
+        pKF->AddChild(mpReferenceKF.lock());
     }
 
     set<shared_ptr<Frame>> Frame::GetChilds()

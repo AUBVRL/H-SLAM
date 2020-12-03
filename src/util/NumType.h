@@ -185,9 +185,7 @@ struct AffLight
 class Timer: std::chrono::high_resolution_clock
 {
 	public:
-		std::vector<float> vtime;
-		time_point start_time;
-		std::string name;
+		
 		Timer(std::string _name) : name(_name){};
 		void startTime()
 		{
@@ -199,7 +197,11 @@ class Timer: std::chrono::high_resolution_clock
 			if (print)
 				printf("%s %f \n", name.c_str(), (float)std::accumulate(vtime.begin(), vtime.end(), 0.0f)/vtime.size());
 		}
-};
 
+	private:
+		std::vector<float> vtime;
+		time_point start_time;
+		std::string name;
+};
 }
 
