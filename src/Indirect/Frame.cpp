@@ -70,7 +70,8 @@ namespace HSLAM
         {
             //should only be used when creating a new map point from a pointHessian.
             boost::lock_guard<boost::mutex> l(_mtx);
-            mvpMapPoints[Mp->index] = Mp;
+            if(!mvpMapPoints[Mp->index])
+                mvpMapPoints[Mp->index] = Mp;
             return;
         }
 
@@ -92,6 +93,10 @@ namespace HSLAM
         return true;
     }
 
+    shared_ptr<Frame> Frame::getPtr()
+    {
+        return shared_from_this();
+    }
 
     std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
     {
@@ -174,9 +179,8 @@ namespace HSLAM
         // Check viewing angle
         Vec3f Pn = pMP->GetNormal();
 
-        const float viewCos = PO.dot(Pn) / dist;
+        const float viewCos = PO.dot(Pn) / dist; 
 
-        std::cout << viewCos << std::endl;
         if (viewCos < viewingCosLimit)
             return false;
 
@@ -226,8 +230,8 @@ namespace HSLAM
 
     void Frame::EraseMapPointMatch(shared_ptr<MapPoint> pMP)
     {
-        assert(!mpReferenceKF.expired());
-        int idx = pMP->getIndexInKF(mpReferenceKF.lock());
+        
+        int idx = pMP->getIndexInKF(getPtr());
         if (idx >= 0)
         {
             boost::lock_guard<boost::mutex> l(_mtx);
@@ -259,8 +263,6 @@ namespace HSLAM
 
     void Frame::UpdateConnections()
     {
-        assert(!mpReferenceKF.expired()); //check that we have set the mpreferencekf to point to the keyframe itself.
-        std::shared_ptr<Frame> ptrThis = mpReferenceKF.lock();
         map<shared_ptr<Frame>, int> KFcounter;
 
         vector<shared_ptr<MapPoint>> vpMP = getMapPointsV();
@@ -310,14 +312,14 @@ namespace HSLAM
             {
                 vPairs.push_back(make_pair(mit->second, mit->first));
                 
-                (mit->first)->AddConnection(ptrThis, mit->second);
+                (mit->first)->AddConnection(getPtr(), mit->second);
             }
         }
 
         if (vPairs.empty())
         {
             vPairs.push_back(make_pair(nmax, pKFmax));
-            pKFmax->AddConnection(ptrThis, nmax);
+            pKFmax->AddConnection(getPtr(), nmax);
         }
 
         sort(vPairs.begin(), vPairs.end());
@@ -339,7 +341,7 @@ namespace HSLAM
             if (mbFirstConnection && fs->KfId != 0)
             {
                 mpParent = mvpOrderedConnectedKeyFrames.front();
-                mpParent->AddChild(ptrThis);
+                mpParent->AddChild(getPtr());
                 mbFirstConnection = false;
             }
         }
@@ -425,10 +427,9 @@ namespace HSLAM
 
     void Frame::ChangeParent(std::shared_ptr<Frame> pKF)
     {
-        assert(!mpReferenceKF.expired());
         boost::lock_guard<boost::mutex> l(mMutexConnections);
         mpParent = pKF;
-        pKF->AddChild(mpReferenceKF.lock());
+        pKF->AddChild(getPtr());
     }
 
     set<shared_ptr<Frame>> Frame::GetChilds()

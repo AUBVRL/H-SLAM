@@ -573,7 +573,7 @@ float FullSystem::optimize(int mnumOptIts)
 			{
 				if(it)
 				{
-					if(it->ph) // if ph still exists update the depth values
+					if(it->getDirStatus() == it->active) //it->ph if ph still exists update the depth values
 						it->updateDepth();
 
 					if (it->sourceFrame == fh->shell->frame) // if this is the origin of the mapPoint update the points' 3D pose

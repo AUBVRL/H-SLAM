@@ -76,7 +76,7 @@ namespace HSLAM
         boost::lock_guard<boost::mutex> l(_mtx);
         idepth = ph->idepth;
         if(ph->efPoint)
-            idepthH = ph->efPoint->HdiF; //ph->idepth_hessian
+            idepthH = ph->idepth_hessian; //efPoint->HdiF; //ph->idepth_hessian
     }
 
     Vec3f MapPoint::getWorldPose()

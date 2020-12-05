@@ -13,7 +13,7 @@ namespace HSLAM
 
     template <typename Type> class IndexThreadReduce;
 
-    class Frame 
+    class Frame : public std::enable_shared_from_this<Frame>
     {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -65,7 +65,9 @@ namespace HSLAM
         void addMapPoint(std::shared_ptr<MapPoint>& Mp);
         void addMapPointMatch(std::shared_ptr<MapPoint> Mp, size_t index);
         bool isInFrustum(std::shared_ptr<MapPoint> pMP, float viewingCosLimit);
-
+        
+        std::shared_ptr<Frame> getPtr();
+        
         void AddConnection(std::shared_ptr<Frame> pKF, const int &weight);
         void UpdateBestCovisibles();
         std::set<std::shared_ptr<Frame>> GetConnectedKeyFrames();

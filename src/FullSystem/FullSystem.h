@@ -308,6 +308,9 @@ private:
 	void updateLocalPoints(std::shared_ptr<Frame> frame);
 	void CheckReplacedInLastFrame();
 	int SearchLocalPoints(std::shared_ptr<Frame> frame, int th = 1, float nnratio = 0.8);
+	int updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches, bool istrackingLastFrame = true);
+	void DrawMatches(std::shared_ptr<Frame> frame);
+	// SE3 cumulativeForm();
 
 	std::shared_ptr<Matcher> matcher;
 	std::shared_ptr<FeatureDetector> detector;
@@ -319,7 +322,33 @@ private:
 	std::vector<std::shared_ptr<Frame>> mvpLocalKeyFrames;
 	std::shared_ptr<Frame> mpReferenceKF;
 	std::shared_ptr<Frame> mLastFrame;
+
+	SE3 Velocity;
+	FixedQueue<SE3, 4> vVelocity;
 	boost::mutex localMapMtx;
+
+	//sort localKeyframes while updating localkeyframes from best to worst:
+	static bool cmpAscending(std::pair<std::shared_ptr<Frame>, int> &a, std::pair<std::shared_ptr<Frame>, int> &b)
+	{
+		return a.second < b.second;
+	}
+	static bool cmpDescending(std::pair<std::shared_ptr<Frame>, int> &a, std::pair<std::shared_ptr<Frame>, int> &b)
+	{
+		return a.second > b.second;
+	}
+	static std::vector<std::pair<std::shared_ptr<Frame>, int>> sortLocalKFs(std::map<std::shared_ptr<Frame>, int> &M, bool descendingOrder = false)
+	{
+		std::vector<std::pair<std::shared_ptr<Frame>, int>> A;
+		for (auto &it : M)
+		{
+			A.push_back(it);
+		}
+		if(descendingOrder)
+			std::sort(A.begin(), A.end(), cmpDescending);
+		else
+			std::sort(A.begin(), A.end(), cmpAscending);
+		return A;
+	}
 };
 }
 

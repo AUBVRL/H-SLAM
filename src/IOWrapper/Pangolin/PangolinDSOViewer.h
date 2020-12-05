@@ -38,6 +38,7 @@ class FrameHessian;
 class CalibHessian;
 class FrameShell;
 
+class Map;
 
 namespace IOWrap
 {
@@ -71,8 +72,9 @@ public:
     virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override;
     virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
+	virtual void publishGlobalMap(std::shared_ptr<Map> _globalMap) override;
 
-    virtual void pushLiveFrame(FrameHessian* image) override;
+	virtual void pushLiveFrame(FrameHessian* image) override;
     virtual void pushDepthImage(MinimalImageB3* image) override;
     virtual bool needPushDepthImage() override;
 
@@ -132,9 +134,16 @@ private:
 
 	std::deque<float> lastNTrackingMs;
 	std::deque<float> lastNMappingMs;
+
+	void DrawIndirectMap(bool bDrawGraph = false);
+	std::shared_ptr<Map> globalmap;
+	pangolin::GlBuffer IndvertexBuffer;
+	pangolin::GlBuffer IndcolorBuffer;
+	int ngoodPoints;
+	int nGlobalPoints;
+	bool bufferValid;
+	
 };
-
-
 
 }
 

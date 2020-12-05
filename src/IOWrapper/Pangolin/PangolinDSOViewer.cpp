@@ -33,6 +33,10 @@
 #include "FullSystem/ImmaturePoint.h"
 #include "OverwritePangolin.h"
 
+#include "Indirect/Map.h"
+#include "Indirect/MapPoint.h"
+#include "Indirect/Frame.h"
+
 namespace HSLAM
 {
 namespace IOWrap
@@ -66,8 +70,11 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
 
 	needReset = false;
 
+	nGlobalPoints = 0;
+	bufferValid = false;
+	ngoodPoints = 0;
 
-    if(startRunThread)
+	if(startRunThread)
         runThread = boost::thread(&PangolinDSOViewer::run, this);
 
 }
@@ -169,8 +176,9 @@ void PangolinDSOViewer::run()
 	{
 		// Clear entire screen
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClearColor(1.0, 1.0, 1.0, 1.0);
 
-		if(setting_render_display3D)
+		if (setting_render_display3D)
 		{
 			// Activate efficiently by object
 			Visualization3D_display.Activate(Visualization3D_camera);
@@ -189,6 +197,7 @@ void PangolinDSOViewer::run()
 			}
 			if(this->settings_showCurrentCamera) currentCam->drawCam(2,0,0.2);
 			drawConstraints();
+			DrawIndirectMap(true);
 			lk3d.unlock();
 		}
 
@@ -291,7 +300,6 @@ void PangolinDSOViewer::run()
 		usleep(1000);
 	}
 
-
 	printf("QUIT Pangolin thread!\n");
 	printf("I'll just kill the whole process.\nSo Long, and Thanks for All the Fish!\n");
 
@@ -332,6 +340,13 @@ void PangolinDSOViewer::reset_internal()
 	internalResImg->setBlack();
 	videoImgChanged= kfImgChanged= resImgChanged=true;
 	openImagesMutex.unlock();
+
+	globalmap.reset();
+	nGlobalPoints = 0;
+	ngoodPoints = 0;
+	IndcolorBuffer.Free();
+	IndvertexBuffer.Free();
+	bufferValid = false;	
 
 	needReset = false;
 }
@@ -417,6 +432,150 @@ void PangolinDSOViewer::drawConstraints()
 	}
 }
 
+void PangolinDSOViewer::DrawIndirectMap(bool bDrawGraph)
+{
+	if(!globalmap)
+		return;
+
+	// control update frequency
+	static int needUpdate = 0;
+	needUpdate = needUpdate + 1;
+
+	if (needUpdate >= 10)
+	{
+		needUpdate = 0;
+		auto vpMPs = globalmap->GetAllMapPoints();
+		auto vpRefMPs = globalmap->GetReferenceMapPoints();
+		
+		if(vpMPs.empty())
+			return;
+
+		std::set<std::shared_ptr<MapPoint>> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+		Vec3f *tmpIndirectBuffer = new Vec3f[vpMPs.size()];
+		Vec3b *tmpIndirectColorBuffer = new Vec3b[vpMPs.size()];
+
+		// glPointSize(mPointSize);
+		// glBegin(GL_POINTS);
+		// glColor3f(0.0,0.0,0.0);
+		Vec3b blue(0, 0, 255);
+		Vec3b red(255, 0, 0);
+
+		ngoodPoints = 0;
+		for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
+		{
+			if (vpMPs[i]->isBad())
+				continue;
+
+			float idepth = vpMPs[i]->getidepth();
+			float idepthH = vpMPs[i]->getidepthHessian();
+
+			float depth = 1.0f / idepth;
+			float depth4 = depth * depth * depth * depth;
+			float var = (1.0f / (idepthH + 0.01));
+
+			if (var * depth4 > this->settings_scaledVarTH)
+				continue;
+			if (var > this->settings_absVarTH)
+				continue;
+
+			tmpIndirectBuffer[ngoodPoints] = vpMPs[i]->getWorldPose();
+			if (spRefMPs.count(vpMPs[i]))
+				tmpIndirectColorBuffer[ngoodPoints] = red;
+			else
+				tmpIndirectColorBuffer[ngoodPoints] = blue;
+			ngoodPoints = ngoodPoints + 1;
+		}
+
+		if(ngoodPoints > nGlobalPoints)
+		{
+			nGlobalPoints = ngoodPoints*1.3;
+			IndvertexBuffer.Reinitialise(pangolin::GlArrayBuffer, nGlobalPoints, GL_FLOAT, 3, GL_DYNAMIC_DRAW );
+			IndcolorBuffer.Reinitialise(pangolin::GlArrayBuffer, nGlobalPoints, GL_UNSIGNED_BYTE, 3, GL_DYNAMIC_DRAW );
+		}
+		if (ngoodPoints <= 0 )
+			return;
+
+		IndvertexBuffer.Upload(tmpIndirectBuffer, sizeof(float) * 3 * ngoodPoints, 0);
+		IndcolorBuffer.Upload(tmpIndirectColorBuffer, sizeof(unsigned char) * 3 * ngoodPoints, 0);
+		bufferValid = true;
+		delete[] tmpIndirectBuffer;
+		delete[] tmpIndirectColorBuffer;
+	}
+	
+	if(!bufferValid)
+		return;
+
+	GLfloat mPointSize = 5;
+
+	glPointSize(mPointSize);
+	IndcolorBuffer.Bind();
+	glColorPointer(IndcolorBuffer.count_per_element, IndcolorBuffer.datatype, 0, 0);
+	glEnableClientState(GL_COLOR_ARRAY);
+
+	IndvertexBuffer.Bind();
+	glVertexPointer(IndvertexBuffer.count_per_element, IndvertexBuffer.datatype, 0, 0);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glDrawArrays(GL_POINTS, 0, ngoodPoints);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	IndvertexBuffer.Unbind();
+
+	glDisableClientState(GL_COLOR_ARRAY);
+	IndcolorBuffer.Unbind();
+
+
+
+
+	if (bDrawGraph)
+	{
+		GLfloat mGraphLineWidth = 2.0;
+		glLineWidth(mGraphLineWidth);
+
+		glColor4f(0.0f, 1.0f, 0.0f, 0.6f);
+		glBegin(GL_LINES);
+		
+		std::vector<std::shared_ptr<Frame>> vpKFs = globalmap->GetAllKeyFrames();		
+
+		for (size_t i = 0; i < vpKFs.size(); i++)
+		{
+			// Covisibility Graph
+			const std::vector<std::shared_ptr<Frame>> vCovKFs = vpKFs[i]->GetCovisiblesByWeight(100);
+			Vec3f Ow = vpKFs[i]->fs->getCameraCenter().cast<float>();
+			if (!vCovKFs.empty())
+			{
+				for (std::vector<std::shared_ptr<Frame>>::const_iterator vit = vCovKFs.begin(), vend = vCovKFs.end(); vit != vend; vit++)
+				{
+					if ((*vit)->fs->KfId < vpKFs[i]->fs->KfId)
+						continue;
+					Vec3f Ow2 = (*vit)->fs->getCameraCenter().cast<float>();
+					glVertex3f(Ow(0), Ow(1), Ow(2));
+					glVertex3f(Ow2(0), Ow2(1), Ow2(2));
+				}
+			}
+
+			// Spanning tree
+			std::shared_ptr<Frame> pParent = vpKFs[i]->GetParent();
+			if (pParent)
+			{
+				Vec3f Owp = pParent->fs->getCameraCenter().cast<float>();
+				glVertex3f(Ow(0), Ow(1), Ow(2));
+				glVertex3f(Owp(0), Owp(1), Owp(2));
+			}
+
+			// Loops
+			std::set<std::shared_ptr<Frame>> sLoopKFs = vpKFs[i]->GetLoopEdges();
+			for (std::set<std::shared_ptr<Frame>>::iterator sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
+			{
+				if ((*sit)->fs->KfId < vpKFs[i]->fs->KfId)
+					continue;
+				Vec3f Owl = (*sit)->fs->getCameraCenter().cast<float>();
+				glVertex3f(Ow(0), Ow(1), Ow(2));
+				glVertex3f(Owl(0), Owl(1), Owl(2));
+			}
+		}
+
+		glEnd();
+	}
+}
 
 
 
@@ -505,6 +664,11 @@ void PangolinDSOViewer::publishCamPose(FrameShell* frame,
 	allFramePoses.push_back(currentCam->camToWorld.translation().cast<float>());
 }
 
+
+void PangolinDSOViewer::publishGlobalMap(std::shared_ptr<Map> _globalMap)
+{
+	globalmap = _globalMap;
+}
 
 void PangolinDSOViewer::pushLiveFrame(FrameHessian* image)
 {

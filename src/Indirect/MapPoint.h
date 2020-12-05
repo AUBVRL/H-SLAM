@@ -2,7 +2,6 @@
 #include "util/NumType.h"
 #include "boost/thread.hpp"
 
-
 namespace HSLAM
 {
     class PointHessian;
@@ -95,13 +94,57 @@ namespace HSLAM
             return status;
         }
 
+        inline float getidepthHessian()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return idepthH;
+        }
+
+        inline float getidepth()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return idepth;
+        }
+
 
         inline void setDirStatus(mpDirStatus _status)
         {
-            boost::lock_guard<boost::mutex> l(_mtx);
+            boost::unique_lock<boost::mutex> l(_mtx);
             status = _status;
-        }
+            
+            if(_status == mpDirStatus::removed)
+            {
+                l.unlock();
+                SetBadFlag();
+            }
 
+            if(_status == mpDirStatus::marginalized) //perform map point culling when point is marginalized
+            {
+                bool bad = false;
+                if(nObs < 2)
+                    bad = true;
+                else if ((((float)mnFound) / ((float)mnVisible)) < 0.25)
+                    bad = true;
+                else
+                {
+                    float var = 1.0f / (idepthH + 0.01);
+                    if(var > 0.001) //settings_absVarTH
+                        bad = true;
+                    else 
+                    {
+                        float depth = 1.0f / idepth;
+                        float depth4 = depth * depth * depth * depth;
+                        if (var * depth4 > 0.001) //settings_scaledVarTH
+                            bad = true;
+                    }
+                }
+                if(bad)
+                {
+                    l.unlock();
+                    SetBadFlag();
+                }
+            }
+        }
 
         inline PointHessian *getPh()
         {
@@ -219,7 +262,7 @@ namespace HSLAM
             if (mObservations.count(pKF))
                 return;
             mObservations[pKF] = idx;
-            nObs++;
+            nObs = nObs + 1;
         }
     };
 

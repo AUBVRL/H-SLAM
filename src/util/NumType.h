@@ -8,7 +8,8 @@
 #include <chrono>
 #include <numeric>
 #include <set>
-
+#include <deque>
+#include <queue>
 namespace HSLAM
 {
 
@@ -203,5 +204,17 @@ class Timer: std::chrono::high_resolution_clock
 		time_point start_time;
 		std::string name;
 };
+
+template <typename T, int MaxLen, typename Container=std::deque<T>>
+class FixedQueue : public std::queue<T, Container> {
+public:
+    void push(const T& value) {
+        if (this->size() == MaxLen) {
+           this->c.pop_front();
+        }
+        std::queue<T, Container>::push(value);
+    }
+};
+
 }
 

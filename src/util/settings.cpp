@@ -43,7 +43,7 @@ float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
 
 int EDGE_THRESHOLD = 19; //15?
 
-int minThFAST = 8;
+int minThFAST = 7; //8
 int minIndDist = 4; //9x9
 int minDirDist = 1; //3x3
 int indFeaturesToExtract = 1000;

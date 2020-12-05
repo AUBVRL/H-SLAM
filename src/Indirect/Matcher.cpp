@@ -20,7 +20,7 @@ namespace HSLAM
         return nmatches;
     }
 
-    int Matcher::SearchLocalMapByProjection(shared_ptr<Frame> F, vector<shared_ptr<MapPoint>> &vpMapPoints, float th, float nnratio)
+    int Matcher::SearchLocalMapByProjection(shared_ptr<Frame> F, vector<shared_ptr<MapPoint>> &vpMapPoints, float th, float nnratio) //this is run from tracking thread -> access tMapPoints only!!
     {
         int nmatches = 0;
 
@@ -46,7 +46,6 @@ namespace HSLAM
             
             const vector<size_t> vIndices = F->GetFeaturesInArea(pMP->mTrackProjX, pMP->mTrackProjY, r);
 
-            std::cout << pMP->mTrackProjX << " " << pMP->mTrackProjY << " " << r <<" " <<vIndices.size() << std::endl;
 
             if (vIndices.empty())
                 continue;
@@ -102,7 +101,7 @@ namespace HSLAM
         return nmatches;
     }
 
-    int Matcher::Fuse(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, float th, std::vector<std::shared_ptr<MapPoint>> &vpReplacePoint)
+    int Matcher::Fuse(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, float th, std::vector<std::shared_ptr<MapPoint>> &vpReplacePoint) //this is run from mapping thread or loop closure thread -> access mvpMapPoints
     {
         // Get Calibration Parameters for later projection
         const float &fx = pKF->HCalib->fxl();
@@ -235,7 +234,7 @@ namespace HSLAM
         return nFused;
     }
 
-    int Matcher::Fuse(std::shared_ptr<Frame> pKF, const std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, const float th)
+    int Matcher::Fuse(std::shared_ptr<Frame> pKF, const std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, const float th) //this is run from mapping thread or loop closure thread -> access mvpMapPoints
     {
 
         Mat33f Rcw = pKF->fs->getPoseInverse().rotationMatrix().cast<float>();
@@ -374,6 +373,139 @@ namespace HSLAM
         return nFused;
     }
 
+    int Matcher::SearchByProjectionFrameToFrame(std::shared_ptr<Frame> CurrentFrame, const std::shared_ptr<Frame> LastFrame, const float th, bool mbCheckOrientation) //this is run from tracking thread -> access tMapPoints only!!
+    {
+        int nmatches = 0;
+
+        // Rotation Histogram (to check rotation consistency)
+        vector<int> rotHist[HISTO_LENGTH];
+        for (int i = 0; i < HISTO_LENGTH; i++)
+            rotHist[i].reserve(500);
+        const float factor = 1.0f / HISTO_LENGTH;
+
+        const Mat33f Rcw = CurrentFrame->fs->getPoseInverse().rotationMatrix().cast<float>(); //  CurrentFrame.mTcw.rowRange(0, 3).colRange(0, 3);
+        const Vec3f tcw = CurrentFrame->fs->getPoseInverse().translation().cast<float>();     //CurrentFrame.mTcw.rowRange(0, 3).col(3);
+
+        const Vec3f twc = -Rcw.transpose() * tcw;
+
+        const Mat33f Rlw = LastFrame->fs->getPoseInverse().rotationMatrix().cast<float>(); //mTcw.rowRange(0, 3).colRange(0, 3);
+        const Vec3f tlw = LastFrame->fs->getPoseInverse().translation().cast<float>();       //mTcw.rowRange(0, 3).col(3);
+
+   
+        for (int i = 0; i < LastFrame->nFeatures; ++i)
+        {
+            std::shared_ptr<MapPoint> pMP = LastFrame->tMapPoints[i];
+
+            if (pMP)
+            {
+                if (!LastFrame->mvbOutlier[i])
+                {
+                    // Project
+                    Vec3f x3Dw = pMP->getWorldPose();
+                    Vec3f x3Dc = Rcw * x3Dw + tcw;
+
+                    const float xc = x3Dc(0);
+                    const float yc = x3Dc(1);
+                    const float invzc = 1.0 / x3Dc(2);
+
+                    if (invzc < 0)
+                        continue;
+
+                    float u = CurrentFrame->HCalib->fxl() * xc * invzc + CurrentFrame->HCalib->cxl();
+                    float v = CurrentFrame->HCalib->fyl() * yc * invzc + CurrentFrame->HCalib->cyl();
+
+                    if (u < mnMinX || u > mnMaxX)
+                        continue;
+                    if (v < mnMinY || v > mnMaxY)
+                        continue;
+
+                    // int nLastOctave = LastFrame.mvKeys[i].octave;
+
+                    // Search in a window. Size depends on scale
+                    // float radius = th * CurrentFrame.mvScaleFactors[nLastOctave];
+                    float radius = th * 1.0f;
+
+
+                    vector<size_t> vIndices2;
+
+                    // if (bForward)
+                    //     vIndices2 = CurrentFrame.GetFeaturesInArea(u, v, radius, nLastOctave);
+                    // else if (bBackward)
+                    //     vIndices2 = CurrentFrame.GetFeaturesInArea(u, v, radius, 0, nLastOctave);
+                    // else
+                    vIndices2 = CurrentFrame->GetFeaturesInArea(u, v, radius);
+
+                    if (vIndices2.empty())
+                        continue;
+
+                    const cv::Mat dMP = pMP->GetDescriptor();
+
+                    int bestDist = 256;
+                    int bestIdx2 = -1;
+
+                    for (vector<size_t>::const_iterator vit = vIndices2.begin(), vend = vIndices2.end(); vit != vend; vit++)
+                    {
+                        const size_t i2 = *vit;
+                        if (CurrentFrame->tMapPoints[i2])
+                            if (CurrentFrame->tMapPoints[i2]->getNObservations() > 0)
+                                continue;
+
+                        const cv::Mat &d = CurrentFrame->Descriptors.row(i2);
+
+                        const int dist = DescriptorDistance(dMP, d);
+
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestIdx2 = i2;
+                        }
+                    }
+
+                    if (bestDist <= TH_HIGH)
+                    {
+                        CurrentFrame->tMapPoints[bestIdx2] = pMP;
+                        nmatches++;
+
+                        if (mbCheckOrientation)
+                        {
+                            float rot = LastFrame->mvKeys[i].angle - CurrentFrame->mvKeys[bestIdx2].angle;
+                            if (rot < 0.0)
+                                rot += 360.0f;
+                            int bin = round(rot * factor);
+                            if (bin == HISTO_LENGTH)
+                                bin = 0;
+                            assert(bin >= 0 && bin < HISTO_LENGTH);
+                            rotHist[bin].push_back(bestIdx2);
+                        }
+                    }
+                }
+            }
+        }
+
+        //Apply rotation consistency
+        if (mbCheckOrientation)
+        {
+            int ind1 = -1;
+            int ind2 = -1;
+            int ind3 = -1;
+
+            ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+
+            for (int i = 0; i < HISTO_LENGTH; i++)
+            {
+                if (i != ind1 && i != ind2 && i != ind3)
+                {
+                    for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+                    {
+                        CurrentFrame->tMapPoints[rotHist[i][j]].reset();
+                        nmatches--;
+                    }
+                }
+            }
+        }
+
+        return nmatches;
+    }
 
 
 
@@ -415,17 +547,7 @@ namespace HSLAM
 
 
 
-
-
-
-
-
-
-
-
-
-
-    int Matcher::SearchByProjection(shared_ptr<Frame> &CurrentFrame, shared_ptr<Frame> &pKF, const set<shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist)
+    int Matcher::SearchByProjection(shared_ptr<Frame> &CurrentFrame, shared_ptr<Frame> &pKF, const set<shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist, bool mbCheckOrientation)
     {
         int nmatches = 0;
         auto CurrPoseInv = CurrentFrame->fs->getPoseInverse();
@@ -557,7 +679,7 @@ namespace HSLAM
         return nmatches;
     }
 
-    int Matcher::searchWithEpipolar(shared_ptr<Frame> pKF1, shared_ptr<Frame> pKF2, vector<pair<size_t, size_t> > &vMatchedPairs)
+    int Matcher::searchWithEpipolar(shared_ptr<Frame> pKF1, shared_ptr<Frame> pKF2, vector<pair<size_t, size_t> > &vMatchedPairs, bool mbCheckOrientation)
     {
         const DBoW3::FeatureVector &vFeatVec1 = pKF1->mFeatVec;
         const DBoW3::FeatureVector &vFeatVec2 = pKF2->mFeatVec;

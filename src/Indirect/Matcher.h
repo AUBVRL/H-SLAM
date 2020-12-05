@@ -27,8 +27,6 @@ namespace HSLAM
     class Matcher
     {
     private:
-        float mfNNratio;
-        bool mbCheckOrientation;
         
         inline float RadiusByViewingCos(const float &viewCos)
         {
@@ -75,19 +73,17 @@ namespace HSLAM
 
     public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-        inline Matcher(float nnratio = 0.6, bool checkOri = true)
-        {
-            mfNNratio = nnratio;
-            mbCheckOrientation = checkOri;
-        }
-
+        Matcher(){}
         ~Matcher() {}
 
         int SearchByBoW(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vpMatches12);
-        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t> > &vMatchedPairs);
-        int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist);
-        int SearchLocalMapByProjection(std::shared_ptr<Frame> F, std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, float th, float nnratio);
+        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t> > &vMatchedPairs, bool mbCheckOrientation = true);
+        int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist, bool mbCheckOrientation = true);
         bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, Mat33f &F12);
+
+        
+        int SearchLocalMapByProjection(std::shared_ptr<Frame> F, std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, float th, float nnratio);
+        int SearchByProjectionFrameToFrame(std::shared_ptr<Frame> CurrentFrame, const std::shared_ptr<Frame> LastFrame, const float th, bool mbCheckOrientation = true);
 
         int Fuse(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, float th, std::vector<std::shared_ptr<MapPoint>> &vpReplacePoint);
         int Fuse(std::shared_ptr<Frame> pKF, const std::vector<std::shared_ptr<MapPoint>> &vpMapPoints, const float th);

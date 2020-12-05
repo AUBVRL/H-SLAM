@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "HSLAM",
+            "label": "HSLAM tumMono",
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/HSLAM",
             "args": [
@@ -22,6 +22,28 @@
                 "nomt=0",
                 "prefetch=0",
                 "start=0",
+                "end=999999999",
+                "speed=0"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "HSLAM EuroC",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/bin/HSLAM",
+            "args": [
+                "files=/mnt/Drive/VSLAM_Datasets/EuroC/ICRA_2019/mh01/data/",
+                "calib=${workspaceFolder}/misc/EuroC/camera.txt",
+                "vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
+                "preset=0",
+                "mode=1",
+                "quiet=1",
+                "nolog=1",
+                "reverse=0",
+                "nogui=0",
+                "nomt=0",
+                "prefetch=0",
+                "start=950",
                 "end=999999999",
                 "speed=0"
             ],
