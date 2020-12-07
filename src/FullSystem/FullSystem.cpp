@@ -245,6 +245,8 @@ void FullSystem::printResult(std::string file, bool printSim)
 
 	for (auto it : allKeyFramesHistory)
 	{
+		if(!it->frame)
+			continue;
 		auto kfPts = it->frame->getMapPointsV();
 		for (int i = 0, iend = kfPts.size(); i < iend; ++i)
 			if (kfPts[i])
@@ -877,8 +879,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	FrameShell* shell = new FrameShell();
 
 	
-	shell->frame = std::make_shared<Frame>(image->PhoUncalibImage, detector, &Hcalib, fh, shell);
-	
+	shell->frame = std::make_shared<Frame>(image->PhoUncalibImage, detector, &Hcalib, fh, shell, globalMap);
 	// std::cout << shell->frame->nFeatures << std::endl;
 	// cv::Mat Output;
 	// shell->frame->Image.convertTo(Output, CV_8UC3);
@@ -887,7 +888,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	// cv::imshow("test2", Output);
 	// cv::waitKey(1);
 
-    shell->marginalizedAt = shell->id = allFrameHistory.size();
+	shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
     shell->incoming_id = id;
 	fh->shell = shell;
@@ -955,7 +956,6 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		//perform joint optimization here!!
 		int nOutlierFreeMatchesF2LocalMap = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
 		
-		DrawMatches(shell->frame);
 
 		//perform joint optimization here
 		Vec4 tres = trackNewCoarse(fh);
@@ -1288,6 +1288,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		ow->publishGlobalMap(globalMap);
 	}
 
+	SearchInNeighbors(fh->shell->frame);
+	KeyFrameCulling(fh->shell->frame);
 	updateLocalKeyframes(fh->shell->frame);
 	updateLocalPoints(fh->shell->frame);
 	// =========================== Marginalize Frames =========================
@@ -1666,8 +1668,8 @@ void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
 			{
 				frame->addMapPointMatch(Mp, i);
 				Mp->AddObservation(frame, i);
-				Mp->ComputeDistinctiveDescriptors();
-				Mp->UpdateNormalAndDepth();
+				Mp->ComputeDistinctiveDescriptors(true);
+				Mp->UpdateNormalAndDepth(frame, true);
 			}
 		}
 	}
@@ -1803,30 +1805,29 @@ void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
 		}
 	}
 
-	// if (keyframeCounter.empty())
-	// 	return;
+	if (keyframeCounter.empty())
+		return;
 
 	auto sortedKfs = sortLocalKFs(keyframeCounter, true);
-	  
+
 
 	int max = 0;
 	std::shared_ptr<Frame> pKFmax;
 
 	mvpLocalKeyFrames.clear();
 	mvpLocalKeyFrames.reserve(3 * sortedKfs.size());
-
-	// for (std::vector<std::pair<std::shared_ptr<Frame>, int>>::const_iterator it = sortedKfs.begin(), itEnd = sortedKfs.end(); it != itEnd; it++)
-	// 	std::cout << it->first->fs->KfId << " " << it->second << std::endl;
 	
-
 	// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
 	// for (std::map<std::shared_ptr<Frame>, int>::const_iterator it = sortedKfs.begin(), itEnd = sortedKfs.end(); it != itEnd; it++)
 	for (std::vector<std::pair<std::shared_ptr<Frame>, int>>::const_iterator it = sortedKfs.begin(), itEnd = sortedKfs.end(); it != itEnd; it++)
 	{
+		if( it - sortedKfs.begin() > 80)
+			break;
+
 		std::shared_ptr<Frame> pKF = it->first;
 
-		// if (pKF->isBad())
-		// 	continue;
+		if (pKF->isBad())
+			continue;
 
 		if (it->second > max)
 		{
@@ -1852,30 +1853,30 @@ void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
 		for (std::vector<std::shared_ptr<Frame>>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
 		{
 			std::shared_ptr<Frame> pNeighKF = *itNeighKF;
-			// if (!pNeighKF->isBad())
-			// {
-			if (pNeighKF->mnTrackReferenceForFrame != frame->fs->id)
+			if (!pNeighKF->isBad())
 			{
-				mvpLocalKeyFrames.push_back(pNeighKF);
-				pNeighKF->mnTrackReferenceForFrame = frame->fs->id;
-				break;
+				if (pNeighKF->mnTrackReferenceForFrame != frame->fs->id)
+				{
+					mvpLocalKeyFrames.push_back(pNeighKF);
+					pNeighKF->mnTrackReferenceForFrame = frame->fs->id;
+					break;
+				}
 			}
-			// }
 		}
 
 		const std::set<std::shared_ptr<Frame>> spChilds = pKF->GetChilds();
 		for (std::set<std::shared_ptr<Frame>>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
 		{
 			std::shared_ptr<Frame> pChildKF = *sit;
-			// if (!pChildKF->isBad())
-			// {
-			if (pChildKF->mnTrackReferenceForFrame != frame->fs->id)
+			if (!pChildKF->isBad())
 			{
-				mvpLocalKeyFrames.push_back(pChildKF);
-				pChildKF->mnTrackReferenceForFrame = frame->fs->id;
-				break;
+				if (pChildKF->mnTrackReferenceForFrame != frame->fs->id)
+				{
+					mvpLocalKeyFrames.push_back(pChildKF);
+					pChildKF->mnTrackReferenceForFrame = frame->fs->id;
+					break;
+				}
 			}
-			// }
 		}
 
 		std::shared_ptr<Frame> pParent = pKF->GetParent();
@@ -1979,6 +1980,155 @@ int FullSystem::updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & n
 		}
 	}
 	return nmatchesMap;
+}
+
+void FullSystem::SearchInNeighbors(std::shared_ptr<Frame> currKF)
+{
+	// Retrieve neighbor keyframes
+	int nn = 10; //20
+	
+	const std::vector<std::shared_ptr<Frame>> vpNeighKFs = currKF->GetBestCovisibilityKeyFrames(nn);
+	std::vector<std::shared_ptr<Frame>> vpTargetKFs;
+	for (std::vector<std::shared_ptr<Frame>>::const_iterator vit = vpNeighKFs.begin(), vend = vpNeighKFs.end(); vit != vend; vit++)
+	{
+		std::shared_ptr<Frame> pKFi = *vit;
+		if (pKFi->isBad() || pKFi->mnFuseTargetForKF == currKF->fs->KfId)
+			continue;
+		vpTargetKFs.push_back(pKFi);
+		pKFi->mnFuseTargetForKF = currKF->fs->KfId;
+
+		// Extend to some second neighbors
+		const std::vector<std::shared_ptr<Frame>> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
+		for (std::vector<std::shared_ptr<Frame>>::const_iterator vit2 = vpSecondNeighKFs.begin(), vend2 = vpSecondNeighKFs.end(); vit2 != vend2; vit2++)
+		{
+			std::shared_ptr<Frame> pKFi2 = *vit2;
+			if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == currKF->fs->KfId || pKFi2->fs->KfId == currKF->fs->KfId)
+				continue;
+			vpTargetKFs.push_back(pKFi2);
+		}
+	}
+	
+	// Search matches by projection from current KF in target KFs
+	std::vector<std::shared_ptr<MapPoint>> vpMapPointMatches = currKF->getMapPointsV();
+	for (std::vector<std::shared_ptr<Frame>>::iterator vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
+	{
+		std::shared_ptr<Frame> pKFi = *vit;
+		matcher->Fuse(pKFi, vpMapPointMatches, 3.0); //th = 3.0
+	}
+	
+	// Search matches by projection from target KFs in current KF
+	std::vector<std::shared_ptr<MapPoint>> vpFuseCandidates;
+	vpFuseCandidates.reserve(vpTargetKFs.size() * vpMapPointMatches.size());
+
+	for (std::vector<std::shared_ptr<Frame>>::iterator vitKF = vpTargetKFs.begin(), vendKF = vpTargetKFs.end(); vitKF != vendKF; vitKF++)
+	{
+		std::shared_ptr<Frame> pKFi = *vitKF;
+
+		std::vector<std::shared_ptr<MapPoint>> vpMapPointsKFi = pKFi->getMapPointsV();
+
+		for (std::vector<std::shared_ptr<MapPoint>>::iterator vitMP = vpMapPointsKFi.begin(), vendMP = vpMapPointsKFi.end(); vitMP != vendMP; vitMP++)
+		{
+			std::shared_ptr<MapPoint> pMP = *vitMP;
+			if (!pMP)
+				continue;
+			if (pMP->isBad() || pMP->mnFuseCandidateForKF == currKF->fs->KfId)
+				continue;
+			pMP->mnFuseCandidateForKF = currKF->fs->KfId;
+			vpFuseCandidates.push_back(pMP);
+		}
+	}
+
+	matcher->Fuse(currKF, vpFuseCandidates, 3.0); //th = 3.0
+
+	// Update points
+	vpMapPointMatches = currKF->getMapPointsV();
+	for (size_t i = 0, iend = vpMapPointMatches.size(); i < iend; i++)
+	{
+		std::shared_ptr<MapPoint> pMP = vpMapPointMatches[i];
+		if (pMP)
+		{
+			if (!pMP->isBad())
+			{
+				pMP->ComputeDistinctiveDescriptors(false);
+				pMP->UpdateNormalAndDepth(currKF, false);
+			}
+		}
+	}
+
+	// Update connections in covisibility graph
+	currKF->UpdateConnections();
+}
+
+
+void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
+{
+    // Check redundant keyframes (only local keyframes)
+    // A keyframe is considered redundant if the 80% of the MapPoints it sees, are seen
+    // in at least other 3 keyframes (in the same or finer scale)
+    // We only consider close stereo points
+    std::vector<std::shared_ptr<Frame>> vpLocalKeyFrames = currKF->GetVectorCovisibleKeyFrames();
+	int KfsChecked = 0;
+	for (std::vector<std::shared_ptr<Frame>>::iterator vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
+	{	
+		std::shared_ptr<Frame> pKF = *vit;
+		if(pKF->fs->KfId==0 || (pKF->getState()== Frame::ekfstate::active))
+            continue;
+        
+		KfsChecked += 1;
+		if(KfsChecked > 10)
+			return;
+
+		const std::vector<std::shared_ptr<MapPoint>> vpMapPoints = pKF->getMapPointsV();
+
+        int nObs = 3;
+        const int thObs=nObs;
+        int nRedundantObservations=0;
+        int nMPs=0;
+        for(size_t i=0, iend=vpMapPoints.size(); i<iend; i++)
+        {
+            std::shared_ptr<MapPoint> pMP = vpMapPoints[i];
+            if(pMP)
+            {
+                if(!pMP->isBad())
+                {
+                    nMPs++;
+                    if(pMP->getNObservations()>thObs)
+                    {
+                        // const int &scaleLevel = pKF->mvKeysUn[i].octave;
+                        const std::map<std::shared_ptr<Frame>, size_t> observations = pMP->GetObservations();
+                        int nObs=0;
+                        for(std::map<std::shared_ptr<Frame>, size_t>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
+                        {
+                            std::shared_ptr<Frame> pKFi = mit->first;
+                            if(pKFi==pKF)
+                                continue;
+                            // const int &scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
+
+                            // if(scaleLeveli<=scaleLevel+1)
+                            // {
+                                nObs++;
+                                if(nObs>=thObs)
+                                    break;
+                            // }
+                        }
+                        if(nObs>=thObs)
+                        {
+                            nRedundantObservations++;
+                        }
+                    }
+                }
+            }
+        }  
+
+        if(nRedundantObservations>0.8*nMPs) //0.9
+            {
+				if(pKF->getState() != Frame::ekfstate::active)
+				{
+					pKF->setBadFlag();		
+					pKF->fs->frame.reset();
+				}
+			}
+	}
 }
 
 

@@ -6,13 +6,13 @@
 #include "Indirect/MapPoint.h"
 #include "opencv2/highgui.hpp"
 #include "util/FrameShell.h"
-
+#include "Indirect/Map.h"
 namespace HSLAM
 {
 
     using namespace std;
 
-    Frame::Frame(float *Img, shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs) : nFeatures(0), isReduced(false), NeedRefresh(NeedRefresh), HCalib(_HCalib), fh(_fh), fs(_fs)
+    Frame::Frame(float *Img, shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs, std::shared_ptr<Map> _gMap) : nFeatures(0), isReduced(false), NeedConnRefresh(true), HCalib(_HCalib), fh(_fh), fs(_fs)
     {
         cv::Mat(hG[0], wG[0], CV_32FC1, Img).convertTo(Image, CV_8U);
         Occupancy = cv::Mat(hG[0], wG[0], CV_8U, cv::Scalar(0));
@@ -25,6 +25,11 @@ namespace HSLAM
         mbFirstConnection = true;
         mnLoopQuery =0;
         mnLoopWords = 0;
+        mnFuseTargetForKF = 0;
+        mbBad = false;
+        mbToBeErased = false;
+        globalMap = _gMap;
+        kfState = ekfstate::active;
         // ComputeBoVW();
     }
     Frame::~Frame()
@@ -46,6 +51,7 @@ namespace HSLAM
             Occupancy.release();
             releaseVec(tMapPoints);
             releaseVec(mvbOutlier);
+            setState(ekfstate::marginalized);
             // NeedRefresh = true;
         }
         return;
@@ -242,29 +248,32 @@ namespace HSLAM
     void Frame::UpdateBestCovisibles()
     {
         boost::lock_guard<boost::mutex> l(mMutexConnections);
-        vector<pair<int, shared_ptr<Frame>>> vPairs;
-        vPairs.reserve(mConnectedKeyFrameWeights.size());
-        for (map<shared_ptr<Frame>, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
-            vPairs.push_back(make_pair(mit->second, mit->first));
-
-        sort(vPairs.begin(), vPairs.end());
-        list<shared_ptr<Frame>> lKFs;
-        list<int> lWs;
-        for (size_t i = 0, iend = vPairs.size(); i < iend; i++)
+        if (NeedConnRefresh)
         {
-            lKFs.push_front(vPairs[i].second);
-            lWs.push_front(vPairs[i].first);
+            NeedConnRefresh = false;
+            vector<pair<int, shared_ptr<Frame>>> vPairs;
+            vPairs.reserve(mConnectedKeyFrameWeights.size());
+            for (map<shared_ptr<Frame>, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
+                vPairs.push_back(make_pair(mit->second, mit->first));
+
+            sort(vPairs.begin(), vPairs.end());
+            list<shared_ptr<Frame>> lKFs;
+            list<int> lWs;
+            for (size_t i = 0, iend = vPairs.size(); i < iend; i++)
+            {
+                lKFs.push_front(vPairs[i].second);
+                lWs.push_front(vPairs[i].first);
+            }
+
+            mvpOrderedConnectedKeyFrames = vector<shared_ptr<Frame>>(lKFs.begin(), lKFs.end());
+            mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
         }
-
-        mvpOrderedConnectedKeyFrames = vector<shared_ptr<Frame>>(lKFs.begin(), lKFs.end());
-        mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
     }
-
 
     void Frame::UpdateConnections()
     {
         map<shared_ptr<Frame>, int> KFcounter;
-
+        auto thisptr = getPtr();
         vector<shared_ptr<MapPoint>> vpMP = getMapPointsV();
 
         //For all map points in keyframe check in which other keyframes are they seen
@@ -312,14 +321,19 @@ namespace HSLAM
             {
                 vPairs.push_back(make_pair(mit->second, mit->first));
                 
-                (mit->first)->AddConnection(getPtr(), mit->second);
+                (mit->first)->AddConnection(thisptr, mit->second);
             }
         }
 
         if (vPairs.empty())
         {
             vPairs.push_back(make_pair(nmax, pKFmax));
-            pKFmax->AddConnection(getPtr(), nmax);
+            pKFmax->AddConnection(thisptr, nmax);
+        }
+
+        for (map<shared_ptr<Frame> , int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
+        {
+            mit->first->UpdateBestCovisibles();
         }
 
         sort(vPairs.begin(), vPairs.end());
@@ -341,7 +355,7 @@ namespace HSLAM
             if (mbFirstConnection && fs->KfId != 0)
             {
                 mpParent = mvpOrderedConnectedKeyFrames.front();
-                mpParent->AddChild(getPtr());
+                mpParent->AddChild(thisptr);
                 mbFirstConnection = false;
             }
         }
@@ -353,14 +367,20 @@ namespace HSLAM
         {
             boost::lock_guard<boost::mutex> l(mMutexConnections);
             if (!mConnectedKeyFrameWeights.count(pKF))
+            {
+                NeedConnRefresh = true;
                 mConnectedKeyFrameWeights[pKF] = weight;
+            }
             else if (mConnectedKeyFrameWeights[pKF] != weight)
+            {
+                NeedConnRefresh = true;
                 mConnectedKeyFrameWeights[pKF] = weight;
+            }
             else
                 return;
         }
 
-        UpdateBestCovisibles();
+        // UpdateBestCovisibles();
     }
 
     set<shared_ptr<Frame>> Frame::GetConnectedKeyFrames()
@@ -432,6 +452,18 @@ namespace HSLAM
         pKF->AddChild(getPtr());
     }
 
+    Frame::ekfstate Frame::getState()
+    {
+        boost::unique_lock<boost::mutex> lock(mMutexConnections);
+        return kfState;
+    }
+
+    void Frame::setState(ekfstate state)
+    {
+        boost::unique_lock<boost::mutex> lock(mMutexConnections);
+        kfState = state;
+    }
+
     set<shared_ptr<Frame>> Frame::GetChilds()
     {
         boost::lock_guard<boost::mutex> l(mMutexConnections);
@@ -462,6 +494,130 @@ namespace HSLAM
     {
         boost::lock_guard<boost::mutex> l(mMutexConnections);
 	    return mspLoopEdges;
+    }
+
+    void Frame::EraseConnection(std::shared_ptr<Frame> pKF)
+    {
+        // bool bUpdate = false;
+        {
+            boost::unique_lock<boost::mutex> lock(mMutexConnections);
+            if (mConnectedKeyFrameWeights.count(pKF))
+            {
+
+                mConnectedKeyFrameWeights.erase(pKF);
+                // bUpdate = true;
+            }
+        }
+
+        // if (bUpdate)
+        //     UpdateBestCovisibles();
+    }
+
+    void Frame::setBadFlag()
+    {
+        auto thisptr = getPtr();
+        {
+            boost::lock_guard<boost::mutex> l(mMutexConnections);
+            if (fs->KfId == 0)
+                return;
+            else if (mbNotErase)
+            {
+                mbToBeErased = true;
+                return;
+            }
+        }
+
+        auto tempConnectivtiy = mConnectedKeyFrameWeights;
+
+        for (std::map<std::shared_ptr<Frame>, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
+            mit->first->EraseConnection(thisptr);
+        
+        for (std::map<std::shared_ptr<Frame>, int>::iterator mit = tempConnectivtiy.begin(), mend = tempConnectivtiy.end(); mit != mend; mit++)
+            mit->first->UpdateBestCovisibles();
+
+        for (size_t i = 0; i < mvpMapPoints.size(); i++)
+            if (mvpMapPoints[i])
+            {
+            
+                mvpMapPoints[i]->EraseObservation(thisptr);
+                if(mvpMapPoints[i]->sourceFrame == thisptr)
+                    mvpMapPoints[i]->SetBadFlag();
+            }
+               
+        {
+            boost::unique_lock<boost::mutex> lock(mMutexConnections);
+            boost::unique_lock<boost::mutex> lock1(_mtx);
+
+            mConnectedKeyFrameWeights.clear();
+            mvpOrderedConnectedKeyFrames.clear();
+
+            // Update Spanning Tree
+            std::set<std::shared_ptr<Frame>> sParentCandidates;
+            sParentCandidates.insert(mpParent);
+
+            // Assign at each iteration one children with a parent (the pair with highest covisibility weight)
+            // Include that children as new parent candidate for the rest
+            while (!mspChildrens.empty())
+            {
+                bool bContinue = false;
+
+                int max = -1;
+                std::shared_ptr<Frame> pC;
+                std::shared_ptr<Frame> pP;
+
+                for (std::set<std::shared_ptr<Frame>>::iterator sit = mspChildrens.begin(), send = mspChildrens.end(); sit != send; sit++)
+                {
+                    std::shared_ptr<Frame> pKF = *sit;
+                    if (pKF->isBad())
+                        continue;
+
+                    // Check if a parent candidate is connected to the keyframe
+                    std::vector<std::shared_ptr<Frame>> vpConnected = pKF->GetVectorCovisibleKeyFrames();
+                    for (size_t i = 0, iend = vpConnected.size(); i < iend; i++)
+                    {
+                        for (std::set<std::shared_ptr<Frame>>::iterator spcit = sParentCandidates.begin(), spcend = sParentCandidates.end(); spcit != spcend; spcit++)
+                        {
+                            if (vpConnected[i]->fs->KfId == (*spcit)->fs->KfId)
+                            {
+                                int w = pKF->GetWeight(vpConnected[i]);
+                                if (w > max)
+                                {
+                                    pC = pKF;
+                                    pP = vpConnected[i];
+                                    max = w;
+                                    bContinue = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (bContinue)
+                {
+                    pC->ChangeParent(pP);
+                    sParentCandidates.insert(pC);
+                    mspChildrens.erase(pC);
+                }
+                else
+                    break;
+            }
+
+            // If a children has no covisibility links with any parent candidate, assign to the original parent of this KF
+            if (!mspChildrens.empty())
+                for (std::set<std::shared_ptr<Frame>>::iterator sit = mspChildrens.begin(); sit != mspChildrens.end(); sit++)
+                {
+                    (*sit)->ChangeParent(mpParent);
+                }
+
+            if(mpParent)
+                mpParent->EraseChild(thisptr);
+            // mTcp = Tcw * mpParent->GetPoseInverse();
+            
+            mbBad = true;
+        }
+
+        globalMap->EraseKeyFrame(thisptr);
+        // mpKeyFrameDB->erase(this);
     }
 
 } // namespace HSLAM

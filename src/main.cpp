@@ -406,7 +406,7 @@ int main( int argc, char** argv )
 
 	FullSystem* fullSystem = new FullSystem();
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
-	fullSystem->linearizeOperation = (playbackSpeed==0);
+	fullSystem->linearizeOperation = (playbackSpeed == 0);
 
 	IOWrap::PangolinDSOViewer* viewer = 0;
 	if(!disableAllDisplay)

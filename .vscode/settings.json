@@ -70,5 +70,5 @@
         "matrixfunctions": "cpp",
         "*.ipp": "cpp"
     },
-    "C_Cpp.intelliSenseEngineFallback": "Enabled"
+    // "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

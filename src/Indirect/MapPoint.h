@@ -53,7 +53,9 @@ namespace HSLAM
         float mTrackViewCos;
         long unsigned int mnTrackReferenceForFrame;
         long unsigned int mnLastFrameSeen;
-        
+
+        size_t mnFuseCandidateForKF;
+
         enum mpDirStatus {active =0, marginalized, removed } status;
 
         void EraseObservation(std::shared_ptr<Frame> &pKF);
@@ -69,14 +71,14 @@ namespace HSLAM
             return mpReplaced;
         }
 
-        void UpdateNormalAndDepth();
+        void UpdateNormalAndDepth(std::shared_ptr<Frame> frame, bool isQuick);
         // Vec3f getWorldPosewPose(SE3& pose);
         Vec3f getWorldPose();
 
         void updateGlobalPose();
 
 
-        void ComputeDistinctiveDescriptors();
+        void ComputeDistinctiveDescriptors(bool isQuick);
         static size_t idCounter;
 
         inline void setPointHessian(PointHessian *_ph)
@@ -255,15 +257,8 @@ namespace HSLAM
             mDescriptor = _descriptor.clone();
         }
 
+        void AddObservation(std::shared_ptr<Frame> &pKF, size_t idx);
 
-        inline void AddObservation(std::shared_ptr<Frame> &pKF, size_t idx)
-        {
-            boost::lock_guard<boost::mutex> l(_mtx); //diff lock?
-            if (mObservations.count(pKF))
-                return;
-            mObservations[pKF] = idx;
-            nObs = nObs + 1;
-        }
     };
 
 } // namespace HSLAM

@@ -10,6 +10,7 @@ namespace HSLAM
     class FrameShell;
     class MapPoint;
     struct FrameHessian;
+    class Map;
 
     template <typename Type> class IndexThreadReduce;
 
@@ -19,7 +20,7 @@ namespace HSLAM
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         
 
-        Frame(float* Img, std::shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs);
+        Frame(float* Img, std::shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs, std::shared_ptr<Map> _gMap);
         ~Frame();
       
         void ReduceToEssential();
@@ -51,6 +52,33 @@ namespace HSLAM
 
         void EraseMapPointMatch(std::shared_ptr<MapPoint> pMP);
 
+        inline bool isBad()
+        {
+            boost::lock_guard<boost::mutex> l(mMutexConnections);
+            return mbBad;
+        }
+        
+        void setBadFlag();
+
+        // Enable/Disable bad flag changes
+        inline void SetNotErase()
+        {
+            boost::unique_lock<boost::mutex> l(mMutexConnections);
+            mbNotErase = true;
+        }
+
+        inline void SetErase()
+        {
+
+            boost::unique_lock<boost::mutex> l(mMutexConnections);
+            if (mspLoopEdges.empty())
+                mbNotErase = false;
+
+            l.unlock();
+            if (mbToBeErased)
+                setBadFlag();
+        }
+
         inline void ReplaceMapPointMatch(const size_t &idx, std::shared_ptr<MapPoint> pMP)
         {
             boost::lock_guard<boost::mutex> l(_mtx);
@@ -69,6 +97,8 @@ namespace HSLAM
         std::shared_ptr<Frame> getPtr();
         
         void AddConnection(std::shared_ptr<Frame> pKF, const int &weight);
+        void EraseConnection(std::shared_ptr<Frame> pKF);
+
         void UpdateBestCovisibles();
         std::set<std::shared_ptr<Frame>> GetConnectedKeyFrames();
         std::vector<std::shared_ptr<Frame>> GetVectorCovisibleKeyFrames();
@@ -110,7 +140,7 @@ namespace HSLAM
 
         int nFeatures;
         bool isReduced;
-        bool NeedRefresh;
+        bool NeedConnRefresh;
 
 
         CalibHessian *HCalib;
@@ -121,19 +151,31 @@ namespace HSLAM
         int mnLoopWords;
         float mLoopScore;
 
-        private:
-   			boost::mutex _mtx;
-            boost::mutex mMutexConnections;
+        size_t mnFuseTargetForKF;
 
-            std::map<std::shared_ptr<Frame>, int> mConnectedKeyFrameWeights;
-            std::vector<std::shared_ptr<Frame>> mvpOrderedConnectedKeyFrames;
-            std::vector<int> mvOrderedWeights;
+        enum ekfstate {active=0, marginalized};
+        ekfstate kfState;
+        ekfstate getState();
+        void setState(ekfstate state);
 
-            std::shared_ptr<Frame> mpParent;
-            std::set<std::shared_ptr<Frame>> mspChildrens;
-            std::set<std::shared_ptr<Frame>> mspLoopEdges;
-            bool mbFirstConnection;
-            bool mbNotErase;
+    private:
+        boost::mutex _mtx;
+        boost::mutex mMutexConnections;
+
+        std::map<std::shared_ptr<Frame>, int> mConnectedKeyFrameWeights;
+        std::vector<std::shared_ptr<Frame>> mvpOrderedConnectedKeyFrames;
+        std::vector<int> mvOrderedWeights;
+
+        std::shared_ptr<Frame> mpParent;
+        std::set<std::shared_ptr<Frame>> mspChildrens;
+        std::set<std::shared_ptr<Frame>> mspLoopEdges;
+        bool mbFirstConnection;
+        bool mbNotErase;
+        bool mbBad;
+        bool mbToBeErased;
+        std::shared_ptr<Map> globalMap;
+
+        
     };
 
 } // namespace HSLAM

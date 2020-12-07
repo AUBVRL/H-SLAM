@@ -309,6 +309,8 @@ private:
 	void CheckReplacedInLastFrame();
 	int SearchLocalPoints(std::shared_ptr<Frame> frame, int th = 1, float nnratio = 0.8);
 	int updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches, bool istrackingLastFrame = true);
+	void SearchInNeighbors(std::shared_ptr<Frame> currKF);
+	void KeyFrameCulling(std::shared_ptr<Frame> currKF);
 	void DrawMatches(std::shared_ptr<Frame> frame);
 	// SE3 cumulativeForm();
 

@@ -22,7 +22,7 @@ namespace HSLAM
         mnVisible = 1;
         mnFound = 1;
         mbBad = false;
-        
+        mnFuseCandidateForKF = 0;
 
         pt = Vec2f(ph->u, ph->v);
         angle = sourceFrame->mvKeys[index].angle;
@@ -121,11 +121,14 @@ namespace HSLAM
     //     return pose.cast<float>() * Vec3f(x, y, z);
     // }
 
-    void MapPoint::ComputeDistinctiveDescriptors()
+    void MapPoint::ComputeDistinctiveDescriptors(bool isQuick)
     {
+        if(isQuick && getNObservations() > 7)
+            return;
+            
         // Retrieve all observed descriptors
         vector<cv::Mat> vDescriptors;
-
+        
         map<shared_ptr<Frame>, size_t> observations = GetObservations();
 
         if (observations.empty())
@@ -135,9 +138,9 @@ namespace HSLAM
 
         for (map<shared_ptr<Frame>, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
         {
-            // shared_ptr<Frame> pKF = mit->first;
-            // if (!pKF->isBad())
-            vDescriptors.push_back(mit->first->Descriptors.row(mit->second));
+            shared_ptr<Frame> pKF = mit->first;
+            if (!pKF->isBad())
+                vDescriptors.push_back(mit->first->Descriptors.row(mit->second));
         }
 
         if (vDescriptors.empty())
@@ -178,7 +181,7 @@ namespace HSLAM
 
     }
 
-    void MapPoint::UpdateNormalAndDepth()
+    void MapPoint::UpdateNormalAndDepth(std::shared_ptr<Frame> frame, bool isQuick)
     {
         map<shared_ptr<Frame>, size_t> observations;
         Vec3f Pos;
@@ -195,31 +198,51 @@ namespace HSLAM
         if (observations.empty())
             return;
 
-        // cv::Mat normal = cv::Mat::zeros(3, 1, CV_32F);
-        Vec3f normal = Vec3f::Zero();
-        int n = 0;
-        for (map<shared_ptr<Frame> , size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+        if (isQuick)
         {
-            shared_ptr<Frame> pKF = mit->first;
-            Vec3f Owi = pKF->fs->getCameraCenter().cast<float>();
+            Vec3f Owi = frame->fs->getCameraCenter().cast<float>();
             Vec3f normali = worldPose - Owi;
-            normal = normal + normali / normali.norm();
-            n++;
+            boost::lock_guard<boost::mutex> l(_mtx);
+            mNormalVector = (mNormalVector + normali / normali.norm()) / 2.0f;
+            return;
         }
-
-        // cv::Mat PC = Pos - pRefKF->GetCameraCenter();
-        // const float dist = cv::norm(PC);
-        // const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
-        // const float levelScaleFactor = pRefKF->mvScaleFactors[level];
-        // const int nLevels = pRefKF->mnScaleLevels;
-
+        else
         {
-            boost::lock_guard<boost::mutex> l(_mtx); //pose lock
-            // mfMaxDistance = dist*levelScaleFactor;
-            // mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
-            mNormalVector = normal / n;
+            Vec3f normal = Vec3f::Zero();
+            int n = 0;
+            for (map<shared_ptr<Frame>, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+            {
+                shared_ptr<Frame> pKF = mit->first;
+                Vec3f Owi = pKF->fs->getCameraCenter().cast<float>();
+                Vec3f normali = worldPose - Owi;
+                normal = normal + normali / normali.norm();
+                n++;
+            }
+
+            // cv::Mat PC = Pos - pRefKF->GetCameraCenter();
+            // const float dist = cv::norm(PC);
+            // const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
+            // const float levelScaleFactor = pRefKF->mvScaleFactors[level];
+            // const int nLevels = pRefKF->mnScaleLevels;
+
+            {
+                boost::lock_guard<boost::mutex> l(_mtx); //pose lock
+                // mfMaxDistance = dist*levelScaleFactor;
+                // mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
+                mNormalVector = normal / n;
+            }
         }
+
         return;
+    }
+
+    void MapPoint::AddObservation(std::shared_ptr<Frame> &pKF, size_t idx)
+    {
+        boost::unique_lock<boost::mutex> l(_mtx); //diff lock?
+        if (mObservations.count(pKF))
+            return;
+        mObservations[pKF] = idx;
+        nObs = nObs + 1;
     }
 
     void MapPoint::EraseObservation(std::shared_ptr<Frame> &pKF)
@@ -299,7 +322,7 @@ namespace HSLAM
         }
         pMP->increaseFound(nfound);
         pMP->increaseVisible(nvisible);
-        pMP->ComputeDistinctiveDescriptors();
+        pMP->ComputeDistinctiveDescriptors(false);
 
         globalMap.lock()->EraseMapPoint(getPtr());
     }
