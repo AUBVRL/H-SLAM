@@ -19,6 +19,8 @@ extern int minIndDist;
 extern int minDirDist;
 extern int indFeaturesToExtract;
 
+extern bool normalizeInfoWithVariance;
+
 #define SOLVER_SVD (int)1
 #define SOLVER_ORTHOGONALIZE_SYSTEM (int)2
 #define SOLVER_ORTHOGONALIZE_POINTMARG (int)4

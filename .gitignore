@@ -34,3 +34,7 @@
 build/
 
 result.txt
+
+Thirdparty/CompiledLibs/
+
+Thirdparty/opencv-3.4.6/

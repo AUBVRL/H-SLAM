@@ -66,6 +66,8 @@ public:
 
 	float idepth_GT;
 
+	bool hasDepthPrior;
+
 	double linearizeResidual(
 			CalibHessian *  HCalib, const float outlierTHSlack,
 			ImmaturePointTemporaryResidual* tmpRes,

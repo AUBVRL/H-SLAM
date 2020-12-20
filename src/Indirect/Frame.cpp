@@ -29,7 +29,7 @@ namespace HSLAM
         mbBad = false;
         mbToBeErased = false;
         globalMap = _gMap;
-        kfState = ekfstate::active;
+        kfState = kfstate::active;
         // ComputeBoVW();
     }
     Frame::~Frame()
@@ -51,7 +51,7 @@ namespace HSLAM
             Occupancy.release();
             releaseVec(tMapPoints);
             releaseVec(mvbOutlier);
-            setState(ekfstate::marginalized);
+            setState(kfstate::marginalized);
             // NeedRefresh = true;
         }
         return;
@@ -452,13 +452,13 @@ namespace HSLAM
         pKF->AddChild(getPtr());
     }
 
-    Frame::ekfstate Frame::getState()
+    Frame::kfstate Frame::getState()
     {
         boost::unique_lock<boost::mutex> lock(mMutexConnections);
         return kfState;
     }
 
-    void Frame::setState(ekfstate state)
+    void Frame::setState(kfstate state)
     {
         boost::unique_lock<boost::mutex> lock(mMutexConnections);
         kfState = state;

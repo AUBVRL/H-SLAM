@@ -36,8 +36,9 @@ include(ProcessorCount)
 ProcessorCount(NUMTHREADS)
 add_definitions("-DThreadCount=${NUMTHREADS}")
 
+set(CMAKE_GENERATOR "Unix Makefiles")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -Wno-deprecated -Wno-deprecated-declarations"
+   "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -Wno-deprecated -Wno-deprecated-declarations" #-fopenmp is added if g2o is compiled with openmp capabilities
 #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
@@ -70,15 +71,18 @@ set(SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/Indirect/MapPoint.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Matcher.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Map.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/Optimizer.cpp
+  # ${PROJECT_SOURCE_DIR}/src/Indirect/LoopCloser.cpp
 )
 
 
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/src
-  ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
-  ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
+  ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
+  ${PROJECT_SOURCE_DIR}/Thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
+  ${G2O_INCLUDE_DIR}
 ) 
 
 

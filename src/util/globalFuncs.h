@@ -357,8 +357,18 @@ inline Vec3b makeRedGreen3B(float val)	// 0 = red, 1=green, 0.5=yellow.
 
 }
 
+inline double getStdDev(std::vector<double> _in)
+{
+	size_t size = _in.size();
+	double sum = std::accumulate(_in.begin(), _in.end(), 0.0);
+	double mean = sum / size;
 
+	std::vector<double> diff(size);
+	std::transform(_in.begin(), _in.end(), diff.begin(),
+				   std::bind2nd(std::minus<double>(), mean));
+	double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+	double stdev = std::sqrt(sq_sum / size);
 
-
-
+	return stdev;
+}
 }

@@ -42,11 +42,9 @@ namespace HSLAM
         Vec3f Owi = sourceFrame->fs->getCameraCenter().cast<float>();
         Vec3f normali = worldPose - Owi;
         mNormalVector = normali / normali.norm();
-
         // OIdepth=pointhessian->idepth_zero_scaled;
         // OWeight = sqrt(1e-3/(pointhessian->efPoint->HdiF+1e-12));
 
-        
         boost::lock_guard<boost::mutex> l(_mtx);  //just in case some other thread wants to create a mapPoint
         id = idCounter;
         idCounter++;
@@ -181,7 +179,7 @@ namespace HSLAM
 
     }
 
-    void MapPoint::UpdateNormalAndDepth(std::shared_ptr<Frame> frame, bool isQuick)
+    void MapPoint::UpdateNormalAndDepth()
     {
         map<shared_ptr<Frame>, size_t> observations;
         Vec3f Pos;
@@ -198,39 +196,28 @@ namespace HSLAM
         if (observations.empty())
             return;
 
-        if (isQuick)
+        Vec3f normal = Vec3f::Zero();
+        int n = 0;
+        for (map<shared_ptr<Frame>, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
         {
-            Vec3f Owi = frame->fs->getCameraCenter().cast<float>();
+            shared_ptr<Frame> pKF = mit->first;
+            Vec3f Owi = pKF->fs->getCameraCenter().cast<float>();
             Vec3f normali = worldPose - Owi;
-            boost::lock_guard<boost::mutex> l(_mtx);
-            mNormalVector = (mNormalVector + normali / normali.norm()) / 2.0f;
-            return;
+            normal = normal + normali / normali.norm();
+            n++;
         }
-        else
+
+        // cv::Mat PC = Pos - pRefKF->GetCameraCenter();
+        // const float dist = cv::norm(PC);
+        // const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
+        // const float levelScaleFactor = pRefKF->mvScaleFactors[level];
+        // const int nLevels = pRefKF->mnScaleLevels;
+
         {
-            Vec3f normal = Vec3f::Zero();
-            int n = 0;
-            for (map<shared_ptr<Frame>, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
-            {
-                shared_ptr<Frame> pKF = mit->first;
-                Vec3f Owi = pKF->fs->getCameraCenter().cast<float>();
-                Vec3f normali = worldPose - Owi;
-                normal = normal + normali / normali.norm();
-                n++;
-            }
-
-            // cv::Mat PC = Pos - pRefKF->GetCameraCenter();
-            // const float dist = cv::norm(PC);
-            // const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
-            // const float levelScaleFactor = pRefKF->mvScaleFactors[level];
-            // const int nLevels = pRefKF->mnScaleLevels;
-
-            {
-                boost::lock_guard<boost::mutex> l(_mtx); //pose lock
-                // mfMaxDistance = dist*levelScaleFactor;
-                // mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
-                mNormalVector = normal / n;
-            }
+            boost::lock_guard<boost::mutex> l(_mtx); //pose lock
+            // mfMaxDistance = dist*levelScaleFactor;
+            // mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
+            mNormalVector = normal / n;
         }
 
         return;

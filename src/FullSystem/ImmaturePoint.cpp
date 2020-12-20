@@ -33,6 +33,7 @@ ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, Ca
 
 	idepth_GT=0;
 	quality=10000;
+	hasDepthPrior = false;
 }
 
 ImmaturePoint::~ImmaturePoint()

@@ -48,6 +48,8 @@ int minIndDist = 4; //9x9
 int minDirDist = 1; //3x3
 int indFeaturesToExtract = 1000;
 
+bool normalizeInfoWithVariance = true; //turn this off to normalize the information matrix for Indirect data with the max (taken from the variance of the inverse depth estimates.)
+
 int pyrLevelsUsed = PYR_LEVELS;
 
 /* Parameters controlling when KF's are taken */
@@ -62,7 +64,7 @@ float setting_maxAffineWeight= 2;
 
 /* initial hessian values to fix unobservable dimensions / priors on affine lighting parameters.
  */
-float setting_idepthFixPrior = 50*50;
+float setting_idepthFixPrior = 50*50; //50*50;
 float setting_idepthFixPriorMargFac = 600*600;
 float setting_initialRotPrior = 1e11;
 float setting_initialTransPrior = 1e10;

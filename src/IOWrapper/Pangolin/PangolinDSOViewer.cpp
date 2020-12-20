@@ -1,28 +1,3 @@
-/**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
-
 #include "PangolinDSOViewer.h"
 #include "KeyFrameDisplay.h"
 
@@ -42,14 +17,11 @@ namespace HSLAM
 namespace IOWrap
 {
 
-
-
 PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
 {
 	this->w = w;
 	this->h = h;
 	running=true;
-
 
 	{
 		boost::unique_lock<boost::mutex> lk(openImagesMutex);
@@ -89,8 +61,6 @@ PangolinDSOViewer::~PangolinDSOViewer()
 
 void PangolinDSOViewer::run()
 {
-	printf("START PANGOLIN!\n");
-
 	pangolin::CreateWindowAndBind("Main",2*w,2*h);
 	const int UI_WIDTH = 180;
 
@@ -127,7 +97,7 @@ void PangolinDSOViewer::run()
 		  .SetLayout(pangolin::LayoutEqual)
 		  .AddDisplay(d_kfDepth)
 		  .AddDisplay(d_video)
-		  .AddDisplay(d_residual);
+		  .AddDisplay(d_residual).SetHandler(new pangolin::HandlerResize());
 
 	// parameter reconfigure gui
 	pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));

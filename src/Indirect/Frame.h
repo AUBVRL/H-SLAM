@@ -153,10 +153,10 @@ namespace HSLAM
 
         size_t mnFuseTargetForKF;
 
-        enum ekfstate {active=0, marginalized};
-        ekfstate kfState;
-        ekfstate getState();
-        void setState(ekfstate state);
+        enum kfstate {active=0, marginalized};
+        kfstate kfState;
+        kfstate getState();
+        void setState(kfstate state);
 
     private:
         boost::mutex _mtx;

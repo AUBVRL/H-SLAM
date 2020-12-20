@@ -511,11 +511,10 @@ int main( int argc, char** argv )
                     printf("RESETTING!\n");
 
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
-                    delete fullSystem;
-
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
-
-                    fullSystem = new FullSystem();
+					usleep(50000); //hack - wait for display wrapper to clean up. My other Display wrapper fixes this but not yet ported.
+					delete fullSystem;
+					fullSystem = new FullSystem();
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed==0);
 

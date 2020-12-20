@@ -71,7 +71,7 @@ namespace HSLAM
             return mpReplaced;
         }
 
-        void UpdateNormalAndDepth(std::shared_ptr<Frame> frame, bool isQuick);
+        void UpdateNormalAndDepth();
         // Vec3f getWorldPosewPose(SE3& pose);
         Vec3f getWorldPose();
 
@@ -101,6 +101,18 @@ namespace HSLAM
             boost::lock_guard<boost::mutex> l(_mtx);
             return idepthH;
         }
+
+        inline float getVariance()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            return (1.0f/(idepthH + 0.0001));
+        }
+
+        inline float getStdDev()
+        {
+            return sqrtf(getVariance()); //no need to lock already locked in getVariance
+        }
+
 
         inline float getidepth()
         {

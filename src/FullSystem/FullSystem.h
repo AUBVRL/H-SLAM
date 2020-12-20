@@ -329,6 +329,8 @@ private:
 	FixedQueue<SE3, 4> vVelocity;
 	boost::mutex localMapMtx;
 
+	int nIndmatches;
+
 	//sort localKeyframes while updating localkeyframes from best to worst:
 	static bool cmpAscending(std::pair<std::shared_ptr<Frame>, int> &a, std::pair<std::shared_ptr<Frame>, int> &b)
 	{

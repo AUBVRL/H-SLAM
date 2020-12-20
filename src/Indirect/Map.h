@@ -51,9 +51,17 @@ namespace HSLAM
 
         void clear();
 
+        bool Idle() {
+            boost::unique_lock<boost::mutex> lock(mutexPoseGraph);
+            return !poseGraphRunning;
+        }
+
         std::vector<std::shared_ptr<Frame>> mvpKeyFrameOrigins;
         std::shared_ptr<KeyFrameDatabase> KfDB;
         boost::mutex mMutexMapUpdate;
+
+         bool poseGraphRunning = false;
+        boost::mutex mutexPoseGraph;
     };
 
     class KeyFrameDatabase

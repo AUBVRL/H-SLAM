@@ -68,7 +68,11 @@
         "iomanip": "cpp",
         "typeindex": "cpp",
         "matrixfunctions": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "codecvt": "cpp",
+        "future": "cpp",
+        "cfenv": "cpp",
+        "valarray": "cpp"
     },
     // "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }
