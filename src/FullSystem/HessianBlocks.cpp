@@ -2,6 +2,7 @@
 #include "util/FrameShell.h"
 #include "FullSystem/ImmaturePoint.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
+#include "Indirect/MapPoint.h"
 
 namespace HSLAM
 {
@@ -87,11 +88,28 @@ void FrameHessian::release()
 {
 	// DELETE POINT
 	// DELETE RESIDUAL
-	for(unsigned int i=0;i<pointHessians.size();i++) delete pointHessians[i];
-	for(unsigned int i=0;i<pointHessiansMarginalized.size();i++) delete pointHessiansMarginalized[i];
-	for(unsigned int i=0;i<pointHessiansOut.size();i++) delete pointHessiansOut[i];
-	for(unsigned int i=0;i<immaturePoints.size();i++) delete immaturePoints[i];
 
+	for (unsigned int i = 0; i < pointHessians.size(); i++)
+	{
+		// if(pointHessians[i] && !pointHessians[i]->Mp.expired())
+		// 	pointHessians[i]->Mp.lock()->setDirStatus(MapPoint::marginalized);
+		delete pointHessians[i];
+	}
+	
+	for (unsigned int i = 0; i < pointHessiansMarginalized.size(); i++)
+	{
+		// if(pointHessiansMarginalized[i] && !pointHessiansMarginalized[i]->Mp.expired())
+		// 	pointHessiansMarginalized[i]->Mp.lock()->setDirStatus(MapPoint::marginalized);
+		delete pointHessiansMarginalized[i];
+	}
+
+	for(unsigned int i=0;i<pointHessiansOut.size();i++) 
+	{
+		// if(pointHessiansOut[i] && !pointHessiansOut[i]->Mp.expired())
+		// 	pointHessiansOut[i]->Mp.lock()->setDirStatus(MapPoint::removed);
+		delete pointHessiansOut[i];
+	}
+	for(unsigned int i=0;i<immaturePoints.size();i++) delete immaturePoints[i];
 
 	pointHessians.clear();
 	pointHessiansMarginalized.clear();

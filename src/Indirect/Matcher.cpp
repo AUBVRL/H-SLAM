@@ -355,6 +355,8 @@ namespace HSLAM
                 {
                     if (!pMPinKF->isBad())
                     {
+
+                        // pMP->Replace(pMPinKF); //enable this and comment the if-else to keep the old Mps only
                         if (pMPinKF->getNObservations() > pMP->getNObservations())
                             pMP->Replace(pMPinKF);
                         else

@@ -171,7 +171,7 @@ public:
          * Calling:
          * Always called, no overhead if not used.
          */
-        virtual void pushLiveFrame(FrameHessian* image) {}
+        virtual void pushLiveFrame(FrameHessian* image, int nIndmatches) {}
 
 
 

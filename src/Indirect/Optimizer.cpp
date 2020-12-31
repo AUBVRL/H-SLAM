@@ -15,7 +15,7 @@ namespace HSLAM
     using namespace std;
     using namespace OptimizationStructs;
 
-    int PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib)
+    bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose)
     {
         g2o::SparseOptimizer optimizer;
         auto linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
@@ -36,6 +36,9 @@ namespace HSLAM
 
         vector<edgeSE3XYZPoseOnly *> vpEdgesMono;
         vector<size_t> vnIndexEdgeMono;
+        vector<double> initErr;
+        double initScale = 1.0;
+        initErr.reserve(2 * N);
         vpEdgesMono.reserve(N);
         vnIndexEdgeMono.reserve(N);
         vector<double> vInformation;
@@ -43,7 +46,7 @@ namespace HSLAM
         double maxInfo = 1e7;
         double stdDev=1e7;
 
-        const float deltaMono = sqrt(5.991);
+        const float deltaMono = sqrt(1.345); // sqrt(5.991);
         {
             // boost::unique_lock<boost::mutex> lock(MapPoint::mGlobalMutex); //this would lock ALL map points poses from changing!
 
@@ -58,20 +61,24 @@ namespace HSLAM
                     edgeSE3XYZPoseOnly *e = new edgeSE3XYZPoseOnly();
                     e->setCamera(calib->fxl(), calib->fyl(), calib->cxl(), calib->cyl());
                     e->setXYZ(pMP->getWorldPose().cast<double>());
+                    e->setInformation(Eigen::Matrix2d::Identity());
                     e->setMeasurement(Vec2((double)pFrame->mvKeys[i].pt.x, (double)pFrame->mvKeys[i].pt.y));
                     e->setId(i);
                     
                     e->setVertex(0, vSE3);
-                    // e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(0)));
-                    //const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
 
-                    double Info = (1.0/double(pMP->getVariance()));
+                    e->computeError();
+                    initErr.push_back(e->error()[0]);
+                    initErr.push_back(e->error()[1]);
+
+                    double Info = pMP->getidepthHessian();
                     vInformation.push_back(Info);
                     if (Info > maxInfo)
                         maxInfo = Info;
 
                     g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
+                   
                     rk->setDelta(deltaMono);
 
                     optimizer.addEdge(e);
@@ -80,31 +87,37 @@ namespace HSLAM
                     vnIndexEdgeMono.push_back(i);
                 }
             }
+            
 
             //compute information vector distribution:
             if (normalizeInfoWithVariance)
                 stdDev = getStdDev(vInformation);
-            
+
+            initScale = getStdDev(initErr); //computeScale(initErr); 
+
             for (int i = 0, iend = vpEdgesMono.size(); i < iend; ++i)
             {
-                if(normalizeInfoWithVariance)
-                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(stdDev+0.001))); //* invSigma2); //set this to take into account depth variance!
+                vpEdgesMono[i]->setScale(initScale);
+
+                if (normalizeInfoWithVariance)
+                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(stdDev+0.00001))); //* invSigma2); //set this to take into account depth variance!
                 else //normalizing by the maximum
-                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(maxInfo+0.001))); //* invSigma2); //set this to take into account depth variance!
+                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(maxInfo+0.00001))); //* invSigma2); //set this to take into account depth variance!
             }
         }
-        if (nInitialCorrespondences < 3 || optimizer.edges().size() < 10)
+        if (nInitialCorrespondences < 10 || optimizer.edges().size() < 10)
             return 0;
 
         // We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
         // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
-        const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991};
+        // const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991}; //1.345
+        const float chi2Mono[4] = {1.345, 1.345, 1.345, 1.345}; //5.991
         const int its[4] = {10, 10, 10, 10};
 
         int nBad = 0;
         for (size_t it = 0; it < 4; it++)
         {
-            vSE3->setEstimate(pFrame->fs->getPoseInverse());
+            vSE3->setEstimate(pFrame->fs->getPoseInverse()); 
             optimizer.initializeOptimization(0);
             optimizer.optimize(its[it]);
             nBad = 0;
@@ -119,8 +132,8 @@ namespace HSLAM
                     e->computeError();
                 }
                 
-
                 const float chi2 = e->chi2();
+
                 if (chi2 > chi2Mono[it])
                 {
                     pFrame->mvbOutlier[idx] = true;
@@ -139,12 +152,20 @@ namespace HSLAM
 
             if (optimizer.edges().size() < 10)
                 break;
+
+            if(!updatePose)
+                break;
         }
 
-        // Recover optimized pose and return number of inliers
+        number_t *hessianData = vSE3->hessianData();
+        Vec6 vHessian;
+        vHessian<< hessianData[0], hessianData[7], hessianData[14], hessianData[21], hessianData[28], hessianData[35];
+        
+        bool isUsable = vHessian.norm() > 1e6;
 
-        pFrame->fs->setPose(vSE3->estimate().inverse());// SetPose(pose);
-
-        return nInitialCorrespondences - nBad;
+        // Recover optimized pose
+        if(isUsable && updatePose)
+            pFrame->fs->setPose(vSE3->estimate().inverse()); 
+        return isUsable; 
     }
 } // namespace HSLAM

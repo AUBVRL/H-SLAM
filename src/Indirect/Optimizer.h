@@ -36,7 +36,7 @@ namespace HSLAM
         {
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-            edgeSE3XYZPoseOnly() : BaseUnaryEdge<2, Vector2d, vertexSE3>(){}
+            edgeSE3XYZPoseOnly() : BaseUnaryEdge<2, Vector2d, vertexSE3>() { scale = 1.0; }
 
             bool read(std::istream &is) override { return true; }
             bool write(std::ostream &os) const override { return true; }
@@ -55,7 +55,13 @@ namespace HSLAM
                 }
                 double u = fx * PointinFrame[0] + cx;
                 double v = fy * PointinFrame[1] + cy;
-                _error =  _measurement - Vec2(u,v) ; //- Vec2(0.5,0.5)
+                _error =  (_measurement - Vec2(u,v) + Vec2(0.5,0.5))/scale; //- Vec2(0.5,0.5)
+                return;
+            }
+
+            void setScale(number_t _scale)
+            {
+                scale = (double)_scale;
             }
 
             void setCamera(const number_t _fx, const number_t _fy, const number_t _cx, const number_t _cy) { fx = (double)_fx; fy = (double)_fy; cx = (double)_cx; cy = (double)_cy; }
@@ -97,11 +103,11 @@ namespace HSLAM
             Vector3 Xw;
         private:
            
-            number_t fx, fy, cx, cy;
+            number_t fx, fy, cx, cy, scale;
         };
     } // namespace OptimizationStructs
 
-    int PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib);
+    bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose = true);
 }
 
 

@@ -8,18 +8,20 @@
 namespace HSLAM
 {
 
-extern DBoW3::Vocabulary Vocab;
-extern int gridSize;
-extern int mnGridCols, mnGridRows;
-extern float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
-extern int EDGE_THRESHOLD;
+    extern bool Pause; //not a good idea:)
+    extern DBoW3::Vocabulary Vocab;
+    extern bool LoopClosure;
+    extern int gridSize;
+    extern int mnGridCols, mnGridRows;
+    extern float mnMinX, mnMaxX, mnMinY, mnMaxY, mfGridElementWidthInv, mfGridElementHeightInv;
+    extern int EDGE_THRESHOLD;
 
-extern int minThFAST;
-extern int minIndDist;
-extern int minDirDist;
-extern int indFeaturesToExtract;
+    extern int minThFAST;
+    extern int minIndDist;
+    extern int minDirDist;
+    extern int indFeaturesToExtract;
 
-extern bool normalizeInfoWithVariance;
+    extern bool normalizeInfoWithVariance;
 
 #define SOLVER_SVD (int)1
 #define SOLVER_ORTHOGONALIZE_SYSTEM (int)2
@@ -151,10 +153,7 @@ extern float setting_trace_minImprovementFactor;
 extern bool setting_render_displayCoarseTrackingFull;
 extern bool setting_render_renderWindowFrames;
 extern bool setting_render_plotTrackingFull;
-extern bool setting_render_display3D;
-extern bool setting_render_displayResidual;
-extern bool setting_render_displayVideo;
-extern bool setting_render_displayDepth;
+
 
 extern bool setting_fullResetRequested;
 

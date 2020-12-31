@@ -108,7 +108,7 @@ public:
         }
 
 
-        virtual void pushLiveFrame(FrameHessian* image) override
+        virtual void pushLiveFrame(FrameHessian* image, int nIndMatches) override
         {
             // can be used to get the raw image / intensity pyramid.
         }

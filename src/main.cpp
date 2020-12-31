@@ -1,28 +1,3 @@
-/**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
-
-
 #include <thread>
 #include <locale.h>
 #include <signal.h>
@@ -31,8 +6,6 @@
 #include <unistd.h>
 
 #include "IOWrapper/Output3DWrapper.h"
-#include "IOWrapper/ImageDisplay.h"
-
 
 #include <boost/thread.hpp>
 #include "util/settings.h"
@@ -42,36 +15,13 @@
 
 #include "util/NumType.h"
 #include "FullSystem/FullSystem.h"
-#include "OptimizationBackend/MatrixAccumulators.h"
-#include "FullSystem/PixelSelector2.h"
-
 
 
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
 
-std::string vignette = "";
-std::string gammaCalib = "";
-std::string source = "";
-std::string calib = "";
-double rescale = 1;
-bool reverse = false;
-bool disableROS = false;
-int start=0;
-int end=100000;
-bool prefetch = false;
-float playbackSpeed=0;	// 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
-bool preload=false;
-bool useSampleOutput=false;
-
-
-int mode=0;
-
-bool firstRosSpin=false;
-
 using namespace HSLAM;
-
 
 void my_exit_handler(int s)
 {
@@ -87,15 +37,109 @@ void exitThread()
 	sigIntHandler.sa_flags = 0;
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
-	firstRosSpin=true;
 	while(true) pause();
 }
 
+const cv::String keys =
+	"{help h usage ?  |      | print this message}"
+	"{files           |<none>| Input images path - mandatory input}"
+	"{calib           |<none>| Camera intrinsic callibration - mandatory input}"
+	"{vocabPath       |      | Vocabulary path}"
+	"{vignette        |      | Path to Vignette model}"
+	"{gamma           |      | Path to gamma response Model}"
+	"{LoopClosure     | False| Enable-Disable loop closure}"
+	"{reverse         | False| Play a sequence in reverse}"
+	"{preload         | False| preload all images into memory}"
+	"{useSampleOutput | False| replace pangolinViewer with another output wrapper}"
+	"{nolog           | False| disable logging optimization data}"
+	"{nogui           | False| disable GUI}"
+	"{save            | False| save debug images}"
+	"{quiet           | True | disable message printing }"
+	"{nomt            | False| when set to true it turns off multiThreading}"
+	"{startIndex      | 0    | Image index to start from}"
+	"{endIndex        |100000| Last image to be processed }"
+	"{mode            | 0    | system mode: 0: use precalibrated gamma and vignette -1: photometric mode without calibration - 2: photometric mode with perfect images}"
+	"{preset          | 0    | preset configuration}"
+	"{speed           | 0.0  | Enforce playback Speed to real-time}";
 
 
-void settingsDefault(int preset)
+int main(int argc, char **argv)
 {
-	printf("\n=============== PRESET Settings: ===============\n");
+	boost::thread exThread = boost::thread(exitThread); // hook crtl+C.
+
+	cv::CommandLineParser parser(argc, argv, keys);
+	std::string vignette = parser.get<std::string>("vignette");
+	std::string gammaCalib = parser.get<std::string>("gamma");
+	std::string source = parser.get<std::string>("files");
+	std::string calib = parser.get<std::string>("calib");
+	std::string vocabPath = parser.get<std::string>("vocabPath");
+	LoopClosure = parser.get<bool>("LoopClosure");
+	bool reverse = parser.get<bool>("reverse");
+	bool preload = parser.get<bool>("preload");
+	bool useSampleOutput = parser.get<bool>("useSampleOutput");
+	setting_debugout_runquiet = parser.get<bool>("quiet");
+	setting_logStuff = !parser.get<bool>("nolog");
+	disableAllDisplay = parser.get<bool>("nogui");
+	debugSaveImages = parser.get<bool>("save");
+	multiThreading = parser.get<bool>("nomt");
+	int startIndex = parser.get<int>("startIndex");
+	int endIndex = parser.get<int>("endIndex");
+	int preset = parser.get<int>("preset");
+	int mode =  parser.get<int>("mode");
+	float playbackSpeed = parser.get<float>("speed"); // 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
+	
+	if (parser.has("help") || parser.has("h") || parser.has("usage") || parser.has("?"))
+	{
+    	parser.printMessage();
+    	return 0;
+	}
+
+	if(source.empty() || calib.empty()) { std::cout<< "path to images or calibration not provided! cannot function without them. exit." << std::endl; return(0);}
+
+	if (!parser.check()) {parser.printErrors(); return 0; }
+
+	if (debugSaveImages)
+	{
+		if(42==system("rm -rf images_out")) std::cout<<"system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n"<<std::endl;
+			if(42==system("mkdir images_out")) std::cout<<"system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n"<<std::endl;
+			if(42==system("rm -rf images_out")) std::cout<<"system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n"<<std::endl;
+			if(42==system("mkdir images_out")) std::cout<<"system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n"<<std::endl;
+	}
+
+	switch (mode)
+	{
+	case 1:
+		setting_photometricCalibration = 0;
+		setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
+		setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
+		break;
+	case 2:
+		setting_photometricCalibration = 0;
+		setting_affineOptModeA = -1; //-1: fix. >=0: optimize (with prior, if > 0).
+		setting_affineOptModeB = -1; //-1: fix. >=0: optimize (with prior, if > 0).
+		setting_minGradHistAdd = 3;
+		break;
+	default:
+		break;
+	}
+
+	if(LoopClosure && !vocabPath.empty())
+	{
+		Vocab.load(vocabPath.c_str());
+
+		printf("loading Vocabulary from %s!\n", vocabPath.c_str());
+		if (Vocab.empty())
+		{
+			printf("failed to load vocabulary! Exit\n");
+			exit(1);
+		}
+	}
+	else
+	{
+		std::cout << "no vocabulary path provided! disabling loop closure." << std::endl;
+		LoopClosure = false; 
+	}
+
 	if(preset == 0 || preset == 1)
 	{
 		printf("DEFAULT settings:\n"
@@ -106,18 +150,9 @@ void settingsDefault(int preset)
 				"- original image resolution\n", preset==0 ? "no " : "1x");
 
 		playbackSpeed = (preset==0 ? 0 : 1);
-		preload = preset==1;
-		setting_desiredImmatureDensity = 1500;
-		setting_desiredPointDensity = 2000;
-		setting_minFrames = 5;
-		setting_maxFrames = 7;
-		setting_maxOptIterations=6;
-		setting_minOptIterations=1;
-
-		setting_logStuff = false;
+		// preload = preset==1;
 	}
-
-	if(preset == 2 || preset == 3)
+	else if(preset == 2 || preset == 3)
 	{
 		printf("FAST settings:\n"
 				"- %s real-time enforcing\n"
@@ -140,245 +175,10 @@ void settingsDefault(int preset)
 
 		setting_logStuff = false;
 	}
-
-	printf("==============================================\n");
-}
-
-
-
-
-
-
-void parseArgument(char* arg)
-{
-	int option;
-	float foption;
-	char buf[1000];
-
-
-    if(1==sscanf(arg,"sampleoutput=%d",&option))
-    {
-        if(option==1)
-        {
-            useSampleOutput = true;
-            printf("USING SAMPLE OUTPUT WRAPPER!\n");
-        }
-        return;
-    }
-
-    if(1==sscanf(arg,"quiet=%d",&option))
-    {
-        if(option==1)
-        {
-            setting_debugout_runquiet = true;
-            printf("QUIET MODE, I'll shut up!\n");
-        }
-        return;
-    }
-
-	if(1==sscanf(arg,"preset=%d",&option))
-	{
-		settingsDefault(option);
-		return;
-	}
-
-
-	if(1==sscanf(arg,"rec=%d",&option))
-	{
-		if(option==0)
-		{
-			disableReconfigure = true;
-			printf("DISABLE RECONFIGURE!\n");
-		}
-		return;
-	}
-
-
-
-	if(1==sscanf(arg,"noros=%d",&option))
-	{
-		if(option==1)
-		{
-			disableROS = true;
-			disableReconfigure = true;
-			printf("DISABLE ROS (AND RECONFIGURE)!\n");
-		}
-		return;
-	}
-
-	if(1==sscanf(arg,"nolog=%d",&option))
-	{
-		if(option==1)
-		{
-			setting_logStuff = false;
-			printf("DISABLE LOGGING!\n");
-		}
-		return;
-	}
-	if(1==sscanf(arg,"reverse=%d",&option))
-	{
-		if(option==1)
-		{
-			reverse = true;
-			printf("REVERSE!\n");
-		}
-		return;
-	}
-	if(1==sscanf(arg,"nogui=%d",&option))
-	{
-		if(option==1)
-		{
-			disableAllDisplay = true;
-			printf("NO GUI!\n");
-		}
-		return;
-	}
-	if(1==sscanf(arg,"nomt=%d",&option))
-	{
-		if(option==1)
-		{
-			multiThreading = false;
-			printf("NO MultiThreading!\n");
-		}
-		return;
-	}
-	if(1==sscanf(arg,"prefetch=%d",&option))
-	{
-		if(option==1)
-		{
-			prefetch = true;
-			printf("PREFETCH!\n");
-		}
-		return;
-	}
-	if(1==sscanf(arg,"start=%d",&option))
-	{
-		start = option;
-		printf("START AT %d!\n",start);
-		return;
-	}
-	if(1==sscanf(arg,"end=%d",&option))
-	{
-		end = option;
-		printf("END AT %d!\n",start);
-		return;
-	}
-
-	if(1==sscanf(arg,"files=%s",buf))
-	{
-		source = buf;
-		printf("loading data from %s!\n", source.c_str());
-		return;
-	}
-
-	if(1==sscanf(arg,"calib=%s",buf))
-	{
-		calib = buf;
-		printf("loading calibration from %s!\n", calib.c_str());
-		return;
-	}
-
-	if(1==sscanf(arg,"vignette=%s",buf))
-	{
-		vignette = buf;
-		printf("loading vignette from %s!\n", vignette.c_str());
-		return;
-	}
-
-	if(1==sscanf(arg,"gamma=%s",buf))
-	{
-		gammaCalib = buf;
-		printf("loading gammaCalib from %s!\n", gammaCalib.c_str());
-		return;
-	}
-
-	if(1==sscanf(arg,"rescale=%f",&foption))
-	{
-		rescale = foption;
-		printf("RESCALE %f!\n", rescale);
-		return;
-	}
-
-	if(1==sscanf(arg,"speed=%f",&foption))
-	{
-		playbackSpeed = foption;
-		printf("PLAYBACK SPEED %f!\n", playbackSpeed);
-		return;
-	}
-
-	if(1==sscanf(arg,"save=%d",&option))
-	{
-		if(option==1)
-		{
-			debugSaveImages = true;
-			if(42==system("rm -rf images_out")) printf("system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n");
-			if(42==system("mkdir images_out")) printf("system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n");
-			if(42==system("rm -rf images_out")) printf("system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n");
-			if(42==system("mkdir images_out")) printf("system call returned 42 - what are the odds?. This is only here to shut up the compiler.\n");
-			printf("SAVE IMAGES!\n");
-		}
-		return;
-	}
-
-	if(1==sscanf(arg,"mode=%d",&option))
-	{
-
-		mode = option;
-		if(option==0)
-		{
-			printf("PHOTOMETRIC MODE WITH CALIBRATION!\n");
-		}
-		if(option==1)
-		{
-			printf("PHOTOMETRIC MODE WITHOUT CALIBRATION!\n");
-			setting_photometricCalibration = 0;
-			setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
-			setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
-		}
-		if(option==2)
-		{
-			printf("PHOTOMETRIC MODE WITH PERFECT IMAGES!\n");
-			setting_photometricCalibration = 0;
-			setting_affineOptModeA = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-			setting_affineOptModeB = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_minGradHistAdd=3;
-		}
-		return;
-	}
-
-	if (1 == sscanf(arg, "vocabPath=%s", buf))
-	{
-		std::string vocabPath = buf;
-		Vocab.load(vocabPath.c_str());
-
-		printf("loading Vocabulary from %s!\n", vocabPath.c_str());
-		if (Vocab.empty())
-		{
-			printf("failed to load vocabulary! Exit\n");
-			exit(1);
-		}
-		return;
-	}
-
-	printf("could not parse argument \"%s\"!!!!\n", arg);
-}
-
-
-
-int main( int argc, char** argv )
-{
-	//setlocale(LC_ALL, "");
-	for(int i=1; i<argc;i++)
-		parseArgument(argv[i]);
-
-	// hook crtl+C.
-	boost::thread exThread = boost::thread(exitThread);
-
+	
 
 	ImageFolderReader* reader = new ImageFolderReader(source,calib, gammaCalib, vignette);
 	reader->setGlobalCalibration();
-
-
 
 	if(setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0)
 	{
@@ -389,16 +189,17 @@ int main( int argc, char** argv )
 
 
 
-	int lstart=start;
-	int lend = end;
+	int lstart=startIndex;
+	int lend = endIndex;
 	int linc = 1;
 	if(reverse)
 	{
 		printf("REVERSE!!!!");
-		lstart=end-1;
+		lstart=endIndex-1;
 		if(lstart >= reader->getNumImages())
 			lstart = reader->getNumImages()-1;
-		lend = start;
+			
+		lend = startIndex;
 		linc = -1;
 	}
 
@@ -421,9 +222,7 @@ int main( int argc, char** argv )
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
 
 
-
-
-    // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
+	// to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
     std::thread runthread([&]() {
         std::vector<int> idsToPlay;
         std::vector<double> timesToPlayAt;
@@ -462,6 +261,9 @@ int main( int argc, char** argv )
 
         for(int ii=0;ii<(int)idsToPlay.size(); ii++)
         {
+			while (Pause)
+				usleep(5000);
+				
             if(!fullSystem->initialized)	// if not initialized: reset start time.
             {
                 gettimeofday(&tv_start, NULL);
@@ -499,12 +301,13 @@ int main( int argc, char** argv )
 
             if(!skipFrame) fullSystem->addActiveFrame(img, i);
 
-
-
-
             delete img;
+	
+			if(viewer!=0)
+				if(viewer->isDead)
+					break;
 
-            if(fullSystem->initFailed || setting_fullResetRequested)
+	        if(fullSystem->initFailed || setting_fullResetRequested)
             {
                 if(ii < 250 || setting_fullResetRequested)
                 {
@@ -512,7 +315,7 @@ int main( int argc, char** argv )
 
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
-					usleep(50000); //hack - wait for display wrapper to clean up. My other Display wrapper fixes this but not yet ported.
+					usleep(10000); //hack - wait for display wrapper to clean up.
 					delete fullSystem;
 					fullSystem = new FullSystem();
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
@@ -527,8 +330,8 @@ int main( int argc, char** argv )
 
             if(fullSystem->isLost)
             {
-                    printf("LOST!!\n");
-                    break;
+                printf("LOST!!\n");
+                break;
             }
 
         }
@@ -571,10 +374,10 @@ int main( int argc, char** argv )
     });
 
 
-    if(viewer != 0)
-        viewer->run();
+	if(viewer != 0)
+	    viewer->run();
 
-    runthread.join();
+	runthread.join();
 
 	for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
 	{

@@ -30,6 +30,7 @@ namespace HSLAM
         mbToBeErased = false;
         globalMap = _gMap;
         kfState = kfstate::active;
+        mbNotErase = false;
         // ComputeBoVW();
     }
     Frame::~Frame()

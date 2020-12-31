@@ -206,7 +206,7 @@ public:
 
 	double getTimestamp(int id)
 	{
-		if(timestamps.size()==0) return id*0.1f;
+		if(timestamps.size()==0) return id*0.04f; //0.1f = 10 Hz
 		if(id >= (int)timestamps.size()) return 0;
 		if(id < 0) return 0;
 		return timestamps[id];

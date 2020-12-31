@@ -31,7 +31,7 @@ namespace HSLAM
 
         sourceFrame->Descriptors.row(index).copyTo(mDescriptor);
         mnLastFrameSeen = 0;
-        mnTrackReferenceForFrame = 0;
+        mnTrackReferenceForFrame = -1;
         status = mpDirStatus::active;
         idepth = ph->idepth;
         idepthH = ph->idepth_hessian;
@@ -64,7 +64,8 @@ namespace HSLAM
         // idepth = ph->idepth;
         // idepthH = ph->idepth_hessian;
         auto calib = sourceFrame->HCalib;
-        worldPose = sourceFrame->fs->getPoseOptiInv().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
+        // worldPose = sourceFrame->fs->getPoseOptiInv().cast<float>() * (Vec3f((pt[0] * calib->fxli() + calib->cxli()), (pt[1] * calib->fyli() + calib->cyli()), 1.0f) * (1.0f/idepth));
+        worldPose = sourceFrame->fs->getPoseOptiInv().cast<float>() * (Vec3f( ((pt[0] - calib->cxl() )/ calib->fxl() ), ((pt[1]-calib->cyl()) / calib->fyl()), 1.0f) * (1.0f/idepth));
 
     }
 
@@ -304,7 +305,7 @@ namespace HSLAM
             }
             else
             {
-                pKF->EraseMapPointMatch(mit->second);
+                // pKF->EraseMapPointMatch(mit->second);
             }
         }
         pMP->increaseFound(nfound);

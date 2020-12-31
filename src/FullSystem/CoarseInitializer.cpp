@@ -52,7 +52,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	newFrame = newFrameHessian;
 
     for(IOWrap::Output3DWrapper* ow : wraps)
-        ow->pushLiveFrame(newFrameHessian);
+        ow->pushLiveFrame(newFrameHessian, 0);
 
 	int maxIterations[] = {5,5,10,30,50};
 

@@ -29,6 +29,7 @@
 #include "FullSystem/Residuals.h"
 #include "OptimizationBackend/AccumulatedSCHessian.h"
 #include "OptimizationBackend/AccumulatedTopHessian.h"
+#include "Indirect/MapPoint.h"
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
 #include "SSE2NEON.h"
@@ -687,6 +688,8 @@ void EnergyFunctional::dropPointsF()
 			EFPoint* p = f->points[i];
 			if(p->stateFlag == EFPointStatus::PS_DROP)
 			{
+				if(!p->data->Mp.expired())
+					p->data->Mp.lock()->setDirStatus(MapPoint::removed);
 				removePoint(p);
 				i--;
 			}

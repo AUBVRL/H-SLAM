@@ -248,25 +248,25 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 
 			if(my_displayMode==0)
 			{
-				if(originalInputSparse[i].status==0)
+				if(originalInputSparse[i].status==0) //immature - yellow
 				{
 					tmpColorBuffer[vertexBufferNumPoints][0] = 0;
 					tmpColorBuffer[vertexBufferNumPoints][1] = 255;
 					tmpColorBuffer[vertexBufferNumPoints][2] = 255;
 				}
-				else if(originalInputSparse[i].status==1)
+				else if(originalInputSparse[i].status==1) //active green
 				{
 					tmpColorBuffer[vertexBufferNumPoints][0] = 0;
 					tmpColorBuffer[vertexBufferNumPoints][1] = 255;
 					tmpColorBuffer[vertexBufferNumPoints][2] = 0;
 				}
-				else if(originalInputSparse[i].status==2)
+				else if(originalInputSparse[i].status==2) //marginalized blue
 				{
 					tmpColorBuffer[vertexBufferNumPoints][0] = 0;
 					tmpColorBuffer[vertexBufferNumPoints][1] = 0;
 					tmpColorBuffer[vertexBufferNumPoints][2] = 255;
 				}
-				else if(originalInputSparse[i].status==3)
+				else if(originalInputSparse[i].status==3) //outliers red
 				{
 					tmpColorBuffer[vertexBufferNumPoints][0] = 255;
 					tmpColorBuffer[vertexBufferNumPoints][1] = 0;

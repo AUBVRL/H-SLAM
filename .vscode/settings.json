@@ -74,5 +74,12 @@
         "cfenv": "cpp",
         "valarray": "cpp"
     },
+
+    "files.exclude": {
+        "**/.git": true,
+        "**/.Thirdparty/CompiledLibs": true,
+        "**/.build": true,
+
+    }
     // "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

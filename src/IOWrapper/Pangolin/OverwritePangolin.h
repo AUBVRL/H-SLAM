@@ -2,8 +2,11 @@
 #define __PANGOVERWRITE__
 
 #include <pangolin/display/display_internal.h>
+#include <pangolin/gl/glfont.h>
 
 //Overwrite some of pangolin's internal functions.
+extern "C" const unsigned char AnonymousPro_ttf[];
+
 namespace pangolin
 {
 
@@ -24,10 +27,14 @@ namespace pangolin
 
     std::mutex new_display_mutex;
     GLfloat Transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f}; //fully transparent color
+    GLfloat BlackTransparent[4] = {0.0f, 0.0f, 0.0f, 0.55f}; //fully transparent color
     GLfloat GreenTransparent[4] = {0.0f, 1.0f, 0.0f, 0.5f};
     GLfloat Black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     GLfloat White[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-
+    GLfloat RedTransparent[4] = {1.0f, 0.0f, 0.0f, 0.8f};
+    
+    GlFont myfont(AnonymousPro_ttf, 22);
+    GlFont largeFont(AnonymousPro_ttf, 32);
     GLfloat *TextColor = White; //{1.0f, 1.0f, 1.0f, 1.0f};
 
     void glRect(Viewport v)
@@ -77,9 +84,59 @@ namespace pangolin
                 glColor4fv(GreenTransparent); //when activated
                 glRect(vcb);
             }
-            glColor4fv(TextColor);
+            glColor4fv(Black);
+            gltext = myfont.Text(var->Meta().friendly);
             gltext.DrawWindow(raster[0], raster[1]);
             // DrawShadowRect(vcb, val);
+        }
+    };
+
+    struct NewSlider : public Slider
+    {
+        NewSlider(std::string title, VarValueGeneric &tv) : Slider(title, tv) {}
+        void Render()
+        {
+            const double val = var->Get();
+
+            if (var->Meta().range[0] != var->Meta().range[1])
+            {
+                double rval = val;
+                if (logscale)
+                {
+                    rval = log(val);
+                }
+                glColor4fv(BlackTransparent);
+                glRect(v);
+                glColor4fv(GreenTransparent);
+                const double norm_val = std::max(0.0, std::min(1.0, (rval - var->Meta().range[0]) / (var->Meta().range[1] - var->Meta().range[0])));
+                glRect(Viewport(v.l, v.b, (int)(v.w * norm_val), v.h));
+                // DrawShadowRect(v);
+                glColor4fv(TextColor); //colour_tx
+                gltext = myfont.Text(var->Meta().friendly);
+                gltext.DrawWindow(raster[0], raster[1]);
+                std::ostringstream oss;
+                oss << std::setprecision(5) << val;
+                std::string str = oss.str();
+                GlText glval = myfont.Text(str);
+                const float l = glval.Width() + 2.0f;
+                glval.DrawWindow(v.l + v.w - l, raster[1]);
+            }
+            else
+            {
+                glColor4fv(Black); //RedTransparent
+                //if (gltext.Text() != var->Meta().friendly)
+                {
+                    gltext = largeFont.Text(var->Meta().friendly);
+                }
+                gltext.DrawWindow(raster[0], raster[1]);
+
+                std::ostringstream oss;
+                oss << std::setprecision(5) << val;
+                std::string str = oss.str();
+                GlText glval = largeFont.Text(str);
+                const float l = glval.Width() + 2.0f;
+                glval.DrawWindow(v.l + v.w - l, raster[1]);
+            }
         }
     };
 
@@ -94,17 +151,17 @@ namespace pangolin
         {
             if (title.find('!') != std::string::npos) //ex: Record Video!Stop Recording
             {
-                gltext = textIfOff = GlFont::I().Text(title.substr(0, title.find('!'))); //Record Video
-                textIfOn = GlFont::I().Text(title.substr(title.find('!') + 1));          //Stop Recording
+                gltext = textIfOff = myfont.Text(title.substr(0, title.find('!'))); //Record Video
+                textIfOn = myfont.Text(title.substr(title.find('!') + 1));          //Stop Recording
                 ChangeableName = true;
             }
             else
-                gltext = textIfOff = textIfOn = GlFont::I().Text(title);
+                gltext = textIfOff = textIfOn = myfont.Text(title);
         }
 
         void Render()
         {
-            glColor4fv(Transparent);
+            glColor4fv(BlackTransparent);
             glRect(v);
             glColor4fv(TextColor);
             if (ChangeableName)
@@ -184,7 +241,7 @@ namespace pangolin
                          !strcmp(var.TypeId(), typeid(int).name()) ||
                          !strcmp(var.TypeId(), typeid(unsigned int).name()))
                 {
-                    nv = new Slider(title, var);
+                    nv = new NewSlider(title, var);
                 }
                 else if (!strcmp(var.TypeId(), typeid(std::function<void(void)>).name()))
                 {

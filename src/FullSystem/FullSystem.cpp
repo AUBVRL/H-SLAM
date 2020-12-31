@@ -324,9 +324,6 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	assert(allFrameHistory.size() > 0);
 	// set pose initialization.
 
-    for(IOWrap::Output3DWrapper* ow : outputWrapper)
-        ow->pushLiveFrame(fh);
-
 
 
 	FrameHessian* lastF = coarseTracker->lastRef;
@@ -350,10 +347,11 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		}
 		SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
 
-		if(nIndmatches > 80)
-			lastF_2_fh_tries.push_back(fh->shell->getPoseInverse() * lastF->shell->getPose());
-		else
+		if(nIndmatches > 30 && isUsable) //if indirect tracking is good use it as prior for Direct tracking
 		{
+			lastF_2_fh_tries.push_back(fh->shell->getPoseInverse() * lastF->shell->getPose());
+		}
+		
 		// get last delta-movement.
 		lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast);							// assume constant motion.
 		lastF_2_fh_tries.push_back(fh_2_slast.inverse() * fh_2_slast.inverse() * lastF_2_slast);	// assume double motion (frame skipped)
@@ -365,7 +363,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		// just try a TON of different initializations (all rotations). In the end,
 		// if they don't work they will only be tried on the coarsest level, which is super fast anyway.
 		// also, if tracking rails here we loose, so we really, really want to avoid that.
-		for(float rotDelta=0.02; rotDelta < 0.05; rotDelta++)
+		for(float rotDelta=0.02; rotDelta < 0.05; rotDelta+=0.01)
 		{
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,rotDelta,0,0), Vec3(0,0,0)));			// assume constant motion.
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,0,rotDelta,0), Vec3(0,0,0)));			// assume constant motion.
@@ -393,7 +391,6 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,rotDelta,-rotDelta,rotDelta), Vec3(0,0,0)));	// assume constant motion.
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,rotDelta,rotDelta,-rotDelta), Vec3(0,0,0)));	// assume constant motion.
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,rotDelta,rotDelta,rotDelta), Vec3(0,0,0)));	// assume constant motion.
-		}
 		}
 
 		if(!slast->poseValid || !sprelast->poseValid || !lastF->shell->poseValid)
@@ -487,6 +484,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	fh->shell->trackingRefId = lastF->shell->id;
 	
 	fh->shell->aff_g2l = aff_g2l;
+
 	fh->shell->setPose(lastF->shell->getPose() * lastF_2_fh.inverse());
 
 	if(coarseTracker->firstCoarseRMSE < 0)
@@ -509,7 +507,6 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 						<< achievedRes[0] << " "
 						<< tryIterations << "\n";
 	}
-
 
 	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
 }
@@ -715,9 +712,14 @@ void FullSystem::activatePointsMT()
 
 			if (newpoint->my_type > 4)
 			{
-				
+				// if(ph->initIdepth_min > 0)
+				// 	std::cout << "idepth min " << ph->initIdepth_min << " idepth max " << ph->initIdepth_max << " idepth final " << newpoint->idepth << std::endl;
+				// if(ph->priorFromInd > 0.0)
+				// 	newpoint->priorFromInd = ph->priorFromInd;
+
 				{ //strategy: block new indirect mapPoint from being created:
-					if (!newpoint->host->shell->frame->getMapPoint(newpoint->my_type - 5))
+					auto oldMp = newpoint->host->shell->frame->getMapPoint(newpoint->my_type - 5);
+					if (!oldMp)
 					{
 						std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(newpoint, globalMap);
 						newpoint->host->shell->frame->addMapPoint(pMP);
@@ -728,7 +730,13 @@ void FullSystem::activatePointsMT()
 					}
 					else
 					{
-						newpoint->hasDepthPrior = true; //This point hessian was traced from an indirect map Point depth prior
+						// std::shared_ptr<MapPoint> pMP = std::make_shared<MapPoint>(newpoint, globalMap);
+						// // newpoint->host->shell->frame->addMapPoint(pMP);
+						// newpoint->Mp = pMP;
+						// pMP->AddObservation(pMP->sourceFrame, pMP->index);
+						// globalMap->AddMapPoint(pMP);
+						// oldMp->Replace(pMP);
+						// // newpoint->priorFromInd =  oldMp->getidepthHessian(); //This point hessian was traced from an indirect map Point depth prior
 					}
 				}
 
@@ -742,7 +750,7 @@ void FullSystem::activatePointsMT()
 				// 	else
 				// 	{
 				// 		newpoint->host->shell->frame->getMapPoint(newpoint->my_type - 5)->Replace(pMP);
-				// 		newpoint->hasDepthPrior = true; //This point hessian was traced from an indirect map Point depth prior
+				// 		// newpoint->hasDepthPrior = true; //This point hessian was traced from an indirect map Point depth prior
 				// 	}
 				// 	newpoint->Mp = pMP;
 				// 	globalMap->AddMapPoint(pMP);
@@ -750,8 +758,7 @@ void FullSystem::activatePointsMT()
 
 
 				//Some immature points could have been initialized from a known indirect map Point that was later removed due to KF culling, use its data:
-				if(ph->hasDepthPrior)
-					newpoint->hasDepthPrior = true;
+				
 			}
 		
 
@@ -764,6 +771,8 @@ void FullSystem::activatePointsMT()
 		else if(newpoint == (PointHessian*)((long)(-1)) || ph->lastTraceStatus==IPS_OOB)
 		{
 			delete ph;
+			if(!ph->Mp.expired())
+				ph->Mp.lock()->setDirStatus(MapPoint::removed);
 			ph->host->immaturePoints[ph->idxInImmaturePoints] = nullptr;
 		}
 		else
@@ -972,29 +981,34 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		}
 
 		// Velocity = cumulativeForm();
+		
 		shell->setPose(mLastFrame->fs->getPose() * Velocity.inverse()); //Velocity * LastFrameTcw
 		nIndmatches = 0;
+		isUsable = false;
 		CheckReplacedInLastFrame();
-		int nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 20, true);
+		int nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 15, true); 
 		if (nFrametoLastMatches < 20)
 		{
 			shell->frame->tMapPoints.clear();
 			shell->frame->tMapPoints.resize(shell->frame->nFeatures, nullptr);
-			nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 40, true);
+			nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 30, true);
 		}
-		
-		PoseOptimization(shell->frame, &Hcalib);
-		int nOutlierFreeMatchesF2F = updatePoseOptimizationData(shell->frame, nFrametoLastMatches, true);
 
-		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);		
-		PoseOptimization(shell->frame, &Hcalib);
-		//perform joint optimization here!!
+		isUsable = PoseOptimization(shell->frame, &Hcalib);
+		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLastMatches, true);
+
+		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
+		PoseOptimization(shell->frame, &Hcalib, isUsable); //isUsable
 		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
-		DrawMatches(shell->frame);
+
+
 		//perform joint optimization here
 		Vec4 tres = trackNewCoarse(fh);
-		shell->frame->mpReferenceKF = mpReferenceKF;
+
 		
+
+		shell->frame->mpReferenceKF = mpReferenceKF;
+
 		if (!std::isfinite((double)tres[0]) || !std::isfinite((double)tres[1]) || !std::isfinite((double)tres[2]) || !std::isfinite((double)tres[3]))
 		{
 			printf("Initial Tracking failed: LOST!\n");
@@ -1030,9 +1044,14 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 		mLastFrame = shell->frame;
 
-		for (IOWrap::Output3DWrapper *ow : outputWrapper)
-			ow->publishCamPose(fh->shell, &Hcalib);
+        
 
+		for (IOWrap::Output3DWrapper *ow : outputWrapper)
+		{
+			ow->publishCamPose(fh->shell, &Hcalib);
+			ow->pushLiveFrame(fh, nIndmatches);
+		}
+		
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);
 		return;
@@ -1331,11 +1350,12 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	SearchInNeighbors(fh->shell->frame);
 	KeyFrameCulling(fh->shell->frame);
+
 	updateLocalKeyframes(fh->shell->frame);
 	updateLocalPoints(fh->shell->frame);
 
 	printLogLine();
-    //printEigenValLine();
+	//printEigenValLine();
 
 }
 
@@ -1432,7 +1452,8 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		}
 	}
 
-	firstFrame->shell->frame->ComputeBoVW();
+	if(LoopClosure)
+		firstFrame->shell->frame->ComputeBoVW();
 
 	globalMap->AddKeyFrame(firstFrame->shell->frame);
 	globalMap->mvpKeyFrameOrigins.push_back(firstFrame->shell->frame);
@@ -1500,15 +1521,15 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 				{
 					if (!pMP->isBad())
 					{
-						Vec3 PointinFrame = Tcw * pMP->getWorldPose().cast<double>();
+						Vec3 PointinFrame =  (Tcw * pMP->getWorldPose().cast<double>());
 						float invz = (1.0 / (float)PointinFrame[2]);
 						if (invz > 0)
 						{
 							float devi = pMP->getStdDev();
-							float idepthmin = invz - 6 * devi;
+							float idepthmin = invz - 15 * devi; //15
 							impt->idepth_min = idepthmin > 0 ? idepthmin : 0;
-							impt->idepth_max = invz + 6 * devi;
-							impt->hasDepthPrior = true;
+							impt->idepth_max = invz + 15 * devi; //15
+							
 						}
 					}
 				}
@@ -1710,8 +1731,8 @@ void FullSystem::printEvalLine()
 
 void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
 {
-	
-	frame->ComputeBoVW(); //possibly move this to loop closure?
+	if(LoopClosure)
+		frame->ComputeBoVW(); //possibly move this to loop closure?
 
 	for(size_t i=0, iend = frame->tMapPoints.size(); i < iend; ++i)
     {
@@ -1742,7 +1763,6 @@ void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
 
 	mnLastKeyFrameId = frame->fs->id;
     mpLastKeyFrame = frame;
-
 
 }
 
@@ -1953,9 +1973,10 @@ void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
 	}
 }
 
+
 void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
 {
-	globalMap->SetReferenceMapPoints(mvpLocalMapPoints);
+	
 	// Update local MapPoints:
 	boost::unique_lock<boost::mutex> lock(localMapMtx);
 
@@ -1973,7 +1994,7 @@ void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
 				continue;
 			if (pMP->mnTrackReferenceForFrame == frame->fs->KfId)
 				continue;
-			if (!pMP->isBad())
+			if (!pMP->isBad() && pMP->checkVar())
 			{
 				mvpLocalMapPoints.push_back(pMP);
 				pMP->mnTrackReferenceForFrame = frame->fs->KfId;
@@ -1986,22 +2007,40 @@ void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
 		if(!frameHessians[i]->shell->frame)
 			continue;
 
-		std::shared_ptr<Frame> pKF = frameHessians[i]->shell->frame;
-		const std::vector<std::shared_ptr<MapPoint>> vpMPs = pKF->getMapPointsV();
-		for (std::vector<std::shared_ptr<MapPoint>>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+
+		for (int j = 0, jend = frameHessians[i]->pointHessiansMarginalized.size(); j < jend; ++j)
 		{
-			std::shared_ptr<MapPoint> pMP = *itMP;
-			if (!pMP)
+			std::shared_ptr<MapPoint> Mp = frameHessians[i]->pointHessiansMarginalized[j]->Mp.lock();
+			if (!Mp)
 				continue;
-			if (pMP->mnTrackReferenceForFrame == frame->fs->KfId)
+			
+			if (Mp->mnTrackReferenceForFrame == frame->fs->KfId)
 				continue;
-			if (!pMP->isBad())
+			if (!Mp->isBad()&& Mp->checkVar())
 			{
-				mvpLocalMapPoints.push_back(pMP);
-				pMP->mnTrackReferenceForFrame = frame->fs->KfId;
+				mvpLocalMapPoints.push_back(Mp);
+				Mp->mnTrackReferenceForFrame = frame->fs->KfId;
 			}
+
+		}
+
+		for (int j = 0, jend = frameHessians[i]->pointHessians.size(); j < jend; ++j)
+		{
+			std::shared_ptr<MapPoint> Mp = frameHessians[i]->pointHessians[j]->Mp.lock();
+			if (!Mp)
+				continue;
+			
+			if (Mp->mnTrackReferenceForFrame == frame->fs->KfId)
+				continue;
+			if (!Mp->isBad()&& Mp->checkVar())
+			{
+				mvpLocalMapPoints.push_back(Mp);
+				Mp->mnTrackReferenceForFrame = frame->fs->KfId;
+			}
+
 		}
 	}
+	globalMap->SetReferenceMapPoints(mvpLocalMapPoints);
 }
 
 void FullSystem::CheckReplacedInLastFrame()
@@ -2024,6 +2063,7 @@ void FullSystem::CheckReplacedInLastFrame()
 int FullSystem::updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches ,bool istrackingLastFrame)
 {
 	int nmatchesMap = 0;
+	int outliers = 0;
 	for (int i = 0; i < frame->nFeatures; ++i)
 	{
 		if (frame->tMapPoints[i])
@@ -2039,6 +2079,7 @@ int FullSystem::updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & n
 					pMP->mbTrackInView = false;
 					pMP->mnLastFrameSeen = frame->fs->id;
 					nmatches--;
+					outliers++;
 				}
 
 				else if (frame->tMapPoints[i]->getNObservations() > 0)
@@ -2054,10 +2095,15 @@ int FullSystem::updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & n
 						nmatchesMap++;
 				}
 				else //stop outliers from going to the mapping thread
+				{
 					frame->tMapPoints[i].reset();
+					outliers++;
+				}
 			}
 		}
 	}
+	// std::string out = istrackingLastFrame ? "last frame " : "local map ";
+	// std::cout << "rejected outliers " + out << outliers << " total matches "<< nmatchesMap<< std::endl;
 	return nmatchesMap;
 }
 
@@ -2152,9 +2198,13 @@ void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
 		std::shared_ptr<Frame> pKF = *vit;
 		if(pKF->fs->KfId==0 || (pKF->getState()== Frame::kfstate::active))
             continue;
-        
+
+		int age = mpLastKeyFrame->fs->KfId - pKF->fs->KfId;
+		if (age > 20)
+			continue;
+
 		KfsChecked += 1;
-		if(KfsChecked > 10)
+		if(KfsChecked > 30)
 			return;
 
 		const std::vector<std::shared_ptr<MapPoint>> vpMapPoints = pKF->getMapPointsV();
@@ -2199,7 +2249,7 @@ void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
             }
         }  
 
-        if(nRedundantObservations>0.8*nMPs) //0.9
+        if(nRedundantObservations>0.9*nMPs) //0.9
             {
 				if(pKF->getState() != Frame::kfstate::active)
 				{
@@ -2235,50 +2285,4 @@ void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
 // 		return vVelocity.back();
 // 	}
 // }
-
-void FullSystem::DrawMatches(std::shared_ptr<Frame> frame)
-{
-	cv::Mat Display;
-	std::vector<cv::KeyPoint> keys;
-	for (int i = 0; i < frame->nFeatures; ++i)
-	{
-		if(frame->tMapPoints[i])
-			keys.push_back(frame->mvKeys[i]);
-	}
-	cv::drawKeypoints(frame->Image, keys, Display, cv::Scalar(0, 255, 0));
-	cv::namedWindow("Matches", cv::WINDOW_KEEPRATIO);
-	cv::imshow("Matches", Display);
-}
-
-//  int FullSystem::DrawMatches2(std::shared_ptr<Frame> f1, std::shared_ptr<Frame> f2, std::vector<Match> &matches) {
-
-//         cv::Mat img(hG[0], wG[0] * 2, CV_8UC3);   // color image displayed
-//         f1->imgDisplay.copyTo(img(cv::Rect(0, 0, wG[0], hG[0])));
-//         f2->imgDisplay.copyTo(img(cv::Rect(wG[0], 0, wG[0], hG[0])));
-
-//         for (auto &m:matches) {
-//             cv::circle(img, cv::Point2f(f1->features[m.index1]->uv[0], f1->features[m.index1]->uv[1]), 1,
-//                        cv::Scalar(0, 250, 0), 2);
-
-//             cv::circle(img, cv::Point2f(f2->features[m.index2]->uv[0] + wG[0], f2->features[m.index2]->uv[1]), 1,
-//                        cv::Scalar(0, 250, 0), 2);
-
-//             cv::line(img, cv::Point2f(f1->features[m.index1]->uv[0], f1->features[m.index1]->uv[1]),
-//                      cv::Point2f(f2->features[m.index2]->uv[0] + wG[0], f2->features[m.index2]->uv[1]),
-//                      cv::Scalar(0, 250, 0),
-//                      1);
-//         }
-
-//         for (auto &feat: f1->features) {
-//             if (feat->isCorner)
-//                 cv::circle(img, cv::Point2f(feat->uv[0], feat->uv[1]), 1, cv::Scalar(0, 0, 250), 2);
-//         }
-//         for (auto &feat: f2->features) {
-//             if (feat->isCorner)
-//                 cv::circle(img, cv::Point2f(feat->uv[0] + wG[0], feat->uv[1]), 1, cv::Scalar(0, 0, 250), 2);
-//         }
-
-//         cv::imshow("Matches", img);
-//         return cv::waitKey(0);
-//     }
 }

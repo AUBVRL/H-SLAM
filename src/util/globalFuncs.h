@@ -371,4 +371,43 @@ inline double getStdDev(std::vector<double> _in)
 
 	return stdev;
 }
+
+//https://github.com/libigl/libigl/blob/master/include/igl/median.cpp
+
+inline double computeMedian(std::vector<double> & V)
+{
+	double median = 0.0;
+	if (V.size() == 0)
+		return median;
+	
+	// http://stackoverflow.com/a/1719155/148668
+	sort(V.begin(), V.end());
+	size_t n = V.size() / 2;
+	if (V.size() % 2 == 0)
+	{
+		// std::nth_element(V.begin(), V.begin() + n - 1, V.end());
+		median = 0.5 * (V[n] + V[n - 1]);
+	}
+	else
+	{
+		median = V[n];
+	}
+	return median;
+}
+
+inline double computeScale(std::vector<double>& _vec)
+{
+	double errmedian = computeMedian(_vec);
+
+	for (auto &element : _vec)
+		element = std::abs(element - errmedian);
+
+	double mad = computeMedian(_vec);
+
+	if (mad > 0.0 && errmedian > 0.0)
+		return 1.4826 * mad;
+	else
+		return 1.0;
+}
+
 }

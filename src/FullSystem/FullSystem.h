@@ -311,7 +311,6 @@ private:
 	int updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches, bool istrackingLastFrame = true);
 	void SearchInNeighbors(std::shared_ptr<Frame> currKF);
 	void KeyFrameCulling(std::shared_ptr<Frame> currKF);
-	void DrawMatches(std::shared_ptr<Frame> frame);
 	// SE3 cumulativeForm();
 
 	std::shared_ptr<Matcher> matcher;
@@ -330,7 +329,8 @@ private:
 	boost::mutex localMapMtx;
 
 	int nIndmatches;
-
+	bool isUsable;
+	
 	//sort localKeyframes while updating localkeyframes from best to worst:
 	static bool cmpAscending(std::pair<std::shared_ptr<Frame>, int> &a, std::pair<std::shared_ptr<Frame>, int> &b)
 	{

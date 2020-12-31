@@ -120,6 +120,18 @@ namespace HSLAM
             return idepth;
         }
 
+        inline bool checkVar()
+        {
+            boost::lock_guard<boost::mutex> l(_mtx);
+            float depth = 1.0f / idepth;
+            float depth4 = depth * depth * depth * depth;
+            float var = (1.0f / (idepthH + 0.01));
+
+            if (var * depth4 < 0.001 && var < 0.001)
+                return true;
+            else
+                return false;
+        }
 
         inline void setDirStatus(mpDirStatus _status)
         {
@@ -130,33 +142,33 @@ namespace HSLAM
             {
                 l.unlock();
                 SetBadFlag();
+                return;
             }
 
             if(_status == mpDirStatus::marginalized) //perform map point culling when point is marginalized
             {
                 bool bad = false;
                 if(nObs < 2)
-                    bad = true;
-                else if ((((float)mnFound) / ((float)mnVisible)) < 0.25)
-                    bad = true;
-                else
-                {
-                    float var = 1.0f / (idepthH + 0.01);
-                    if(var > 0.001) //settings_absVarTH
-                        bad = true;
-                    else 
-                    {
-                        float depth = 1.0f / idepth;
-                        float depth4 = depth * depth * depth * depth;
-                        if (var * depth4 > 0.001) //settings_scaledVarTH
-                            bad = true;
-                    }
-                }
-                if(bad)
                 {
                     l.unlock();
+                    bad = true;
+                }
+                else if ((((float)mnFound) / ((float)mnVisible)) < 0.25)
+                {
+                    l.unlock();
+                    bad = true;
+                }
+                else
+                {
+                    l.unlock();
+                    bad = !checkVar();
+                }
+
+                if(bad)
+                {
                     SetBadFlag();
                 }
+                    
             }
         }
 
