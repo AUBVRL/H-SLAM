@@ -32,6 +32,7 @@ namespace HSLAM
 		double movedByOpt;
 
 		bool isKeyframe;
+		bool needRefresh;
 
 		std::shared_ptr<Frame> frame;
 
@@ -50,6 +51,7 @@ namespace HSLAM
 			statistics_outlierResOnThis = statistics_goodResOnThis = 0;
 			trackingRefId = 0;
 			isKeyframe = false;
+			needRefresh = false;
 		}
 
 		SE3 getPose() {
@@ -91,6 +93,19 @@ namespace HSLAM
             boost::lock_guard<boost::mutex> l(shellPoseMutex);
             worldToCamOpti = Scw;
 			worldToCamOptiInv = Scw.inverse();
+			needRefresh = true;
+		}
+
+		bool doesNeedRefresh()
+		{
+			boost::lock_guard<boost::mutex> l(shellPoseMutex);
+			return needRefresh;
+		}
+
+		void setRefresh(bool _refresh)
+		{
+			boost::lock_guard<boost::mutex> l(shellPoseMutex);
+			needRefresh = _refresh;
 		}
 
 		private:

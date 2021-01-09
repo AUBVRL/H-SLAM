@@ -184,13 +184,23 @@ void PangolinDSOViewer::run()
 			{
 				float blue[3] = {0,0,1};
 				float orange[3] = {0.8, 0.4, 0.0};
+				
+				bool overWriteRefresh = false;
+				if (fh->originFrame->doesNeedRefresh())
+				{
+					fh->camToWorld = fh->originFrame->getPoseOptiInv();
+					fh->needRefresh = true;
+					overWriteRefresh = true;
+					fh->originFrame->setRefresh(false);
+				}
 				if (settings_showKFCameras->Get())
-					fh->drawCam(1, fh->originFrame->frame? blue : orange, 0.1);
+					fh->drawCam(1, fh->originFrame->frame ? blue : orange, 0.1, false);
 
-				refreshed += (int)(fh->refreshPC(refreshed < 10, settings_scaledVarTH->Get(), settings_absVarTH->Get(),
+				refreshed += (int)(fh->refreshPC((refreshed < 10 || overWriteRefresh), settings_scaledVarTH->Get(), settings_absVarTH->Get(),
 						settings_pointCloudMode->Get(), settings_minRelBS->Get(), settings_sparsity->Get()));
 				fh->drawPC(1);
 			}
+
 			if(settings_showCurrentCamera->Get()) currentCam->drawCam(2,0,0.2);
 			drawConstraints();
 			DrawIndirectMap(settings_drawIndCov->Get());

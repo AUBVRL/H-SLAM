@@ -95,7 +95,7 @@ public:
         return (id < other.id);
     }
 
-
+	bool needRefresh;
 private:
 	float fx,fy,cx,cy;
 	float fxi,fyi,cxi,cyi;
@@ -105,7 +105,7 @@ private:
 	int my_sparsifyFactor;
 	int my_displayMode;
 	float my_minRelBS;
-	bool needRefresh;
+	
 
 
 	int numSparsePoints;

@@ -22,6 +22,7 @@
 #include "Indirect/Map.h"
 #include "Indirect/Matcher.h"
 #include "Indirect/Optimizer.h"
+#include "Indirect/LoopCloser.h"
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
@@ -120,6 +121,9 @@ FullSystem::FullSystem()
 	detector = std::make_shared<FeatureDetector>();
 	globalMap = std::make_shared<Map>();
 	matcher = std::make_shared<Matcher>();
+	if(LoopClosure)
+		loopCloser = std::make_shared<LoopCloser>(this);
+
 	Velocity = SE3();
 
 	statistics_lastNumOptIts=0;
@@ -149,9 +153,7 @@ FullSystem::FullSystem()
 	linearizeOperation=true;
 	runMapping=true;
 	mappingThread = boost::thread(&FullSystem::mappingLoop, this);
-	lastRefStopID=0;
-
-
+	lastRefStopID = 0;
 
 	minIdJetVisDebug = -1;
 	maxIdJetVisDebug = -1;
@@ -189,8 +191,11 @@ FullSystem::~FullSystem()
 	{
 		if (fh->shell->frame)
 			fh->shell->frame.reset();
-		delete fh;
-		fh = nullptr;
+		if(fh)
+		{
+			delete fh;
+			fh = nullptr;
+		}
 	}
 	delete coarseDistanceMap;
 	delete coarseTracker;
@@ -198,6 +203,8 @@ FullSystem::~FullSystem()
 	delete coarseInitializer;
 	delete pixelSelector;
 	delete ef;
+	loopCloser.reset();
+	matcher.reset();
 	detector.reset();
 	globalMap.reset();
 }
@@ -986,7 +993,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		nIndmatches = 0;
 		isUsable = false;
 		CheckReplacedInLastFrame();
-		int nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 15, true); 
+		int nFrametoLastMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 15, true);
 		if (nFrametoLastMatches < 20)
 		{
 			shell->frame->tMapPoints.clear();
@@ -1177,6 +1184,15 @@ void FullSystem::blockUntilMappingIsFinished()
 	trackedFrameSignal.notify_all();
 	lock.unlock();
 
+	if (loopCloser)
+	{
+		loopCloser->SetFinish(true);
+		// if (globalMap->NumFrames() > 4)
+		// {
+		// 	globalMap->lastOptimizeAllKFs();
+		// }
+	}
+
 	mappingThread.join();
 
 }
@@ -1206,23 +1222,31 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
 	}
 
+
+
 	traceNewCoarse(fh);
 
-	IndirectMapper(fh->shell->frame);
+	
 
 	boost::unique_lock<boost::mutex> lock(mapMutex);
-
+	
 	// =========================== Flag Frames to be Marginalized. =========================
 	flagFramesForMarginalization(fh);
 
 
 	// =========================== add New Frame to Hessian Struct. =========================
-	fh->idx = frameHessians.size();
-	frameHessians.push_back(fh);
+	{
+		boost::unique_lock<boost::mutex> lock(framesMutex);
+		fh->idx = frameHessians.size();
+		frameHessians.push_back(fh);
+	}
+
 	fh->shell->KfId = allKeyFramesHistory.back()->KfId + 1;
 	fh->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(fh->shell);
 	ef->insertFrame(fh, &Hcalib);
+
+	IndirectMapper(fh->shell->frame);
 
 	setPrecalcValues();
 
@@ -1344,12 +1368,18 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	// =========================== Marginalize Frames =========================
 
-	for(unsigned int i=0;i<frameHessians.size();i++)
-		if(frameHessians[i]->flaggedForMarginalization)
-			{marginalizeFrame(frameHessians[i]); i=0;}
+	{
+		boost::unique_lock<boost::mutex> lock(framesMutex);
+		for (unsigned int i = 0; i < frameHessians.size(); i++)
+			if (frameHessians[i]->flaggedForMarginalization)
+			{
+				marginalizeFrame(frameHessians[i]);
+				i = 0;
+			}
+	}
 
 	SearchInNeighbors(fh->shell->frame);
-	KeyFrameCulling(fh->shell->frame);
+	// KeyFrameCulling(fh->shell->frame);
 
 	updateLocalKeyframes(fh->shell->frame);
 	updateLocalPoints(fh->shell->frame);
@@ -1366,8 +1396,13 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	// add firstframe.
 	FrameHessian* firstFrame = coarseInitializer->firstFrame;
-	firstFrame->idx = frameHessians.size();
-	frameHessians.push_back(firstFrame);
+	
+	{
+		boost::unique_lock<boost::mutex> lock(framesMutex);
+		firstFrame->idx = frameHessians.size();
+		frameHessians.push_back(firstFrame);
+	}
+	
 	firstFrame->frameID = allKeyFramesHistory.size();
 	firstFrame->shell->KfId = 0;
 	newFrame->shell->KfId = 1;
@@ -1452,8 +1487,6 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		}
 	}
 
-	if(LoopClosure)
-		firstFrame->shell->frame->ComputeBoVW();
 
 	globalMap->AddKeyFrame(firstFrame->shell->frame);
 	globalMap->mvpKeyFrameOrigins.push_back(firstFrame->shell->frame);
@@ -1481,6 +1514,9 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		if(pMP)
 			pMP->increaseFound();
 	}
+
+	if (loopCloser)
+		loopCloser->InsertKeyFrame(firstFrame->shell->frame);
 
 	initialized = true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
@@ -1731,8 +1767,6 @@ void FullSystem::printEvalLine()
 
 void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
 {
-	if(LoopClosure)
-		frame->ComputeBoVW(); //possibly move this to loop closure?
 
 	for(size_t i=0, iend = frame->tMapPoints.size(); i < iend; ++i)
     {
@@ -1764,6 +1798,8 @@ void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
 	mnLastKeyFrameId = frame->fs->id;
     mpLastKeyFrame = frame;
 
+	if (loopCloser)
+		loopCloser->InsertKeyFrame(frame);
 }
 
 int FullSystem::SearchLocalPoints(std::shared_ptr<Frame> frame, int th, float nnratio)
@@ -2132,7 +2168,7 @@ void FullSystem::SearchInNeighbors(std::shared_ptr<Frame> currKF)
 			vpTargetKFs.push_back(pKFi2);
 		}
 	}
-	
+
 	// Search matches by projection from current KF in target KFs
 	std::vector<std::shared_ptr<MapPoint>> vpMapPointMatches = currKF->getMapPointsV();
 	for (std::vector<std::shared_ptr<Frame>>::iterator vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
