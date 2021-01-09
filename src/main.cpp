@@ -187,8 +187,6 @@ int main(int argc, char **argv)
 	}
 
 
-
-
 	int lstart=startIndex;
 	int lend = endIndex;
 	int linc = 1;
@@ -316,9 +314,14 @@ int main(int argc, char **argv)
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
 					usleep(10000); //hack - wait for display wrapper to clean up.
-					delete fullSystem;
+					if(fullSystem)
+					{
+						delete fullSystem;
+						fullSystem = nullptr;
+					}
+						
 					fullSystem = new FullSystem();
-                    fullSystem->setGammaFunction(reader->getPhotometricGamma());
+					fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed==0);
 
 
@@ -388,7 +391,11 @@ int main(int argc, char **argv)
 
 
 	printf("DELETE FULLSYSTEM!\n");
-	delete fullSystem;
+	if (fullSystem)
+	{
+		delete fullSystem;
+		fullSystem = nullptr;
+	}
 
 	printf("DELETE READER!\n");
 	delete reader;

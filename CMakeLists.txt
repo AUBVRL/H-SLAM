@@ -72,7 +72,8 @@ set(SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/Indirect/Matcher.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Map.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Optimizer.cpp
-  # ${PROJECT_SOURCE_DIR}/src/Indirect/LoopCloser.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/Sim3Solver.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/LoopCloser.cpp
 )
 
 
@@ -152,6 +153,7 @@ set(LIBS
   ${BOOST_THREAD_LIBRARY}
   boost_system
   cxsparse
+  cholmod
 )
 
 # build main executable (only if we have both OpenCV and Pangolin)

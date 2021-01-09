@@ -72,7 +72,8 @@
         "codecvt": "cpp",
         "future": "cpp",
         "cfenv": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "strstream": "cpp"
     },
 
     "files.exclude": {

@@ -7,6 +7,7 @@
 #include "opencv2/highgui.hpp"
 #include "util/FrameShell.h"
 #include "Indirect/Map.h"
+
 namespace HSLAM
 {
 
@@ -618,7 +619,7 @@ namespace HSLAM
         }
 
         globalMap->EraseKeyFrame(thisptr);
-        // mpKeyFrameDB->erase(this);
+        globalMap->KfDB->erase(thisptr);
     }
 
 } // namespace HSLAM

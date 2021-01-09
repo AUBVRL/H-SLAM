@@ -142,6 +142,10 @@ typedef Eigen::Matrix<float,14,1> Vec14f;
 typedef Eigen::Matrix<double,14,14> Mat1414;
 typedef Eigen::Matrix<double,14,1> Vec14;
 
+// Consistent group, the first is a group of keyframes that are considered as consistent, and the second is how many times they are detected
+class Frame;
+typedef std::pair<std::set<std::shared_ptr<Frame>,std::owner_less<std::shared_ptr<Frame>>>, int> ConsistentGroup;
+typedef std::map<std::shared_ptr<Frame>, Sim3, std::less<std::shared_ptr<Frame>>, Eigen::aligned_allocator<std::pair<std::shared_ptr<Frame> const, Sim3>>> KeyFrameAndPose;
 
 /// Returns the 3D cross product Skew symmetric matrix of a given 3D vector.
 template<class Derived>

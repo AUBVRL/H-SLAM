@@ -688,8 +688,8 @@ void EnergyFunctional::dropPointsF()
 			EFPoint* p = f->points[i];
 			if(p->stateFlag == EFPointStatus::PS_DROP)
 			{
-				if(!p->data->Mp.expired())
-					p->data->Mp.lock()->setDirStatus(MapPoint::removed);
+				// if(!p->data->Mp.expired())
+				// 	p->data->Mp.lock()->setDirStatus(MapPoint::removed);
 				removePoint(p);
 				i--;
 			}
