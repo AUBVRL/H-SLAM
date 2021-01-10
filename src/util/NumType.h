@@ -86,6 +86,7 @@ typedef Eigen::Matrix<float,3,1> Vec3f;
 typedef Eigen::Matrix<float,2,1> Vec2f;
 typedef Eigen::Matrix<float,6,1> Vec6f;
 
+typedef Eigen::Matrix<uint16_t, 2, 1> Vec2i;
 
 
 typedef Eigen::Matrix<double,4,9> Mat49;

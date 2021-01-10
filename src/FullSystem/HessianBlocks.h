@@ -209,14 +209,13 @@ struct FrameHessian
 	{
 		assert(efFrame==0);
 		release(); instanceCounter--;
-		for(int i=0;i<pyrLevelsUsed;i++)
+		for (int i = 0; i < pyrLevelsUsed; i++)
 		{
-			delete[] dIp[i];
-			delete[]  absSquaredGrad[i];
-
+			if (dIp[i])
+				delete[] dIp[i];
+			if (absSquaredGrad[i])
+				delete[] absSquaredGrad[i];
 		}
-
-
 
 		if(debugImage != 0) delete debugImage;
 	};

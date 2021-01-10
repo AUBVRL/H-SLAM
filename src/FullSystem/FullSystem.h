@@ -42,6 +42,7 @@ class EnergyFunctional;
 
 class Map;
 class Matcher;
+class LoopCloser;
 
 template<typename T> inline void deleteOut(std::vector<T*> &v, const int i)
 {
@@ -111,7 +112,8 @@ inline bool eigenTestNan(const MatXX &m, std::string msg)
 
 
 
-class FullSystem {
+class FullSystem
+{
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	FullSystem();
@@ -144,13 +146,14 @@ public:
 	void setGammaFunction(float* BInv);
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
+	boost::mutex mapMutex;
+
+	
+	std::shared_ptr<Matcher> matcher;
+	std::shared_ptr<Map> globalMap;
+
 
 private:
-
-	CalibHessian Hcalib;
-
-
-
 
 	// opt single point
 	int optimizePoint(PointHessian* point, int minObs, bool flagOOB);
@@ -242,7 +245,7 @@ private:
 
 
 	// ================== changed by mapper-thread. protected by mapMutex ===============
-	boost::mutex mapMutex;
+	
 	std::vector<FrameShell*> allKeyFramesHistory;
 
 	EnergyFunctional* ef;
@@ -253,6 +256,8 @@ private:
 	CoarseDistanceMap* coarseDistanceMap;
 
 	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
+	boost::mutex framesMutex;  // mutex to lock frame read and write
+
 	std::vector<PointFrameResidual*> activeResiduals;
 	float currentMinActDist;
 
@@ -313,9 +318,8 @@ private:
 	void KeyFrameCulling(std::shared_ptr<Frame> currKF);
 	// SE3 cumulativeForm();
 
-	std::shared_ptr<Matcher> matcher;
+	
 	std::shared_ptr<FeatureDetector> detector;
-	std::shared_ptr<Map> globalMap;
 
 	size_t mnLastKeyFrameId;
 	std::shared_ptr<Frame> mpLastKeyFrame;
@@ -330,7 +334,9 @@ private:
 
 	int nIndmatches;
 	bool isUsable;
-	
+
+	std::shared_ptr<LoopCloser> loopCloser;
+
 	//sort localKeyframes while updating localkeyframes from best to worst:
 	static bool cmpAscending(std::pair<std::shared_ptr<Frame>, int> &a, std::pair<std::shared_ptr<Frame>, int> &b)
 	{

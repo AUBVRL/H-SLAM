@@ -78,10 +78,9 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, cv::Mat &Occupancy, std::v
         cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
 
         Descriptors = cv::Mat::zeros((int)mvKeys.size(), 32, CV_8UC1);
-        // computeOrbDescriptor(Image, ImageBlurred, mvKeys, Descriptors,0, mvKeys.size());
-        ThreadPool->reduce(boost::bind(&FeatureDetector::computeOrbDescriptor, this, Image, ImageBlurred, mvKeys, Descriptors, _1,
+        // computeOrbDescriptor(Image, ImageBlurred, &mvKeys, Descriptors,0, mvKeys.size());
+        ThreadPool->reduce( boost::bind(&FeatureDetector::computeOrbDescriptor, this, Image, ImageBlurred, &mvKeys, Descriptors, _1,
                            _2), 0, mvKeys.size(), std::ceil(mvKeys.size() / NUM_THREADS));
-
 }
 
 // void FeatureDetector::ExtractFeatures(cv::Mat &Image, FeatureType FeatType ,vector<Vec3f*>&DirPyr, int id, vector<float*>& GradPyr, vector<cv::KeyPoint> &mvKeys, cv::Mat &Descriptors, int &NumFeatures, int NumFeaturesToExtract, shared_ptr<IndexThreadReduce<Vec10>> ThreadPool)
@@ -230,17 +229,19 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, cv::Mat &Occupancy, std::v
 //     return;
 // }
 
-void FeatureDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max)
+const float radConv = (float)(CV_PI / 180.f);
+void FeatureDetector::computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> *Keys, cv::Mat &Descriptors_, int min, int max)
 {
     for (int j = min; j < max; j++)
     {
         cv::Point *ppattern = &pattern[0];
-        Keys[j].angle = IC_Angle(Orig, Keys[j].pt, umax);
-
-        float angle = (float)Keys[j].angle * (float)(CV_PI / 180.f);
+        float ang = IC_Angle(Orig, (*Keys)[j].pt, umax);
+        (*Keys)[j].angle = ang;
+        
+        float angle = ang * radConv;
         float a = (float)cos(angle), b = (float)sin(angle);
 
-        const uchar *center = &img.at<uchar>(cvRound(Keys[j].pt.y), cvRound(Keys[j].pt.x));
+        const uchar *center = &img.at<uchar>(cvRound((*Keys)[j].pt.y), cvRound((*Keys)[j].pt.x));
 
         const int step = (int)img.step;
         uchar *desc = Descriptors_.ptr((int)j);
