@@ -1,5 +1,6 @@
 #pragma once
 #include "util/NumType.h"
+#include <iostream>
 
 #if _WIN32 || _WIN64
 #if _WIN64
@@ -77,7 +78,13 @@ namespace HSLAM
         ~Matcher() {}
 
         int SearchByBoW(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vpMatches12);
-        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t> > &vMatchedPairs, bool mbCheckOrientation = true);
+        int SearchByBow(std::shared_ptr<Frame> frame1, std::shared_ptr<Frame> frame2, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &matches);
+
+        int SearchBySim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::shared_ptr<MapPoint>> &vpMatches12, const float &s12, const Mat33f &R12, const Vec3f &t12, const float th);
+        int SearchBySim3Projection(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, std::vector<std::shared_ptr<MapPoint>> &vpMatched, int th);
+
+
+        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vMatchedPairs, bool mbCheckOrientation = true);
         int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist, bool mbCheckOrientation = true);
         bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, Mat33f &F12);
 
@@ -94,23 +101,27 @@ namespace HSLAM
 #ifdef __SSE2__
 
 #ifdef Env64
-            const unsigned long long int *pa = a.ptr<unsigned long long int>();
-            const unsigned long long int *pb = b.ptr<unsigned long long int>();
+            
+            const uint64_t* pa = a.ptr<uint64_t>();
+            const uint64_t *pb = b.ptr<uint64_t>();
 
             for (int i = 0; i < 4; i++, pa++, pb++)
             {
-                unsigned int v = *pa ^ *pb; //can't do this
+                uint64_t v = *pa ^ *pb;
                 dist += _mm_popcnt_u64(v);
             }
+
+            
             return dist;
 #else
             const int *pa = a.ptr<int32_t>();
             const int *pb = b.ptr<int32_t>();
             for (int i = 0; i < 8; i++, pa++, pb++)
             {
-                unsigned int v = *pa ^ *pb; //can't do this
+                unsigned int v = *pa ^ *pb; 
                 dist += _mm_popcnt_u32(v);
             }
+
             return dist;
 #endif
 

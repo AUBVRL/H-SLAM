@@ -43,6 +43,10 @@ float mnMaxY = 480;
 float mfGridElementWidthInv = (float)mnGridCols/(float)(mnMaxX-mnMinX);
 float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
 
+int minKfIdDist_LoopCandidate = 50; // min nmbre of keyframes between current and candidate to consider the candidate as potential loop closure.
+int kfGap = 60; // minimum number of keyframes have passed since last loop closure performed.
+int mnCovisibilityConsistencyTh = 3; //nbre of candidates connected to the loop candidate must also confirm for loop closure to take place
+
 int EDGE_THRESHOLD = 19; //15?
 
 int minThFAST = 7; //8

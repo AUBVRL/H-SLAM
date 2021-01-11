@@ -13,7 +13,8 @@ namespace HSLAM
 
     using namespace std;
 
-    Frame::Frame(float *Img, shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs, std::shared_ptr<Map> _gMap) : nFeatures(0), isReduced(false), NeedConnRefresh(true), HCalib(_HCalib), fh(_fh), fs(_fs)
+    Frame::Frame(float *Img, shared_ptr<FeatureDetector> detector, CalibHessian *_HCalib, FrameHessian *_fh, FrameShell *_fs, std::shared_ptr<Map> _gMap) : nFeatures(0), isReduced(false), 
+    NeedConnRefresh(true), HCalib(_HCalib), fh(_fh), fs(_fs)
     {
         cv::Mat(hG[0], wG[0], CV_32FC1, Img).convertTo(Image, CV_8U);
         Occupancy = cv::Mat(hG[0], wG[0], CV_8U, cv::Scalar(0));
@@ -385,10 +386,10 @@ namespace HSLAM
         // UpdateBestCovisibles();
     }
 
-    set<shared_ptr<Frame>> Frame::GetConnectedKeyFrames()
+    set<shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> Frame::GetConnectedKeyFrames()
     {
         boost::lock_guard<boost::mutex> l(mMutexConnections);
-        set<shared_ptr<Frame>> s;
+        set<shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> s;
         for (map<shared_ptr<Frame>, int>::iterator mit = mConnectedKeyFrameWeights.begin(); mit != mConnectedKeyFrameWeights.end(); mit++)
             s.insert(mit->first);
         return s;

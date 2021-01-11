@@ -21,6 +21,11 @@ namespace HSLAM
     extern int minDirDist;
     extern int indFeaturesToExtract;
 
+    extern int minKfIdDist_LoopCandidate;
+    extern int kfGap;
+    extern int mnCovisibilityConsistencyTh;
+
+
     extern bool normalizeInfoWithVariance;
 
 #define SOLVER_SVD (int)1

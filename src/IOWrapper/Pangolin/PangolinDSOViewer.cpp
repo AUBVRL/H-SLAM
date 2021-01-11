@@ -125,6 +125,8 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
     _Pause = new Var<bool>("ui.Pause!Resume", Pause, false);
     RecordScreen = new Var<bool>("ui.Record Screen!Stop Recording", false, false);
 
+	settings_KfIdToDraw = new pangolin::Var<int> ("ui.KfAgeDisp", 0, 0, 1400, false);
+
 
 	settings_nPts = new pangolin::Var<int> ("ui.activePoints",setting_desiredPointDensity, 50,5000, false);
 	settings_nCandidates = new pangolin::Var<int> ("ui.pointCandidates",setting_desiredImmatureDensity, 50,5000, false);
@@ -182,7 +184,9 @@ void PangolinDSOViewer::run()
 			int refreshed=0;
 			for(KeyFrameDisplay* fh : keyframes)
 			{
-				float blue[3] = {0,0,1};
+				if(fh->originFrame->KfId < settings_KfIdToDraw->Get())
+					continue;
+				float blue[3] = {0, 0, 1};
 				float orange[3] = {0.8, 0.4, 0.0};
 				
 				bool overWriteRefresh = false;
@@ -214,9 +218,9 @@ void PangolinDSOViewer::run()
 			for(float d : lastNMappingMs) sd+=d;
 			*settings_mapFps=lastNMappingMs.size()*1000.0f / sd;
 			int offsetVOcabSize = 0;
-			// if (!Vocab.empty())
-			// 	offsetVOcabSize = 570; //the BovW model used is 570MB when loaded
-			*memUse = getCurrentRSS() / 1048576 - offsetVOcabSize;
+			if (!Vocab.empty())
+				offsetVOcabSize = 450; //the BovW model used is about 450 MB when loaded
+			*memUse = (getCurrentRSS() / 1048576) - offsetVOcabSize;
 		}
 		{
 			model3DMutex.lock();
@@ -436,7 +440,8 @@ void PangolinDSOViewer::DrawIndirectMap(bool bDrawGraph)
 		// if (needUpdate >= 10)
 		// {
 		// 	needUpdate = 0;
-		auto vpMPs = globalmap->GetAllMapPoints();
+		std::vector<std::shared_ptr<MapPoint>> vpMPs;
+		globalmap->GetAllMapPoints(vpMPs);
 		auto vpRefMPs = globalmap->GetReferenceMapPoints();
 
 		if (vpMPs.empty())
@@ -538,8 +543,9 @@ void PangolinDSOViewer::DrawIndirectMap(bool bDrawGraph)
 
 		glColor4f(0.8f, 0.8f, 0.0f, 0.7f); //light yellow
 		glBegin(GL_LINES);
-		
-		std::vector<std::shared_ptr<Frame>> vpKFs = globalmap->GetAllKeyFrames();		
+
+		std::vector<std::shared_ptr<Frame>> vpKFs;
+		globalmap->GetAllKeyFrames(vpKFs);
 
 		for (size_t i = 0; i < vpKFs.size(); i++)
 		{

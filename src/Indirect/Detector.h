@@ -22,7 +22,7 @@ public:
 private:
     std::vector<int> InitUmax();
     std::vector<cv::Point> InitPattern();
-    void computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> &Keys, cv::Mat &Descriptors_, int min, int max);
+    void computeOrbDescriptor(const cv::Mat &Orig, const cv::Mat &img, std::vector<cv::KeyPoint> *Keys, cv::Mat &Descriptors_, int min, int max);
     float IC_Angle(const cv::Mat &image, cv::Point2f pt, const std::vector<int> &u_max);
     std::vector<cv::KeyPoint> Ssc(std::vector<cv::KeyPoint> keyPoints, int numRetPoints, int minDist, float tolerance, int cols, int rows);
     

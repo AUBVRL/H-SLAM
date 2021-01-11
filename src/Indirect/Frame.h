@@ -100,7 +100,7 @@ namespace HSLAM
         void EraseConnection(std::shared_ptr<Frame> pKF);
 
         void UpdateBestCovisibles();
-        std::set<std::shared_ptr<Frame>> GetConnectedKeyFrames();
+        std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> GetConnectedKeyFrames();
         std::vector<std::shared_ptr<Frame>> GetVectorCovisibleKeyFrames();
         std::vector<std::shared_ptr<Frame>> GetBestCovisibilityKeyFrames(const int &N);
         std::vector<std::shared_ptr<Frame>> GetCovisiblesByWeight(const int &w);

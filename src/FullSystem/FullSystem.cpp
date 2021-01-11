@@ -370,7 +370,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		// just try a TON of different initializations (all rotations). In the end,
 		// if they don't work they will only be tried on the coarsest level, which is super fast anyway.
 		// also, if tracking rails here we loose, so we really, really want to avoid that.
-		for(float rotDelta=0.02; rotDelta < 0.05; rotDelta+=0.01)
+		for(float rotDelta=0.02; rotDelta < 0.05; rotDelta++) //rotDelta+=0.01
 		{
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,rotDelta,0,0), Vec3(0,0,0)));			// assume constant motion.
 			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1,0,rotDelta,0), Vec3(0,0,0)));			// assume constant motion.
@@ -733,7 +733,7 @@ void FullSystem::activatePointsMT()
 						newpoint->Mp = pMP;
 						pMP->AddObservation(pMP->sourceFrame, pMP->index);
 						globalMap->AddMapPoint(pMP);
-						
+
 					}
 					else
 					{
@@ -788,8 +788,7 @@ void FullSystem::activatePointsMT()
 		}
 	}
 
-
-	for(FrameHessian* host : frameHessians)
+	for (FrameHessian *host : frameHessians)
 	{
 		for(int i=0;i<(int)host->immaturePoints.size();i++)
 		{
@@ -1004,15 +1003,18 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		isUsable = PoseOptimization(shell->frame, &Hcalib);
 		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLastMatches, true);
 
-		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
-		PoseOptimization(shell->frame, &Hcalib, isUsable); //isUsable
-		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
+		// int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
+		// PoseOptimization(shell->frame, &Hcalib, isUsable); //isUsable
+		// nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
 
 
 		//perform joint optimization here
 		Vec4 tres = trackNewCoarse(fh);
 
 		
+		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
+		// PoseOptimization(shell->frame, &Hcalib, isUsable); //isUsable
+		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
 
 		shell->frame->mpReferenceKF = mpReferenceKF;
 
@@ -1235,11 +1237,10 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 	// =========================== add New Frame to Hessian Struct. =========================
-	{
-		boost::unique_lock<boost::mutex> lock(framesMutex);
-		fh->idx = frameHessians.size();
-		frameHessians.push_back(fh);
-	}
+	
+	fh->idx = frameHessians.size();
+	frameHessians.push_back(fh);
+	
 
 	fh->shell->KfId = allKeyFramesHistory.back()->KfId + 1;
 	fh->frameID = allKeyFramesHistory.size();
@@ -1368,15 +1369,13 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	// =========================== Marginalize Frames =========================
 
-	{
-		boost::unique_lock<boost::mutex> lock(framesMutex);
-		for (unsigned int i = 0; i < frameHessians.size(); i++)
-			if (frameHessians[i]->flaggedForMarginalization)
-			{
-				marginalizeFrame(frameHessians[i]);
-				i = 0;
-			}
-	}
+	for (unsigned int i = 0; i < frameHessians.size(); i++)
+		if (frameHessians[i]->flaggedForMarginalization)
+		{
+			marginalizeFrame(frameHessians[i]);
+			i = 0;
+		}
+
 
 	SearchInNeighbors(fh->shell->frame);
 	// KeyFrameCulling(fh->shell->frame);
@@ -1398,7 +1397,6 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	FrameHessian* firstFrame = coarseInitializer->firstFrame;
 	
 	{
-		boost::unique_lock<boost::mutex> lock(framesMutex);
 		firstFrame->idx = frameHessians.size();
 		frameHessians.push_back(firstFrame);
 	}
@@ -1497,7 +1495,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	mvpLocalKeyFrames.push_back(newFrame->shell->frame);
 	mvpLocalKeyFrames.push_back(firstFrame->shell->frame);
-	mvpLocalMapPoints=globalMap->GetAllMapPoints();
+	globalMap->GetAllMapPoints(mvpLocalMapPoints);
 	
 	mpReferenceKF = newFrame->shell->frame;
 
@@ -1516,7 +1514,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	}
 
 	if (loopCloser)
-		loopCloser->InsertKeyFrame(firstFrame->shell->frame);
+		loopCloser->InsertKeyFrame(firstFrame->shell->frame, globalMap->GetMaxMPid());
 
 	initialized = true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
@@ -1799,7 +1797,8 @@ void FullSystem::IndirectMapper(std::shared_ptr<Frame> frame)
     mpLastKeyFrame = frame;
 
 	if (loopCloser)
-		loopCloser->InsertKeyFrame(frame);
+		loopCloser->InsertKeyFrame(frame, globalMap->GetMaxMPid());
+
 }
 
 int FullSystem::SearchLocalPoints(std::shared_ptr<Frame> frame, int th, float nnratio)

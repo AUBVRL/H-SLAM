@@ -15,7 +15,12 @@ namespace HSLAM
         mnBigChangeIdx = 0;
         KfDB = std::make_shared<KeyFrameDatabase>();
     }
-    
+
+    Map::~Map()
+    {
+        clear();
+    }
+
     void Map::AddKeyFrame(shared_ptr<Frame> pKF)
     {
         boost::lock_guard<boost::mutex> l(mMutexMap);
@@ -110,10 +115,20 @@ namespace HSLAM
         mnMaxKFid = 0;
         mvpReferenceMapPoints.clear();
         mvpKeyFrameOrigins.clear();
+        KfDB->clear();
     }
 
 
+    bool Map::OptimizeALLKFs()
+    {
+        return true;
+    }
 
+
+    void Map::runPoseGraphOptimization()
+    {
+        return;
+    }
 
 
 
@@ -160,7 +175,7 @@ namespace HSLAM
 
     vector<shared_ptr<Frame>> KeyFrameDatabase::DetectLoopCandidates(shared_ptr<Frame> pKF, float minScore)
     {
-        set<shared_ptr<Frame>> spConnectedKeyFrames = pKF->GetConnectedKeyFrames();
+        set<shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> spConnectedKeyFrames = pKF->GetConnectedKeyFrames();
         list<shared_ptr<Frame>> lKFsSharingWords;
 
         // Search all keyframes that share a word with current keyframes
@@ -178,7 +193,8 @@ namespace HSLAM
                     if (pKFi->mnLoopQuery != pKF->fs->KfId)
                     {
                         pKFi->mnLoopWords = 0;
-                        if (!spConnectedKeyFrames.count(pKFi))
+                        // if (!spConnectedKeyFrames.count(pKFi))
+                        if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
                         {
                             pKFi->mnLoopQuery = pKF->fs->KfId;
                             lKFsSharingWords.push_back(pKFi);

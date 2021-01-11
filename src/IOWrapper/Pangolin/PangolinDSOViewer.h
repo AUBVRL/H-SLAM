@@ -155,6 +155,8 @@ private:
 
 	pangolin::Var<bool> *settings_resetButton;
 
+	pangolin::Var<int> *settings_KfIdToDraw;
+
 
 	pangolin::Var<int> *settings_nPts;
 	pangolin::Var<int> *settings_nCandidates;
