@@ -20,18 +20,22 @@ namespace HSLAM
 
         std::vector<std::shared_ptr<MapPoint>> mvpReferenceMapPoints;
 
-        long unsigned int mnMaxKFid;
+        size_t mnMaxMPid;
+        size_t mnMaxKFid;
 
         // Index related to a big change in the map (loop closure, global BA)
         int mnBigChangeIdx;
 
         boost::mutex mMutexMap;
 
+        bool Busy = false;  // is pose graph running?
+        boost::mutex mutexBusy;
+
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         Map();
 
-        ~Map() {}
+        ~Map();
         void AddKeyFrame(std::shared_ptr<Frame> pKF);
         void AddMapPoint(std::shared_ptr<MapPoint> pMP);
         void EraseMapPoint(std::shared_ptr<MapPoint> pMP);
@@ -40,28 +44,33 @@ namespace HSLAM
         void InformNewBigChange();
         int GetLastBigChangeIdx();
 
-        std::vector<std::shared_ptr<Frame>> GetAllKeyFrames();
-        std::vector<std::shared_ptr<MapPoint>> GetAllMapPoints();
+        void GetAllKeyFrames(std::vector<std::shared_ptr<Frame>>& _Out);
+        void GetAllMapPoints(std::vector<std::shared_ptr<MapPoint>>& _Out);
         std::vector<std::shared_ptr<MapPoint>> GetReferenceMapPoints();
 
         long unsigned int MapPointsInMap();
         long unsigned KeyFramesInMap();
 
-        long unsigned int GetMaxKFid();
+        size_t GetMaxKFid();
+        size_t GetMaxMPid();
 
         void clear();
 
-        bool Idle() {
-            boost::unique_lock<boost::mutex> lock(mutexPoseGraph);
-            return !poseGraphRunning;
+        bool isIdle() {
+            boost::unique_lock<boost::mutex> lock(mutexBusy);
+            return !Busy;
+        }
+
+        void setBusy(bool _isBusy)
+        {
+            boost::unique_lock<boost::mutex> lock(mutexBusy);
+            Busy = _isBusy;
         }
 
         std::vector<std::shared_ptr<Frame>> mvpKeyFrameOrigins;
         std::shared_ptr<KeyFrameDatabase> KfDB;
         boost::mutex mMutexMapUpdate;
 
-         bool poseGraphRunning = false;
-        boost::mutex mutexPoseGraph;
     };
 
     class KeyFrameDatabase
@@ -80,8 +89,6 @@ namespace HSLAM
         std::vector<std::shared_ptr<Frame>> DetectLoopCandidates(std::shared_ptr<Frame> pKF, float minScore);
 
     protected:
-        // Associated vocabulary
-        // const ORBVocabulary *mpVoc;
 
         // Inverted file
         std::vector<std::list<std::shared_ptr<Frame>>> mvInvertedFile;

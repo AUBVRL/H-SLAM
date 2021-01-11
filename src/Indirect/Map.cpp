@@ -12,6 +12,7 @@ namespace HSLAM
     Map::Map()
     {
         mnMaxKFid = 0;
+        mnMaxMPid = 0;
         mnBigChangeIdx = 0;
         KfDB = std::make_shared<KeyFrameDatabase>();
     }
@@ -33,6 +34,8 @@ namespace HSLAM
     {
         boost::lock_guard<boost::mutex> l(mMutexMap);
         mspMapPoints.insert(pMP);
+        if ( pMP->id > mnMaxMPid)
+            mnMaxMPid = pMP->id;
     }
 
     void Map::EraseMapPoint(shared_ptr<MapPoint> pMP)
@@ -65,16 +68,20 @@ namespace HSLAM
         return mnBigChangeIdx;
     }
 
-    vector<shared_ptr<Frame>> Map::GetAllKeyFrames()
+    void Map::GetAllKeyFrames(vector<shared_ptr<Frame>>& _Out)
     {
+        releaseVec(_Out);
         boost::lock_guard<boost::mutex> l(mMutexMap);
-        return vector<shared_ptr<Frame>>(mspKeyFrames.begin(), mspKeyFrames.end());
+        _Out.reserve(mspKeyFrames.size());
+        _Out.assign(mspKeyFrames.begin(), mspKeyFrames.end());
     }
 
-    vector<shared_ptr<MapPoint>> Map::GetAllMapPoints()
+    void Map::GetAllMapPoints(vector<shared_ptr<MapPoint>>& _Out)
     {
+        releaseVec(_Out);
         boost::lock_guard<boost::mutex> l(mMutexMap);
-        return vector<shared_ptr<MapPoint>>(mspMapPoints.begin(), mspMapPoints.end());
+        _Out.reserve(mspMapPoints.size());
+        _Out.assign(mspMapPoints.begin(), mspMapPoints.end());
     }
 
     long unsigned int Map::MapPointsInMap()
@@ -95,20 +102,22 @@ namespace HSLAM
         return mvpReferenceMapPoints;
     }
 
-    long unsigned int Map::GetMaxKFid()
+    size_t Map::GetMaxKFid()
     {
         boost::lock_guard<boost::mutex> l(mMutexMap);
         return mnMaxKFid;
     }
 
+    size_t Map::GetMaxMPid()
+    {
+        boost::lock_guard<boost::mutex> l(mMutexMap);
+        return mnMaxMPid;
+    }
+
+
     void Map::clear()
     {
         mspMapPoints.clear();
-        // for (set<shared_ptr<MapPoint>>::iterator sit = mspMapPoints.begin(), send = mspMapPoints.end(); sit != send; sit++)
-        //     delete *sit;
-
-        // for (set<KeyFrame *>::iterator sit = mspKeyFrames.begin(), send = mspKeyFrames.end(); sit != send; sit++)
-        //     delete *sit;
 
         mspMapPoints.clear();
         mspKeyFrames.clear();
@@ -117,19 +126,6 @@ namespace HSLAM
         mvpKeyFrameOrigins.clear();
         KfDB->clear();
     }
-
-
-    bool Map::OptimizeALLKFs()
-    {
-        return true;
-    }
-
-
-    void Map::runPoseGraphOptimization()
-    {
-        return;
-    }
-
 
 
     //KEYFRAMEDATABSE

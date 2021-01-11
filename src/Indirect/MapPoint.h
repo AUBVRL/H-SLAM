@@ -28,8 +28,6 @@ namespace HSLAM
         float idepthH;
         std::shared_ptr<MapPoint> mpReplaced;
 
-        
-
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         MapPoint(PointHessian *_ph, std::shared_ptr<Map> _globalMap);
@@ -39,8 +37,7 @@ namespace HSLAM
         PointHessian* ph;
         size_t id;  // the mappoint descriptor comes from the sourceId descriptor matrix.
         float index; //index of the point in the original keyframe = immPt.type-5
-        Vec2f pt;
-        float angle;
+        Vec2i pt;
         bool mbBad;
 
         std::shared_ptr<MapPoint> getPtr();
@@ -53,6 +50,13 @@ namespace HSLAM
         float mTrackViewCos;
         long unsigned int mnTrackReferenceForFrame;
         long unsigned int mnLastFrameSeen;
+
+        // Variables used by loop closing
+        long unsigned int mnLoopPointForKF;
+        long unsigned int mnCorrectedByKF;
+        long unsigned int mnCorrectedReference;
+        // cv::Mat mPosGBA;
+        // long unsigned int mnBAGlobalForKF;
 
         size_t mnFuseCandidateForKF;
 
@@ -89,6 +93,7 @@ namespace HSLAM
 
         void updateDepth();
 
+        void updateDepthfromInd(float _idepth);
 
         inline mpDirStatus getDirStatus()
         {

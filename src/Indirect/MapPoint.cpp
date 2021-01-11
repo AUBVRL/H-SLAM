@@ -24,9 +24,12 @@ namespace HSLAM
         mbBad = false;
         mnFuseCandidateForKF = 0;
 
-        pt = Vec2f(ph->u, ph->v);
-        angle = sourceFrame->mvKeys[index].angle;
+        mnLoopPointForKF = 0;
+        mnCorrectedByKF = 0;
+        mnCorrectedReference = 0;
 
+        pt = Vec2i(ph->u, ph->v);
+        
         auto calib = sourceFrame->HCalib;
 
         sourceFrame->Descriptors.row(index).copyTo(mDescriptor);
@@ -76,6 +79,12 @@ namespace HSLAM
         idepth = ph->idepth;
         if(ph->efPoint)
             idepthH = ph->idepth_hessian; //efPoint->HdiF; //ph->idepth_hessian
+    }
+
+    void MapPoint::updateDepthfromInd(float _idepth)
+    {
+        boost::lock_guard<boost::mutex> l(_mtx);
+        idepth = _idepth;
     }
 
     Vec3f MapPoint::getWorldPose()
@@ -305,7 +314,7 @@ namespace HSLAM
             }
             else
             {
-                // pKF->EraseMapPointMatch(mit->second);
+                pKF->EraseMapPointMatch(mit->second);
             }
         }
         pMP->increaseFound(nfound);

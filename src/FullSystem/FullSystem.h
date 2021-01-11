@@ -148,10 +148,10 @@ public:
 
 	boost::mutex mapMutex;
 
-	
+	CalibHessian Hcalib;
 	std::shared_ptr<Matcher> matcher;
 	std::shared_ptr<Map> globalMap;
-
+	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
 
 private:
 
@@ -255,8 +255,6 @@ private:
 	PixelSelector* pixelSelector;
 	CoarseDistanceMap* coarseDistanceMap;
 
-	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
-	boost::mutex framesMutex;  // mutex to lock frame read and write
 
 	std::vector<PointFrameResidual*> activeResiduals;
 	float currentMinActDist;
