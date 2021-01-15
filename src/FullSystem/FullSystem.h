@@ -162,7 +162,7 @@ private:
 	double linAllPointSinle(PointHessian* point, float outlierTHSlack, bool plot);
 
 	// mainPipelineFunctions
-	Vec4 trackNewCoarse(FrameHessian* fh);
+	Vec4 trackNewCoarse(FrameHessian *fh, bool writePose = false);
 	void traceNewCoarse(FrameHessian* fh);
 	void activatePoints();
 	void activatePointsMT();

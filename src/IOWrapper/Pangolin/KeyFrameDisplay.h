@@ -89,7 +89,7 @@ public:
 	int id;
 	bool active;
 	Sim3 camToWorld;
-
+	int width, height;
 	inline bool operator < (const KeyFrameDisplay& other) const
     {
         return (id < other.id);
@@ -99,7 +99,7 @@ public:
 private:
 	float fx,fy,cx,cy;
 	float fxi,fyi,cxi,cyi;
-	int width, height;
+	
 
 	float my_scaledTH, my_absTH, my_scale;
 	int my_sparsifyFactor;

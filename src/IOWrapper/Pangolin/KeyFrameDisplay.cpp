@@ -321,10 +321,10 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 
 void KeyFrameDisplay::drawCam(float lineWidth, float* color, float sizeFactor,  bool drawOrig)
 {
-	if(width == 0)
+	if(width == 0 || !originFrame)
 		return;
 
-	if (drawOrig && originFrame)
+	if (drawOrig)
 		camToWorld = Sim3(originFrame->getPose().matrix());
 	else if (drawOrig == false)
 		camToWorld = originFrame->getPoseOptiInv();
