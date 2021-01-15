@@ -1013,6 +1013,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 		
 		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
+		checkOutliers(shell->frame, &Hcalib);
 		// PoseOptimization(shell->frame, &Hcalib, isUsable); //isUsable
 		nIndmatches = updatePoseOptimizationData(shell->frame, nFrametoLocalMapMatches, false);
 
@@ -1053,7 +1054,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 		mLastFrame = shell->frame;
 
-        
+
 
 		for (IOWrap::Output3DWrapper *ow : outputWrapper)
 		{
@@ -2145,7 +2146,7 @@ int FullSystem::updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & n
 void FullSystem::SearchInNeighbors(std::shared_ptr<Frame> currKF)
 {
 	// Retrieve neighbor keyframes
-	int nn = 10; //20
+	int nn = 5; //10 20
 	
 	const std::vector<std::shared_ptr<Frame>> vpNeighKFs = currKF->GetBestCovisibilityKeyFrames(nn);
 	std::vector<std::shared_ptr<Frame>> vpTargetKFs;
@@ -2158,7 +2159,7 @@ void FullSystem::SearchInNeighbors(std::shared_ptr<Frame> currKF)
 		pKFi->mnFuseTargetForKF = currKF->fs->KfId;
 
 		// Extend to some second neighbors
-		const std::vector<std::shared_ptr<Frame>> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
+		const std::vector<std::shared_ptr<Frame>> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(2); //5
 		for (std::vector<std::shared_ptr<Frame>>::const_iterator vit2 = vpSecondNeighKFs.begin(), vend2 = vpSecondNeighKFs.end(); vit2 != vend2; vit2++)
 		{
 			std::shared_ptr<Frame> pKFi2 = *vit2;

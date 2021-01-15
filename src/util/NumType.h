@@ -200,9 +200,12 @@ class Timer: std::chrono::high_resolution_clock
 		void endTime(bool print = false)
 		{
 			vtime.emplace_back(std::chrono::duration_cast<std::chrono::microseconds>(now() - start_time).count()/1000.0f);
+			currEstimate = (float)std::accumulate(vtime.begin(), vtime.end(), 0.0f) / vtime.size();
 			if (print)
-				printf("%s %f \n", name.c_str(), (float)std::accumulate(vtime.begin(), vtime.end(), 0.0f)/vtime.size());
+				printf("%s %f \n", name.c_str(), currEstimate);
 		}
+
+		float currEstimate = 0;
 
 	private:
 		std::vector<float> vtime;

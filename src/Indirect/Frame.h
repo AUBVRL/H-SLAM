@@ -161,6 +161,7 @@ namespace HSLAM
     private:
         boost::mutex _mtx;
         boost::mutex mMutexConnections;
+        boost::mutex BoVWmutex; //computeBoVW may be called from various threads! lock it
 
         std::map<std::shared_ptr<Frame>, int> mConnectedKeyFrameWeights;
         std::vector<std::shared_ptr<Frame>> mvpOrderedConnectedKeyFrames;

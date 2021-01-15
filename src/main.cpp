@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 	setting_logStuff = !parser.get<bool>("nolog");
 	disableAllDisplay = parser.get<bool>("nogui");
 	debugSaveImages = parser.get<bool>("save");
-	multiThreading = parser.get<bool>("nomt");
+	multiThreading = !parser.get<bool>("nomt");
 	int startIndex = parser.get<int>("startIndex");
 	int endIndex = parser.get<int>("endIndex");
 	int preset = parser.get<int>("preset");
@@ -260,7 +260,10 @@ int main(int argc, char **argv)
         for(int ii=0;ii<(int)idsToPlay.size(); ii++)
         {
 			while (Pause)
+			{
 				usleep(5000);
+			}
+				
 				
             if(!fullSystem->initialized)	// if not initialized: reset start time.
             {
@@ -295,11 +298,11 @@ int main(int argc, char **argv)
                 }
             }
 
+			
+			if (!skipFrame) fullSystem->addActiveFrame(img, i);
+			
 
-
-            if(!skipFrame) fullSystem->addActiveFrame(img, i);
-
-            delete img;
+			delete img;
 	
 			if(viewer!=0)
 				if(viewer->isDead)
@@ -310,7 +313,6 @@ int main(int argc, char **argv)
                 if(ii < 250 || setting_fullResetRequested)
                 {
                     printf("RESETTING!\n");
-
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
 					usleep(10000); //hack - wait for display wrapper to clean up.

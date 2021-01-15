@@ -39,8 +39,10 @@ namespace HSLAM
     {
         Image.release();
         Occupancy.release();
-        releaseVec(mvKeys);
-        releaseVec(mGrid);
+        if(!mvKeys.empty())
+            releaseVec(mvKeys);
+        if(!mGrid.empty())
+            releaseVec(mGrid);
         Descriptors.release();
     };
 
@@ -227,6 +229,7 @@ namespace HSLAM
 
     void Frame::ComputeBoVW()
     {
+        boost::lock_guard<boost::mutex> l(BoVWmutex);
         if (mBowVec.empty())
         {
             vector<cv::Mat> vDesc;

@@ -122,7 +122,7 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
 
 
 	settings_resetButton = new pangolin::Var<bool> ("ui.Reset",false,false);
-    _Pause = new Var<bool>("ui.Pause!Resume", Pause, false);
+    _Pause = new Var<bool>(Pause?"ui.Resume!Pause" :"ui.Pause!Resume", false, false);
     RecordScreen = new Var<bool>("ui.Record Screen!Stop Recording", false, false);
 
 	settings_KfIdToDraw = new pangolin::Var<int> ("ui.KfAgeDisp", 0, 0, 1400, false);
@@ -165,8 +165,9 @@ void PangolinDSOViewer::run()
 
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-	glEnable(GL_POINT_SMOOTH);
+	
+	// glEnable(GL_POINT_SMOOTH);
+	// glEnable(GL_BLEND);
 
 	// Default hooks for exiting (Esc) and fullscreen (tab).
 	while( !pangolin::ShouldQuit() && running )
@@ -250,17 +251,16 @@ void PangolinDSOViewer::run()
 	    setting_minGradHistAdd = settings_gradHistAdd->Get();
 
 		if (Pushed(*_Pause)) {Pause = !Pause;}
-    	// if (Pushed(*_Reset)) {ResetRequest = !ResetRequest;}
     	if (Pushed(*ShowPanel)) {Nopanel->Show(false); panel->Show(true);}
 		if (Pushed(*HidePanel)) {Nopanel->Show(true); panel->Show(false); }
 		if (Pushed(*RecordScreen))
-        	DisplayBase().RecordOnRender("ffmpeg:[fps=30,bps=45388608,flip=true,unique_filename]//screencap.avi"); //8388608
+        	DisplayBase().RecordOnRender("ffmpeg:[fps=15,bps=90388608,flip=true,unique_filename]//screencap.avi"); //8388608 45388608
 
 		if (Pushed(*settings_resetButton)) 
 	    {
 	    	printf("RESET!\n");
-	    	settings_resetButton->Reset();
-	    	setting_fullResetRequested = true;
+			settings_resetButton->Reset();
+			setting_fullResetRequested = true;
 	    }
 
 		// Swap frames and Process Events
@@ -304,8 +304,8 @@ void PangolinDSOViewer::reset_internal()
 	allFramePoses.clear();
 	keyframesByKFID.clear();
 	connections.clear();
+	currentCam->width = currentCam->height = 0; //prevent current camera from getting drawn (causes crash at reset)
 	model3DMutex.unlock();
-
 
 	//openImagesMutex.lock();
 	boost::unique_lock<boost::mutex> lk(openImagesMutex);
@@ -624,6 +624,10 @@ void PangolinDSOViewer::publishGraph(const std::map<uint64_t, Eigen::Vector2i, s
 		totalMargFwd += p.second[1];
 
         uint64_t inverseKey = (((uint64_t)target) << 32) + ((uint64_t)host);
+		
+		if(connectivity.find(inverseKey) == connectivity.end())
+			continue;
+
 		Eigen::Vector2i st = connectivity.at(inverseKey);
 		connections[runningID].bwdAct = st[0];
 		connections[runningID].bwdMarg = st[1];

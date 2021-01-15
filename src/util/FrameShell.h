@@ -59,8 +59,16 @@ namespace HSLAM
             return camToWorld;
         }
 
-        void setPose(const SE3 &_Twc) {
-            boost::lock_guard<boost::mutex> l(shellPoseMutex);
+        void setPose(const SE3 &_Twc, bool bypassLock = false) { //very dangerous to bypasslock! only allowing it cz will only be accessed from another func in this class which will be locked already
+			if (bypassLock)
+			{
+				camToWorld = _Twc;
+				Tcw = camToWorld.inverse();
+				Ow = -camToWorld.rotationMatrix() * Tcw.translation();
+				return;
+			}
+
+			boost::lock_guard<boost::mutex> l(shellPoseMutex);
             camToWorld = _Twc;
 			Tcw = camToWorld.inverse();
 			Ow = -camToWorld.rotationMatrix() * Tcw.translation();
@@ -91,8 +99,12 @@ namespace HSLAM
 
         void setPoseOpti(const Sim3 &Scw) {
             boost::lock_guard<boost::mutex> l(shellPoseMutex);
-            worldToCamOpti = Scw;
+			
+			worldToCamOpti = Scw;
 			worldToCamOptiInv = Scw.inverse();
+			auto Temp = worldToCamOptiInv;
+			Temp.setScale(1.0);
+			setPose(SE3(Temp.matrix()), true);
 			needRefresh = true;
 		}
 
