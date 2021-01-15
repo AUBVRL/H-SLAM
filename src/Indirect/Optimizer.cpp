@@ -31,7 +31,6 @@ namespace HSLAM
     using namespace std;
     using namespace OptimizationStructs;
 
-
     bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose)
     {
 
@@ -44,7 +43,7 @@ namespace HSLAM
 
         g2o::SparseOptimizer optimizer;
         auto linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
-        g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+        g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
         optimizer.setAlgorithm(solver);
 
         int nInitialCorrespondences = 0;
@@ -68,9 +67,9 @@ namespace HSLAM
         vector<double> vInformation;
         vInformation.reserve(N);
         double maxInfo = 1e7;
-        double stdDev=1e7;
+        double stdDev = 1e7;
 
-        const float deltaMono = sqrt(1.345); //sqrt(1.345); // sqrt(5.991);
+        const float deltaMono = sqrt(5.991); //sqrt(1.345); // sqrt(5.991);
         {
             // boost::unique_lock<boost::mutex> lock(MapPoint::mGlobalMutex); //this would lock ALL map points poses from changing!
 
@@ -88,7 +87,7 @@ namespace HSLAM
                     e->setInformation(Eigen::Matrix2d::Identity());
                     e->setMeasurement(Vec2((double)pFrame->mvKeys[i].pt.x, (double)pFrame->mvKeys[i].pt.y));
                     e->setId(i);
-                    
+
                     e->setVertex(0, vSE3);
 
                     e->computeError();
@@ -102,7 +101,7 @@ namespace HSLAM
 
                     g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
-                   
+
                     rk->setDelta(deltaMono);
 
                     optimizer.addEdge(e);
@@ -111,22 +110,21 @@ namespace HSLAM
                     vnIndexEdgeMono.push_back(i);
                 }
             }
-            
 
             //compute information vector distribution:
             if (normalizeInfoWithVariance)
                 stdDev = getStdDev(vInformation);
 
-            initScale = getStdDev(initErr); //computeScale(initErr); 
+            // initScale = getStdDev(initErr); //computeScale(initErr);
 
             for (int i = 0, iend = vpEdgesMono.size(); i < iend; ++i)
             {
                 vpEdgesMono[i]->setScale(initScale);
 
                 if (normalizeInfoWithVariance)
-                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(stdDev+0.00001))); //* invSigma2); //set this to take into account depth variance!
-                else //normalizing by the maximum
-                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity()* (vInformation[i]/(maxInfo+0.00001))); //* invSigma2); //set this to take into account depth variance!
+                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity() * (vInformation[i] / (stdDev + 0.00001)));  //* invSigma2); //set this to take into account depth variance!
+                else                                                                                                       //normalizing by the maximum
+                    vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity() * (vInformation[i] / (maxInfo + 0.00001))); //* invSigma2); //set this to take into account depth variance!
             }
         }
         if (nInitialCorrespondences < 10 || optimizer.edges().size() < 10)
@@ -134,8 +132,8 @@ namespace HSLAM
 
         // We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
         // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
-        // const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991}; //1.345
-        const float chi2Mono[4] = {1.345, 1.345, 1.345, 1.345}; //5.991
+        const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991}; //1.345
+        // const float chi2Mono[4] = {1.345, 1.345, 1.345, 1.345}; //5.991
         const int its[4] = {10, 10, 10, 10};
 
         int nBad = 0;
@@ -155,7 +153,7 @@ namespace HSLAM
                 {
                     e->computeError();
                 }
-                
+
                 const float chi2 = e->chi2();
 
                 if (chi2 > chi2Mono[it])
@@ -177,21 +175,114 @@ namespace HSLAM
             if (optimizer.edges().size() < 10)
                 break;
 
-            if(!updatePose)
+            if (!updatePose)
                 break;
         }
 
-        // number_t *hessianData = vSE3->hessianData();
-        // Vec6 vHessian;
-        // vHessian<< hessianData[0], hessianData[7], hessianData[14], hessianData[21], hessianData[28], hessianData[35];
-        
-        // bool isUsable = vHessian.norm() > 1e6;
+        number_t *hessianData = vSE3->hessianData();
+        Vec6 vHessian;
+        vHessian<< hessianData[0], hessianData[7], hessianData[14], hessianData[21], hessianData[28], hessianData[35];
+
+        bool isUsable = vHessian.norm() > 1e6;
         // // Recover optimized pose
-        // if(isUsable && updatePose)
-        //     pFrame->fs->setPose(vSE3->estimate().inverse());
-        bool isUsable = false;
+        if(isUsable && updatePose)
+            pFrame->fs->setPose(vSE3->estimate().inverse());
+        // bool isUsable = false;
         return isUsable;
+    }
+
+    int checkOutliers(std::shared_ptr<Frame> pFrame, CalibHessian* calib)
+    {
+        g2o::SparseOptimizer optimizer;
+        auto linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
+        g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+        optimizer.setAlgorithm(solver);
+
+        vertexSE3 *vSE3 = new vertexSE3(); //VertexSE3Expmap Converter::toSE3Quat(pFrame->mTcw));
+        vSE3->setEstimate(pFrame->fs->getPoseInverse());
+
+        vSE3->setId(0);
+        vSE3->setFixed(false);
+        optimizer.addVertex(vSE3);
+
+        const int N = pFrame->nFeatures;
+        vector<edgeSE3XYZPoseOnly *> vpEdgesMono;
+        vector<size_t> vnIndexEdgeMono;
+        vector<double> initErr;
+        double initScale = 1.0;
+        initErr.reserve(2 * N);
+        vpEdgesMono.reserve(N);
+        vnIndexEdgeMono.reserve(N);
+        vector<double> vInformation;
+        vInformation.reserve(N);
+        double stdDev = 1e7;
+
+        for (int i = 0; i < N; i++)
+        {
+            std::shared_ptr<MapPoint> pMP = pFrame->tMapPoints[i];
+            if (pMP)
+            {
+                pFrame->mvbOutlier[i] = false;
+
+                edgeSE3XYZPoseOnly *e = new edgeSE3XYZPoseOnly();
+                e->setCamera(calib->fxl(), calib->fyl(), calib->cxl(), calib->cyl());
+                e->setXYZ(pMP->getWorldPose().cast<double>());
+                e->setInformation(Eigen::Matrix2d::Identity());
+                e->setMeasurement(Vec2((double)pFrame->mvKeys[i].pt.x, (double)pFrame->mvKeys[i].pt.y));
+                e->setId(i);
+
+                e->setVertex(0, vSE3);
+
+                e->computeError();
+                initErr.push_back(e->error()[0]);
+                initErr.push_back(e->error()[1]);
+
+                double Info = pMP->getidepthHessian();
+                vInformation.push_back(Info);
+                optimizer.addEdge(e);
+                vpEdgesMono.push_back(e);
+                vnIndexEdgeMono.push_back(i);
+            }
         }
+
+        stdDev = getStdDev(vInformation);
+        initScale = getStdDev(initErr);
+        for (int i = 0, iend = vpEdgesMono.size(); i < iend; ++i)
+        {
+            // vpEdgesMono[i]->setScale(initScale);
+            vpEdgesMono[i]->setInformation(Eigen::Matrix2d::Identity() * (vInformation[i] / (stdDev + 0.00001))); //* invSigma2); //set this to take into account depth variance!
+        }
+
+        optimizer.initializeOptimization(0);
+        int nBad = 0;
+        for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++)
+        {
+            edgeSE3XYZPoseOnly *e = vpEdgesMono[i];
+
+            const size_t idx = vnIndexEdgeMono[i];
+
+            if (pFrame->mvbOutlier[idx])
+            {
+                e->computeError();
+            }
+
+            const float chi2 = e->chi2();
+
+            if (chi2 > 5.991)
+            {
+                pFrame->mvbOutlier[idx] = true;
+                e->setLevel(1);
+                nBad++;
+            }
+            else
+            {
+                pFrame->mvbOutlier[idx] = false;
+                e->setLevel(0);
+            }
+        }
+
+        return nBad;
+    }
 
 int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::shared_ptr<MapPoint>> &vpMatches1, Sim3 &g2oS12, const float th2, const bool bFixScale)
 {
@@ -437,6 +528,8 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                 std::shared_ptr<Frame> pKF = vpKFs[i];
                 if (pKF->isBad())
                     continue;
+                if(pKF->fs->KfId > maxKfIdatCand)
+                    continue;
                 g2o::VertexSim3Expmap *VSim3 = new g2o::VertexSim3Expmap();
 
                 const int nIDi = pKF->fs->KfId;
@@ -463,7 +556,7 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                 // VSim3->setEstimate(g2o::Sim3(TempPose.rotationMatrix(), TempPose.translation(), TempPose.scale()));
                 // vScw[nIDi] = TempPose;
 
-                if (pKF == pLoopKF || pKF->getState() == Frame::active || pKF->fs->KfId > maxKfIdatCand)
+                if (pKF == pLoopKF )//|| pKF->getState() == Frame::active || pKF->fs->KfId > maxKfIdatCand)
                     VSim3->setFixed(true);
                 else
                     VSim3->setFixed(false);
@@ -727,17 +820,19 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
 }
 
 
-void GlobalBundleAdjustemnt(std::shared_ptr<Map> pMap, int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick)
-{
-    std::vector<std::shared_ptr<Frame>> vpKFs;
-    pMap->GetAllKeyFrames(vpKFs);
-    std::vector<std::shared_ptr<MapPoint>> vpMP;
-    pMap->GetAllMapPoints(vpMP);
-    BundleAdjustment(vpKFs, vpMP, nIterations, pbStopFlag, nLoopKF, bRobust, useSchurTrick);
-}
+// void GlobalBundleAdjustemnt(std::shared_ptr<Map> pMap, int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick)
+// {
+//     std::vector<std::shared_ptr<Frame>> vpKFs;
+//     pMap->GetAllKeyFrames(vpKFs);
+//     std::vector<std::shared_ptr<MapPoint>> vpMP;
+//     pMap->GetAllMapPoints(vpMP);
+//     BundleAdjustment(vpKFs, vpMP, nIterations, pbStopFlag, nLoopKF, bRobust, useSchurTrick);
+// }
 
-void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
-                                 int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick)
+void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP, 
+                        std::vector<std::shared_ptr<Frame>> &activeKfs, std::vector<std::shared_ptr<MapPoint>> &activeMps,
+                                 int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
+                                 int totalKfId, int currMaxKF, int currMaxMp)
 {
     if(vpKFs.size() < 2  || vpMP.size() < 10)
         return;
@@ -774,15 +869,21 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         std::shared_ptr<Frame> pKF = vpKFs[i];
         if (pKF->isBad())
             continue;
+
+        if(pKF->fs->KfId > currMaxKF)
+            continue;
+
         g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
 
-        auto Pose = pKF->fs->getPoseOpti();
+        auto Pose = pKF->fs->getPoseOpti(); //
         Pose.setScale(1.0);
         vSE3->setEstimate(g2o::SE3Quat(Pose.rotationMatrix(), Pose.translation())); //this removes the scale from the pose, remember to re-add it later
 
         vSE3->setId(pKF->fs->KfId);
-        if(pKF->getState() == Frame::active)
+
+        if(std::find(activeKfs.begin(), activeKfs.end(), pKF) != activeKfs.end()) //this KF was active when the candidate was detected need to fix its pose!
             vSE3->setFixed(true);
+        
         optimizer.addVertex(vSE3);
         if (pKF->fs->KfId > maxKFid)
             maxKFid = pKF->fs->KfId;
@@ -796,7 +897,12 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         std::shared_ptr<MapPoint> pMP = vpMP[i];
         if (pMP->isBad() || pMP->sourceFrame->isBad() )
             continue;
+
+        if (pMP->sourceFrame->fs->KfId > currMaxKF || pMP->id > currMaxMp)
+            continue;
+
         
+
         VertexPointDepth *vPoint = new VertexPointDepth(); //g2o::vertexSBAPointXYZ..
         vPoint->setUV(pMP->pt.cast<double>());
         
@@ -812,8 +918,17 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         if(useSchurTrick)
             vPoint->setMarginalized(true);
 
-        if(pMP->getDirStatus() == MapPoint::active || pMP->sourceFrame->getState()==Frame::active)
+        
+        // if(pMP->getDirStatus() == MapPoint::active || pMP->sourceFrame->getState()==Frame::active || pMP->id > currMaxMp)
+        //     vPoint->setFixed(true);
+        
+        // if(pMP->sourceFrame->fs->KfId > currMaxKF)
+        //     vPoint->setFixed(true);
+        
+        if(std::find(activeKfs.begin(), activeKfs.end(), pMP->sourceFrame) != activeKfs.end()) //this KF was active when the candidate was detected need to fix its pose!
             vPoint->setFixed(true);
+        
+        
 
         optimizer.addVertex(vPoint);
 
@@ -827,7 +942,7 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         {
 
             std::shared_ptr<Frame> pKF = mit->first;
-            if (pKF->isBad() || pKF->fs->KfId > maxKFid)
+            if (pKF->isBad() || pKF->fs->KfId > currMaxKF)
                 continue;
 
             nEdges++;
@@ -882,8 +997,12 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
     for (size_t i = 0; i < vpKFs.size(); i++)
     {
         std::shared_ptr<Frame> pKF = vpKFs[i];
-        if (pKF->isBad() || pKF->getState() == Frame::active)
+        if (pKF->isBad() || pKF->fs->KfId > currMaxKF) //pKF->getState() == Frame::active || 
             continue;
+        
+        if(std::find(activeKfs.begin(), activeKfs.end(),pKF) != activeKfs.end()) //this KF was active when the candidate was detected need to fix its pose!
+            continue;
+
         g2o::VertexSE3Expmap *vSE3 = static_cast<g2o::VertexSE3Expmap *>(optimizer.vertex(pKF->fs->KfId));
         g2o::SE3Quat SE3quat = vSE3->estimate();
         // if (nLoopKF == 0)
@@ -910,6 +1029,10 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         std::shared_ptr<MapPoint> pMP = vpMP[i];
 
         if (pMP->isBad() || pMP->sourceFrame->isBad() ||  pMP->getDirStatus() != MapPoint::marginalized)
+            continue;
+        if (pMP->id > currMaxMp)
+            continue;
+        if(std::find(activeKfs.begin(), activeKfs.end(), pMP->sourceFrame) != activeKfs.end()) //this KF was active when the candidate was detected need to fix its pose!
             continue;
 
         VertexPointDepth *vPoint = static_cast<VertexPointDepth *>(optimizer.vertex(pMP->id + maxKFid + 1));

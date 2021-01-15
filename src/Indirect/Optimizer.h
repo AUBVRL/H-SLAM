@@ -71,7 +71,7 @@ namespace HSLAM
                 }
                 double u = fx * PointinFrame[0] + cx;
                 double v = fy * PointinFrame[1] + cy;
-                _error =  (_measurement - Vec2(u,v) + Vec2(0.5,0.5))/scale; //- Vec2(0.5,0.5)
+                _error =  (_measurement - Vec2(u,v))/scale; //+ Vec2(0.5,0.5)
                 return;
             }
 
@@ -284,29 +284,30 @@ namespace HSLAM
                 return J;
             }
 
-            void linearizeOplus()
-            {
-                VertexPointDepth *vpoint = static_cast<VertexPointDepth *>(_vertices[0]);
-                double psi_a = vpoint->estimate();
-                VertexSE3Expmap *vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
-                SE3Quat T_cw = vpose->estimate();
-                VertexSE3Expmap *vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
-                const camParams *cam = static_cast<const camParams *>(parameter(0));
-                SE3Quat A_aw = vanchor->estimate();
-                SE3Quat T_ca = T_cw * A_aw.inverse();
+            // void linearizeOplus()
+            // {
+            //     VertexPointDepth *vpoint = static_cast<VertexPointDepth *>(_vertices[0]);
+            //     double psi_a = vpoint->estimate();
+            //     VertexSE3Expmap *vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
+            //     SE3Quat T_cw = vpose->estimate();
+            //     VertexSE3Expmap *vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
+            //     const camParams *cam = static_cast<const camParams *>(parameter(0));
+            //     SE3Quat A_aw = vanchor->estimate();
+            //     SE3Quat T_ca = T_cw * A_aw.inverse();
 
-                Vec3 x1 = cam->camInvMap(vpoint->UV) * (1.0 / vpoint->estimate());
-                Vector3 x_a = invert_depth(x1);
-                Vector3 y = T_ca * x_a;
+            //     Vec3 x1 = cam->camInvMap(vpoint->UV) * (1.0 / vpoint->estimate());
+            //     Vector3 x_a = invert_depth(x1);
+            //     Vector3 y = T_ca * x_a;
 
-                Matrix<double, 2, 3, Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
-                Matrix<double, 3, 3> d_invert_depth;
-                double z2 = x1(2) * x1(2);
-                d_invert_depth << 1.0 / x1(2), 0.0, -x1(0) / z2, 0.0, 1.0 / x1(2), -x1(1) / z2, 0.0, 0.0, -1.0 / z2;
-                _jacobianOplus[0] = -Jcam * T_ca.rotation().toRotationMatrix() * d_invert_depth * (x1 /vpoint->estimate());
-                _jacobianOplus[1] = -Jcam * d_expy_d_y(y);
-                _jacobianOplus[2] = Jcam * T_ca.rotation().toRotationMatrix() * d_expy_d_y(x_a);
-            }
+            //     Matrix<double, 2, 3, Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
+            //     Matrix<double, 3, 3> d_invert_depth;
+            //     double z2 = x1(2) * x1(2);
+            //     d_invert_depth << 1.0 / x1(2), 0.0, -x1(0) / z2, 0.0, 1.0 / x1(2), -x1(1) / z2, 0.0, 0.0, -1.0 / z2;
+            //     _jacobianOplus[0] = -Jcam * T_ca.rotation().toRotationMatrix() * d_invert_depth * (x1 /vpoint->estimate());
+            //     _jacobianOplus[1] = -Jcam * d_expy_d_y(y);
+            //     _jacobianOplus[2] = Jcam * T_ca.rotation().toRotationMatrix() * d_expy_d_y(x_a);
+            // }
+            
             // void linearizeOplus()
             // {
             //     VertexSBAPointXYZ *vpoint = static_cast<VertexSBAPointXYZ *>(_vertices[0]);
@@ -331,6 +332,8 @@ namespace HSLAM
     } // namespace OptimizationStructs
 
     bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose = true);
+    int checkOutliers(std::shared_ptr<Frame> pFrame, CalibHessian* calib);
+    
     int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::shared_ptr<MapPoint>> &vpMatches1, Sim3 &g2oS12, const float th2, const bool bFixScale);
     // void OptimizeEssentialGraph(std::shared_ptr<Map> pMap, FullSystem* _fs, std::shared_ptr<Frame> pLoopKF, std::shared_ptr<Frame> pCurKF, const KeyFrameAndPose &NonCorrectedSim3, const KeyFrameAndPose &CorrectedSim3,
     //                             const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections, const bool &bFixScale);
@@ -346,7 +349,9 @@ namespace HSLAM
 
     void GlobalBundleAdjustemnt(std::shared_ptr<Map> pMap, int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick);
     void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
-                          int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick);
+                          std::vector<std::shared_ptr<Frame>> &activeKfs, std::vector<std::shared_ptr<MapPoint>> &activeMps,
+                          int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
+                          int totalKfId, int currMaxKF, int currMaxMp);
 } // namespace HSLAM
 
 #endif

@@ -71,17 +71,22 @@ namespace HSLAM {
 
             }
 
-            if (DetectLoop())
+            bool loopDetected = DetectLoop();
+            if (loopDetected)
             {
-                if(computeSim3())
+
+                if (computeSim3())
                 {
+                    static Timer loopCorrTime("loopCorr");
+                    loopCorrTime.startTime();
                     auto gMap = globalMap.lock();
-                    if(gMap->isIdle()) //prevent from doing a loop closure correction when another is taking place!
-                        {
-                            gMap->setBusy(true);
-                            CorrectLoop();
-                            gMap->setBusy(false);
-                        }
+                    if (gMap->isIdle()) //prevent from doing a loop closure correction when another is taking place!
+                    {
+                        gMap->setBusy(true);
+                        CorrectLoop();
+                        gMap->setBusy(false);
+                    }
+                    loopCorrTime.endTime(true);
                 }
             }
 
@@ -449,14 +454,14 @@ namespace HSLAM {
     void LoopCloser::CorrectLoop()
     {
         cout << "Loop detected!" << endl;
-        // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
+        // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);  //
         auto gMap = globalMap.lock();
         int maxKfId = 0;
         std::vector<std::shared_ptr<Frame>> allKFrames;
         std::vector<std::shared_ptr<MapPoint>> allMapPoints;
 
         {
-            // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
+            boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
             maxKfId = globalMap.lock()->GetMaxKFid();
             globalMap.lock()->GetAllKeyFrames(allKFrames);
             globalMap.lock()->GetAllMapPoints(allMapPoints);
@@ -604,6 +609,8 @@ namespace HSLAM {
         for (std::vector<std::shared_ptr<Frame>>::iterator vit = mvpCurrentConnectedKFs.begin(), vend = mvpCurrentConnectedKFs.end(); vit != vend; vit++)
         {
             std::shared_ptr<Frame> pKFi = *vit;
+            if(pKFi->fs->KfId > currMaxKF)
+                continue;
             std::vector<std::shared_ptr<Frame>> vpPreviousNeighbors = pKFi->GetVectorCovisibleKeyFrames();
 
             // Update connections. Detect new links.
@@ -637,7 +644,7 @@ namespace HSLAM {
         mbStopGBA = false;
         // mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment, this, mpCurrentKF->mnId);
         
-        // GlobalBundleAdjustemnt(gMap, 10, &mbStopGBA, candidateKF->fs->KfId, true, true);
+        // BundleAdjustment(allKFrames, allMapPoints, ActiveFrames, ActivePoints, 10, &mbStopGBA, true, true, maxKfId, currMaxKF, currMaxMp);
 
         // // Loop closed. Release Local Mapping.
         // mpLocalMapper->Release();
