@@ -95,6 +95,10 @@ typedef Eigen::Matrix<double,8,9> Mat89;
 typedef Eigen::Matrix<double,9,4> Mat94;
 typedef Eigen::Matrix<double,9,8> Mat98;
 
+typedef Eigen::Matrix<double,2,8> Mat28;
+typedef Eigen::Matrix<float,2,8> Mat28f;
+
+
 typedef Eigen::Matrix<double,8,1> Mat81;
 typedef Eigen::Matrix<double,1,8> Mat18;
 typedef Eigen::Matrix<double,9,1> Mat91;

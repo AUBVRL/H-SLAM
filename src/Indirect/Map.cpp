@@ -172,6 +172,9 @@ namespace HSLAM
     vector<shared_ptr<Frame>> KeyFrameDatabase::DetectLoopCandidates(shared_ptr<Frame> pKF, float minScore)
     {
         set<shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> spConnectedKeyFrames = pKF->GetConnectedKeyFrames();
+        // auto vConnectedKeyFrames = pKF->GetCovisiblesByWeight(30);
+        // std::set<shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> spConnectedKeyFrames(vConnectedKeyFrames.begin(), vConnectedKeyFrames.end()); 
+
         list<shared_ptr<Frame>> lKFsSharingWords;
 
         // Search all keyframes that share a word with current keyframes
@@ -189,8 +192,8 @@ namespace HSLAM
                     if (pKFi->mnLoopQuery != pKF->fs->KfId)
                     {
                         pKFi->mnLoopWords = 0;
-                        // if (!spConnectedKeyFrames.count(pKFi))
-                        if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
+                        if (!spConnectedKeyFrames.count(pKFi)) // if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
+
                         {
                             pKFi->mnLoopQuery = pKF->fs->KfId;
                             lKFsSharingWords.push_back(pKFi);

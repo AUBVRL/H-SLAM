@@ -308,7 +308,9 @@ private:
 	bool TrackLocalMap(std::shared_ptr<Frame> frame);
 
 	void updateLocalKeyframes(std::shared_ptr<Frame> frame);
+	void updateLocalKeyframesOld(std::shared_ptr<Frame> frame);
 	void updateLocalPoints(std::shared_ptr<Frame> frame);
+	void updateLocalPointsOld(std::shared_ptr<Frame> frame);
 	void CheckReplacedInLastFrame();
 	int SearchLocalPoints(std::shared_ptr<Frame> frame, int th = 1, float nnratio = 0.8);
 	int updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches, bool istrackingLastFrame = true);

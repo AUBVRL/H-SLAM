@@ -151,7 +151,7 @@ int setting_gammaWeightsPixelSelect = 1; // 1 = use original intensity for pixel
 
 
 float setting_huberTH = 9; // Huber Threshold
-
+float setting_huberTH_Ind = 1.345; // Huber Threshold
 
 
 

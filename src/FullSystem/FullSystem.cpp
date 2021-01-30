@@ -34,6 +34,8 @@
 
 #include "util/ImageAndExposure.h"
 
+#include "Indirect/IndirectTracker.h"
+
 #include <cmath>
 
 namespace HSLAM
@@ -425,10 +427,13 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
 	{
 		AffLight aff_g2l_this = aff_last_2_l;
 		SE3 lastF_2_fh_this = lastF_2_fh_tries[i];
+		
+		bool trackIndirect = trackNewestCoarse(fh->shell->frame, lastF->shell->frame, lastF_2_fh_this, pyrLevelsUsed-1);
+		std::cout << std::endl << std::endl;
 		bool trackingIsGood = coarseTracker->trackNewestCoarse(
-				fh, lastF_2_fh_this, aff_g2l_this,
-				pyrLevelsUsed-1,
-				achievedRes);	// in each level has to be at least as good as the last try.
+			fh, lastF_2_fh_this, aff_g2l_this,
+			pyrLevelsUsed - 1,
+			achievedRes); // in each level has to be at least as good as the last try.
 		tryIterations++;
 
 		if(i != 0)
@@ -1906,6 +1911,95 @@ bool FullSystem::TrackLocalMap(std::shared_ptr<Frame> frame)
 }
 
 void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
+{
+	mvpLocalKeyFrames.clear();
+
+	//include currently active frames
+	for (auto it : frameHessians)
+	{
+		assert(it->shell->frame != nullptr);
+
+		mvpLocalKeyFrames.push_back(it->shell->frame);
+		it->shell->frame->mnTrackReferenceForFrame = frame->fs->id;
+		mpReferenceKF = it->shell->frame; // this will settle on the latest keyframe added in the map but might be changed later if we found one with more matches
+		const std::vector<std::shared_ptr<Frame>> vNeighs = it->shell->frame->GetBestCovisibilityKeyFrames(2);
+
+		for (auto it2 : vNeighs)
+			if (it2->mnTrackReferenceForFrame != frame->fs->id && it->shell->frame)
+			{
+				mvpLocalKeyFrames.push_back(it2);
+				it2->mnTrackReferenceForFrame = frame->fs->id;
+			}
+	}
+
+	std::map<std::shared_ptr<Frame>, int> keyframeCounter;
+	auto mapPoints = frame->getMapPointsV();
+
+	for (auto it : mapPoints)
+	{
+		if (!it || it->isBad())
+			continue;
+
+		const std::map<std::shared_ptr<Frame>, size_t> observations = it->GetObservations();
+		for (std::map<std::shared_ptr<Frame>, size_t>::const_iterator it = observations.begin(), itend = observations.end(); it != itend; it++)
+			keyframeCounter[it->first]++;
+	}
+
+	int max = 0;
+	std::shared_ptr<Frame> pKFmax = nullptr;
+
+	for (auto it : keyframeCounter)
+	{
+		if (it.first->isBad() || it.second < 10)
+			continue;
+
+		if (it.second > max)
+		{
+			max = it.second;
+			pKFmax = it.first;
+		}
+
+		if (it.first->mnTrackReferenceForFrame == frame->fs->id)
+			continue;
+
+		mvpLocalKeyFrames.push_back(it.first);
+		it.first->mnTrackReferenceForFrame = frame->fs->id;
+	}
+
+	if (pKFmax)
+		mpReferenceKF = pKFmax;
+	frame->mpReferenceKF = mpReferenceKF;
+}
+
+void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
+{
+	// Update local MapPoints:
+	boost::unique_lock<boost::mutex> lock(localMapMtx);
+
+	mvpLocalMapPoints.clear();
+
+	for (auto itKF : mvpLocalKeyFrames)
+	{
+		std::shared_ptr<Frame> pKF = itKF;
+		const std::vector<std::shared_ptr<MapPoint>> vpMPs = pKF->getMapPointsV();
+
+		for (auto pMP : vpMPs)
+		{
+			if (!pMP || pMP->mnTrackReferenceForFrame == frame->fs->KfId)
+				continue;
+
+			if (!pMP->isBad() ) //&& pMP->checkVar()
+			{
+				mvpLocalMapPoints.push_back(pMP);
+				pMP->mnTrackReferenceForFrame = frame->fs->KfId;
+			}
+		}
+	}
+
+	globalMap->SetReferenceMapPoints(mvpLocalMapPoints);
+}
+
+void FullSystem::updateLocalKeyframesOld(std::shared_ptr<Frame> frame)
 {	
 	//Update Local Keyframes
 	// Each map point vote for the keyframes in which it has been observed
@@ -2024,7 +2118,7 @@ void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
 }
 
 
-void FullSystem::updateLocalPoints(std::shared_ptr<Frame> frame)
+void FullSystem::updateLocalPointsOld(std::shared_ptr<Frame> frame)
 {
 	
 	// Update local MapPoints:

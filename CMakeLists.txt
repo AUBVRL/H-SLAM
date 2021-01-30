@@ -71,6 +71,7 @@ set(SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/Indirect/MapPoint.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Matcher.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Map.cpp
+  ${PROJECT_SOURCE_DIR}/src/Indirect/IndirectTracker.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Optimizer.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/Sim3Solver.cpp
   ${PROJECT_SOURCE_DIR}/src/Indirect/LoopCloser.cpp

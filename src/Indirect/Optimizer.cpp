@@ -69,7 +69,7 @@ namespace HSLAM
         double maxInfo = 1e7;
         double stdDev = 1e7;
 
-        const float deltaMono = sqrt(5.991); //sqrt(1.345); // sqrt(5.991);
+        const float deltaMono = sqrt(1.345); //sqrt(1.345); // sqrt(5.991);
         {
             // boost::unique_lock<boost::mutex> lock(MapPoint::mGlobalMutex); //this would lock ALL map points poses from changing!
 
@@ -94,7 +94,7 @@ namespace HSLAM
                     initErr.push_back(e->error()[0]);
                     initErr.push_back(e->error()[1]);
 
-                    double Info = pMP->getidepthHessian();
+                    double Info = sqrtf(pMP->getidepthHessian());
                     vInformation.push_back(Info);
                     if (Info > maxInfo)
                         maxInfo = Info;
@@ -115,7 +115,7 @@ namespace HSLAM
             if (normalizeInfoWithVariance)
                 stdDev = getStdDev(vInformation);
 
-            // initScale = getStdDev(initErr); //computeScale(initErr);
+            initScale = getStdDev(initErr); //computeScale(initErr);
 
             for (int i = 0, iend = vpEdgesMono.size(); i < iend; ++i)
             {
@@ -132,8 +132,8 @@ namespace HSLAM
 
         // We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
         // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
-        const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991}; //1.345
-        // const float chi2Mono[4] = {1.345, 1.345, 1.345, 1.345}; //5.991
+        // const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991}; //1.345
+        const float chi2Mono[4] = {1.345, 1.345, 1.345, 1.345}; //5.991
         const int its[4] = {10, 10, 10, 10};
 
         int nBad = 0;

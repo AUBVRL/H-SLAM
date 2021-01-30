@@ -122,7 +122,7 @@ extern bool setting_forceAceptStep;
 
 
 extern float setting_huberTH;
-
+extern float setting_huberTH_Ind;
 
 extern bool setting_logStuff;
 extern float benchmarkSetting_fxfyfac;
