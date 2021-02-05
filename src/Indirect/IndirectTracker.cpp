@@ -19,17 +19,48 @@ namespace HSLAM
             auto Mp = currFrame->tMapPoints[i]; //global map points that matched to current frame
             if (!Mp)
                 continue;
-            Vec3f PtinRef = (refFramePose * Mp->getWorldPose().cast<double>()).cast<float>(); //Project the global map points to reference frame
-            float u = (currFrame->HCalib->fxl() * PtinRef[0] / PtinRef[2]) + currFrame->HCalib->cxl();// +0.5;
-            float v = (currFrame->HCalib->fyl() * PtinRef[1] / PtinRef[2]) + currFrame->HCalib->cyl(); // + 0.5;
-            float idepth = 1.0f / PtinRef[2];
-            float idH = sqrtf(Mp->getidepthHessian());
 
-            auto matchedLoc = currFrame->mvKeys[i].pt;
-            Vec10f Out;
-            Out << matchedLoc.x, matchedLoc.y, (float)u, (float)v, idepth, idH, NAN, NAN, NAN, NAN; //last 3 elements are populated by KRes (u,v, id) proejcted to currEstimate
-            dataOut.push_back(Out);
-            idHs.push_back(idH);
+
+        SE3 leftToLeft_0 = refFramePose * Mp->sourceFrame->fs->getPose() ;
+	    auto R = (leftToLeft_0.rotationMatrix()).cast<float>();
+	    auto t = (leftToLeft_0.translation()).cast<float>();
+        
+        auto KliP = Vec3f(
+            ((float)Mp->pt[0] - currFrame->HCalib->cxl()) * currFrame->HCalib->fxli(),
+            ((float)Mp->pt[1] - currFrame->HCalib->cyl()) * currFrame->HCalib->fyli(),
+            1);
+
+        float scale = Mp->sourceFrame->fs->getPoseOptiInv().scale();
+        float idepth = Mp->getidepth() / scale;
+        Vec3f ptp = R * KliP + t * idepth;
+        float drescale = 1.0 / ptp[2];
+        float new_idepth = idepth * drescale;
+        std::cout << drescale << std::endl;
+        if (!(drescale > 0))
+            continue;
+
+        float u = ptp[0] * drescale;
+        float v = ptp[1] * drescale;
+        float Ku = u * currFrame->HCalib->fxl() + currFrame->HCalib->cxl();
+        float Kv = v * currFrame->HCalib->fyl() + currFrame->HCalib->cyl();
+
+
+
+
+
+        // Vec3f PtinRef = refFramePose.cast<float>() * Mp->getWorldPose(); //Project the global map points to reference frame
+        // float u = PtinRef[0];                                            // PtinRef[2];
+        // float v = PtinRef[1];                                            // / PtinRef[2];
+        // // float u = (currFrame->HCalib->fxl() * PtinRef[0] / PtinRef[2]) + currFrame->HCalib->cxl();// +0.5;
+        // // float v = (currFrame->HCalib->fyl() * PtinRef[1] / PtinRef[2]) + currFrame->HCalib->cyl(); // + 0.5;
+        // float depth = PtinRef[2];
+        float idH = sqrtf(Mp->getidepthHessian());
+
+        auto matchedLoc = currFrame->mvKeys[i].pt;
+        Vec10f Out;
+        Out << matchedLoc.x, matchedLoc.y, Ku, Kv, new_idepth, idH, NAN, NAN, NAN, NAN; //last 3 elements are populated by KRes (u,v, id) proejcted to currEstimate
+        dataOut.push_back(Out);
+        idHs.push_back(idH);
         }
         //normalize weights
         float idHsNormalizer = (float)getStdDev(idHs);
@@ -50,46 +81,52 @@ Vec3 calcRes(CalibHessian* HCalib, SE3& refToNew, std::vector<Vec10f>& vMPs, std
     float maxEnergy = 2*setting_huberTH_Ind*cutoffTH-setting_huberTH_Ind*setting_huberTH_Ind;	// energy for r=setting_coarseCutoffTH.
 
     Mat33f RKi = (refToNew.rotationMatrix().cast<float>() *  HCalib->getInvCalibMatrix() ); //project from ref to current given latest estimate
-	Vec3f t = (refToNew.translation()).cast<float>();
+    Vec3f t = (refToNew.translation()).cast<float>();
     
     float E = 0;
     
     for (int i = 0, iend = vMPs.size(); i < iend; ++i)
     {
         Vec3f Ptin (vMPs[i][2], vMPs[i][3], vMPs[i][4]); //(u,v, idepth) in refFrame
-        Vec3f pt = RKi * Vec3f(Ptin[0], Ptin[1], 1) + t * Ptin[2]; //project point to currFrame with currEstimate
-        float u = pt[0] / pt[2];
-        float v = pt[1] / pt[2];
+        Vec3f pt = RKi * Vec3f(Ptin[0], Ptin[1], 1) + t*Ptin[2];
+		float u = pt[0] / pt[2];
+		float v = pt[1] / pt[2];
+		float Ku = HCalib->fxl() * u + HCalib->cxl();
+		float Kv = HCalib->fyl() * v + HCalib->cyl();
+		float new_idepth = Ptin[2]/pt[2];
 
-        float Ku = HCalib->fxl() * u + HCalib->cxl();
-        float Kv = HCalib->fyl() * v + HCalib->cyl();
-        float new_idepth = Ptin[2] / pt[2];
+        // Vec3f pt = refToNew.cast<float>() * Ptin; //project point to currFrame with currEstimate
+        // float u = pt[0] / pt[2];
+        // float v = pt[1] / pt[2];
+
+        // float Ku = HCalib->fxl() * u + HCalib->cxl();
+        // float Kv = HCalib->fyl() * v + HCalib->cyl();
+        // float new_idepth = 1.0 / pt[2];
 
         vMPs[i][6] = u;
         vMPs[i][7] = v;
         vMPs[i][8] = new_idepth;
 
         Vec2f residual = Vec2f(vMPs[i][0], vMPs[i][1]) - Vec2f(Ku, Kv);
-        float error = residual.dot((Mat22f::Identity() * MatchesinRef[i][5]) * residual);
-        if (error > cutoffTH)
-        {
-			E += maxEnergy;
-			numTermsInE++;
-			numSaturated++;
-            vMPs[i][9] = 0;
-        }
-        else
+        float error = residual.dot(residual);
+        // if (error > cutoffTH)
+        // {
+		// 	E += maxEnergy;
+		// 	numTermsInE++;
+		// 	numSaturated++;
+        //     vMPs[i][9] = 0;
+        // }
+        // else
         {
             float hw = error < setting_huberTH_Ind ? 1 : setting_huberTH_Ind / sqrtf(error);
             _Residuals.push_back(residual);
             vMPs[i][9] = hw;
-            E += hw * error * (2 - hw); // error
+            E += hw  * error * (2 - hw); // error   (Mat22f::Identity() * MatchesinRef[i][5]) * 
             numTermsInE++;
         }
     }
 
     float saturatedRatio = numSaturated / (float)numTermsInE;
-    std::cout << "energy: " << E << " saturationRatio: " << saturatedRatio << " cutOff: " << cutoffTH << " numSat: " << numSaturated << " numInE: " << numTermsInE << std::endl;
 
     return Vec3(E, saturatedRatio, numTermsInE);
 }
@@ -126,7 +163,7 @@ void calcGSSSE(std::shared_ptr<Frame>frame, Mat88 &H_out, Vec8 &b_out, const SE3
         Jac(1, 6) = 0.0;
         Jac(1, 7) = 0.0;
         Jac = -Jac;
-        Mat22f IndWeights = Mat22f::Identity() * MatchesinRef[i][5] * MatchesinRef[i][9]; // W = diag(hw * NormalizedIdepthHessian)
+        Mat22f IndWeights = Mat22f::Identity()  * MatchesinRef[i][9]; // W = diag(hw * NormalizedIdepthHessian)   * MatchesinRef[i][5]
         H_out += (Jac.transpose() * (IndWeights * Jac)).cast<double>(); //J^T W J
         b_out += (Jac.transpose() * IndWeights * Residuals[i]).cast<double>();
     }
@@ -158,19 +195,21 @@ bool trackNewestCoarse(std::shared_ptr<Frame> newFrame, std::shared_ptr<Frame> r
     float lambdaExtrapolationLimit = 0.001;
 
     SE3 refToNew_current = lastToNew_out;
-
+    float setting_IndCutoffTH = 20.0;
     for (int lvl = coarsestLvl; lvl >= 0; lvl--)
     {
         Mat88 H;
         Vec8 b;
         float IndCutoffRepeat=1.0f;
-        Vec3 resOld = calcRes(newFrame->HCalib, refToNew_current, MatchesinRef, Residuals, IndCutoffRepeat);
         
-		while(resOld[1] > 0.6 && IndCutoffRepeat < 15)
-		{
-			IndCutoffRepeat*=2;
-            resOld = calcRes(newFrame->HCalib, refToNew_current, MatchesinRef, Residuals, IndCutoffRepeat);
-		}
+        Vec3 resOld = calcRes(newFrame->HCalib, refToNew_current, MatchesinRef, Residuals, setting_IndCutoffTH*IndCutoffRepeat);
+        
+		// while(resOld[1] > 0.6 && IndCutoffRepeat < 50)
+		// {
+		// 	IndCutoffRepeat*=2;
+        //     resOld = calcRes(newFrame->HCalib, refToNew_current, MatchesinRef, Residuals, setting_IndCutoffTH*IndCutoffRepeat);
+        
+		// }
 
         calcGSSSE(newFrame, H, b, refToNew_current);
 
@@ -203,11 +242,11 @@ bool trackNewestCoarse(std::shared_ptr<Frame> newFrame, std::shared_ptr<Frame> r
 
             SE3 refToNew_new = SE3::exp((Vec6)(incScaled.head<6>())) * refToNew_current;
 
-            Vec3 resNew = calcRes(newFrame->HCalib, refToNew_new, MatchesinRef, Residuals, IndCutoffRepeat);
+            Vec3 resNew = calcRes(newFrame->HCalib, refToNew_new, MatchesinRef, Residuals, setting_IndCutoffTH*IndCutoffRepeat);
 
             bool accept = (resNew[0]/resNew[2] < resOld[0]/resOld[2]); //nbre of residuals is equal in both; I should include a cutoff to remove large outliers... then these would be normalized by their respective number of measurements
 
-
+            std::cout << resNew[0] / resNew[2] << std::endl;
             if (accept)
             {
                 calcGSSSE(newFrame, H, b, refToNew_new);
@@ -228,6 +267,7 @@ bool trackNewestCoarse(std::shared_ptr<Frame> newFrame, std::shared_ptr<Frame> r
                 break;
             }
         }
+        std::cout << std::endl;
     }
 
     // set!
