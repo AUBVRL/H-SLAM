@@ -339,11 +339,12 @@ namespace HSLAM
     //                             const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections, const bool &bFixScale);
 
 
-    void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &allKFrames, std::vector<std::shared_ptr<MapPoint>> &allMapPoints,  std::vector<std::shared_ptr<Frame>> &actKFAtCand, std::vector<std::shared_ptr<MapPoint>> &actMpAtCand,
+    void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::shared_ptr<MapPoint>> &allMapPoints,  std::vector<std::shared_ptr<Frame>> &actKFAtCand, std::vector<std::shared_ptr<MapPoint>> &actMpAtCand,
                                 std::shared_ptr<Frame> pLoopKF, std::shared_ptr<Frame> pCurKF,
                                 const KeyFrameAndPose &NonCorrectedSim3, const KeyFrameAndPose &CorrectedSim3,
                                 const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections,
-                                const size_t nMaxKFid, const size_t maxKfIdatCand, const size_t maxMPIdatCand, const bool &bFixScale);
+                                const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity,
+                                const size_t maxKfIdatCand, const size_t minActkfid, const size_t maxMPIdatCand, const bool &bFixScale);
 
 
 

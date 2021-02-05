@@ -427,9 +427,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
 	{
 		AffLight aff_g2l_this = aff_last_2_l;
 		SE3 lastF_2_fh_this = lastF_2_fh_tries[i];
-		
-		bool trackIndirect = trackNewestCoarse(fh->shell->frame, lastF->shell->frame, lastF_2_fh_this, pyrLevelsUsed-1);
-		std::cout << std::endl << std::endl;
+		// bool trackIndirect = trackNewestCoarse(fh->shell->frame, lastF->shell->frame, Test, pyrLevelsUsed - 1);
 		bool trackingIsGood = coarseTracker->trackNewestCoarse(
 			fh, lastF_2_fh_this, aff_g2l_this,
 			pyrLevelsUsed - 1,
@@ -1462,7 +1460,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		firstFrame->shell->setPose(SE3());
 		firstFrame->shell->aff_g2l = AffLight(0,0);
 		firstFrame->setEvalPT_scaled(firstFrame->shell->getPose().inverse(),firstFrame->shell->aff_g2l);
-		
+		firstFrame->shell->setPoseOpti(Sim3(firstFrame->shell->getPoseInverse().matrix()));
 
 		newFrame->shell->setPose(firstToNew.inverse());
 		newFrame->shell->aff_g2l = AffLight(0,0);
@@ -1922,7 +1920,7 @@ void FullSystem::updateLocalKeyframes(std::shared_ptr<Frame> frame)
 		mvpLocalKeyFrames.push_back(it->shell->frame);
 		it->shell->frame->mnTrackReferenceForFrame = frame->fs->id;
 		mpReferenceKF = it->shell->frame; // this will settle on the latest keyframe added in the map but might be changed later if we found one with more matches
-		const std::vector<std::shared_ptr<Frame>> vNeighs = it->shell->frame->GetBestCovisibilityKeyFrames(2);
+		const std::vector<std::shared_ptr<Frame>> vNeighs = it->shell->frame->GetBestCovisibilityKeyFrames(10); //2
 
 		for (auto it2 : vNeighs)
 			if (it2->mnTrackReferenceForFrame != frame->fs->id && it->shell->frame)

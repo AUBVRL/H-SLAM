@@ -74,7 +74,7 @@ namespace HSLAM {
 
         size_t currMaxMp;
         size_t currMaxKF;
-
+        size_t minActId;
 
         std::vector<std::shared_ptr<MapPoint>> ActivePoints;
         std::vector<std::shared_ptr<Frame>> ActiveFrames;

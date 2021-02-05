@@ -563,8 +563,10 @@ float FullSystem::optimize(int mnumOptIts)
 		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		for(FrameHessian* fh : frameHessians)
 		{
-			fh->shell->setPose(fh->PRE_camToWorld);
-			fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
+			// fh->shell->setPose(fh->PRE_camToWorld);
+			// fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
+			fh->shell->setPoseOpti(Sim3(fh->PRE_camToWorld.inverse().matrix()));
+
 			fh->shell->aff_g2l = fh->aff_g2l();
 
 			auto Mps = fh->shell->frame->getMapPointsV();

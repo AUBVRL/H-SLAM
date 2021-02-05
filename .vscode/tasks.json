@@ -33,7 +33,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/HSLAM",
             "args": [
-                "-files=/mnt/Drive/VSLAM_Datasets/EuroC/ICRA_2019/mh04/data/", //mh01
+                "-files=/mnt/Drive/VSLAM_Datasets/EuroC/ICRA_2019/v2o1/data/", //mh01
                 "-calib=${workspaceFolder}/misc/EuroC/camera.txt",
                 "-LoopClosure=True",
                 "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
@@ -45,7 +45,7 @@
                 "-nogui=False",
                 "-nomt=False",
                 "-preload=False",
-                "-startIndex=400", //950
+                "-startIndex=200", //950
                 "-endIndex=999999999",
                 "-speed=0.0"
             ],

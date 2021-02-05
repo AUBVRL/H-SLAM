@@ -152,6 +152,8 @@ public:
 	std::shared_ptr<Matcher> matcher;
 	std::shared_ptr<Map> globalMap;
 	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
+	EnergyFunctional* ef;
+	std::vector<FrameShell*> allKeyFramesHistory;
 
 private:
 
@@ -246,9 +248,7 @@ private:
 
 	// ================== changed by mapper-thread. protected by mapMutex ===============
 	
-	std::vector<FrameShell*> allKeyFramesHistory;
 
-	EnergyFunctional* ef;
 	IndexThreadReduce<Vec10> treadReduce;
 
 	float* selectionMap;

@@ -330,8 +330,6 @@ void PangolinDSOViewer::drawConstraints()
 	{
 		// draw constraints
 		glLineWidth(1);
-		glBegin(GL_LINES);
-
 		glColor3f(0,1,0);
 		glBegin(GL_LINES);
 		for(unsigned int i=0;i<connections.size();i++)

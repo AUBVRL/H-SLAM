@@ -19,6 +19,7 @@ namespace HSLAM {
         mainLoop = boost::thread(&LoopCloser::Run, this);
         currMaxMp = 0;
         currMaxKF = 0;
+        minActId = 0;
     }
 
     void LoopCloser::InsertKeyFrame(shared_ptr<Frame> &frame, int maxMpId)
@@ -48,7 +49,7 @@ namespace HSLAM {
                     continue;
                 }
                 
-                if (KFqueue.size() > 20)
+                if (KFqueue.size() > 5)
                 { //can happen if optimization took too long!! in this case just add the accumulated kfs to the database and move on
                     
                     for (auto it : KFqueue)
@@ -100,7 +101,7 @@ namespace HSLAM {
     {
         // boost::unique_lock<boost::mutex> lock(fullSystem->mapMutex);
         auto gMap = globalMap.lock();
-   
+        minActId = UINT_MAX;
         for (int i = 0, iend = fullSystem->frameHessians.size(); i < iend; ++i)
         {
             std::shared_ptr<Frame> actKF = fullSystem->frameHessians[i]->shell->frame;
@@ -115,6 +116,9 @@ namespace HSLAM {
                     continue;
                 _MPs.push_back(kfPts[j]);
             }
+
+            if(actKF->fs->KfId < minActId)
+                minActId = actKF->fs->KfId;
         }
     }
 
@@ -456,14 +460,12 @@ namespace HSLAM {
         cout << "Loop detected!" << endl;
         // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);  //
         auto gMap = globalMap.lock();
-        int maxKfId = 0;
-        std::vector<std::shared_ptr<Frame>> allKFrames;
+        // std::vector<std::shared_ptr<Frame>> allKFrames;
         std::vector<std::shared_ptr<MapPoint>> allMapPoints;
 
         {
-            boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
-            maxKfId = globalMap.lock()->GetMaxKFid();
-            globalMap.lock()->GetAllKeyFrames(allKFrames);
+            // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
+            // globalMap.lock()->GetAllKeyFrames(allKFrames);
             globalMap.lock()->GetAllMapPoints(allMapPoints);
         }
 
@@ -490,7 +492,10 @@ namespace HSLAM {
             {
                 std::shared_ptr<Frame> pKFi = *vit;
 
-                if(pKFi->fs->KfId > currMaxKF) //make sure currently active keyframes are not modified!!
+                if(pKFi->fs->KfId > currMaxKF) //make sure keyframes added after loop detection are not modified!!
+                    continue;
+
+                if(pKFi->fs->KfId > minActId ) //if the connected keyframe to the loop candidate was recently added don't update its pose!! this is like a bubble that protects the recently added keyframes from being changed! 
                     continue;
 
                 Sim3 TiwTemp = pKFi->fs->getPoseOpti();
@@ -498,7 +503,7 @@ namespace HSLAM {
 
                 // SE3 Tiw = SE3(TiwTemp.matrix()); //pKFi->fs->getPoseInverse(); //getPose
 
-                if (pKFi != candidateKF) //currentKF - below not changed..
+                // if (pKFi != candidateKF) //currentKF - below not changed..
                 {
                     Sim3 g2oSic = TiwTemp * TempTwc; //SE3 Tic = Tiw * Twc
                     // Sim3 g2oSic = Sim3(Tic.matrix());
@@ -522,7 +527,7 @@ namespace HSLAM {
             }
 
 
-            // Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
+            // Correct all MapPoints obsrved by candidate keyframe and neighbors, so that they align with the other side of the loop
             for (KeyFrameAndPose::iterator mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
             {
                 std::shared_ptr<Frame> pKFi = mit->first;
@@ -628,10 +633,11 @@ namespace HSLAM {
 
         // Optimize graph 
         //this allows future data captured since the candidate detection to also fix the gauge freedom and prevent unwanted errors!
-        OptimizeEssentialGraph(allKFrames, allMapPoints, ActiveFrames, ActivePoints, currentKF ,candidateKF , NonCorrectedSim3, CorrectedSim3, LoopConnections, maxKfId, currMaxKF, currMaxMp, false); //mpMatchedKF, mpCurrentKF,
+        OptimizeEssentialGraph(fullSystem->allKeyFramesHistory, allMapPoints, ActiveFrames, ActivePoints, currentKF ,candidateKF , NonCorrectedSim3, CorrectedSim3, LoopConnections, 
+                                fullSystem->ef->connectivityMap, currMaxKF, minActId, currMaxMp, false); //mpMatchedKF, mpCurrentKF,
         
-        for (auto it : allKFrames )
-            it->fs->setRefresh(true);
+        for (auto it : fullSystem->allKeyFramesHistory)
+            it->setRefresh(true);
         gMap->InformNewBigChange();
 
         // Add loop edge
@@ -649,8 +655,8 @@ namespace HSLAM {
         // // Loop closed. Release Local Mapping.
         // mpLocalMapper->Release();
 
-        for (auto it : allKFrames)
-            it->fs->setRefresh(true);
+        for (auto it : fullSystem->allKeyFramesHistory)
+            it->setRefresh(true);
 
         mLastLoopKFid = currentKF->fs->KfId;
         cout << "Loop correction complete!" << endl;

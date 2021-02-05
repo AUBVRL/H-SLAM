@@ -45,7 +45,7 @@ float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
 
 int minKfIdDist_LoopCandidate = 50; // min nmbre of keyframes between current and candidate to consider the candidate as potential loop closure.
 int kfGap = 60; // minimum number of keyframes have passed since last loop closure performed.
-int mnCovisibilityConsistencyTh = 3; //nbre of candidates connected to the loop candidate must also confirm for loop closure to take place
+int mnCovisibilityConsistencyTh = 1; //nbre of candidates connected to the loop candidate must also confirm for loop closure to take place
 
 int EDGE_THRESHOLD = 19; //15?
 
@@ -151,7 +151,7 @@ int setting_gammaWeightsPixelSelect = 1; // 1 = use original intensity for pixel
 
 
 float setting_huberTH = 9; // Huber Threshold
-float setting_huberTH_Ind = 1.345; // Huber Threshold
+float setting_huberTH_Ind = 5.991; // Huber Threshold
 
 
 

@@ -51,7 +51,6 @@ namespace HSLAM
         long unsigned int MapPointsInMap();
         long unsigned KeyFramesInMap();
 
-        size_t GetMaxKFid();
         size_t GetMaxMPid();
 
         void clear();

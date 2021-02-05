@@ -429,7 +429,7 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
 
     // Optimize!
     optimizer.initializeOptimization(0);
-    optimizer.optimize(5);
+    optimizer.optimize(10);
 
     // Check inliers
     int nBad=0;
@@ -495,10 +495,11 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
 }
 
 
-void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vector<std::shared_ptr<MapPoint>> &vpMPs, std::vector<std::shared_ptr<Frame>> &actKFAtCand, std::vector<std::shared_ptr<MapPoint>> &actMpAtCand, std::shared_ptr<Frame> pLoopKF, std::shared_ptr<Frame> pCurKF,
+void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::shared_ptr<MapPoint>> &vpMPs, std::vector<std::shared_ptr<Frame>> &actKFAtCand, std::vector<std::shared_ptr<MapPoint>> &actMpAtCand, std::shared_ptr<Frame> pLoopKF, std::shared_ptr<Frame> pCurKF,
            const KeyFrameAndPose &NonCorrectedSim3, const KeyFrameAndPose &CorrectedSim3, 
            const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections,
-           const size_t nMaxKFid, const size_t maxKfIdatCand, const size_t maxMPIdatCand, const bool &bFixScale)
+           const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity,
+           const size_t maxKfIdatCand, const size_t minActkfid,const size_t maxMPIdatCand, const bool &bFixScale)
         {
 
             g2o::SparseOptimizer optimizer;
@@ -515,28 +516,80 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
             // solver->setUserLambdaInit(1e-16);
             // optimizer.setAlgorithm(solver);
 
-        
+            const size_t nMaxKFid = vpKFs.size();
             std::vector<Sim3, Eigen::aligned_allocator<Sim3>> vScw(nMaxKFid + 1);
             vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3>> vCorrectedSwc(nMaxKFid + 1);
             vector<g2o::VertexSim3Expmap *, Eigen::aligned_allocator<g2o::VertexSim3Expmap *>> vpVertices(nMaxKFid + 1);
+            std::map<int, std::shared_ptr<Frame>> keyframesByKFID;
 
             const int minFeat = 100;
+
+
+            CalibHessian *hcalib = nullptr; //find a good keyframe and grab its calibration -> used for removed keyframes!!
+            int attempts = 0;
+            while (hcalib == nullptr )
+            {
+                if(attempts > 500)
+                    break;
+                auto goodKF = vpKFs[attempts]->frame;
+                if(!goodKF)
+                {
+                    attempts++;
+                    continue;
+                }
+                hcalib = goodKF->HCalib;
+            }
 
             // Set KeyFrame vertices
             for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
             {
-                std::shared_ptr<Frame> pKF = vpKFs[i];
-                if (pKF->isBad())
+                if(vpKFs[i]->KfId > maxKfIdatCand)
                     continue;
-                if(pKF->fs->KfId > maxKfIdatCand)
+
+                const int nIDi = vpKFs[i]->KfId;
+
+                std::shared_ptr<Frame> pKF = vpKFs[i]->frame;
+                
+                keyframesByKFID[nIDi] = pKF;
+
+                if (!pKF && hcalib) //removed keyframes still contribute to correcting the total path using pose-pose constraints!
+                {
+                    g2o::VertexSim3Expmap *VSim3 = new g2o::VertexSim3Expmap();
+                    
+                    auto TempSiw = vpKFs[i]->getPoseOpti();
+                    // TempSiw.setScale(1.0);
+                    vScw[nIDi] = TempSiw; //Siw
+                    VSim3->setEstimate(g2o::Sim3(TempSiw.rotationMatrix(), TempSiw.translation(), TempSiw.scale()));
+                    VSim3->setFixed(false);
+                    VSim3->setId(nIDi);
+                    VSim3->setMarginalized(false);
+                    VSim3->_fix_scale = false; //bFixScale;
+
+                    VSim3->_principle_point1[0] = hcalib->cxl(); 
+                    VSim3->_principle_point1[1] = hcalib->cyl(); 
+                    VSim3->_focal_length1[0] = hcalib->fxl();
+                    VSim3->_focal_length1[1] = hcalib->fyl();
+                    VSim3->_principle_point2[0] = hcalib->cxl();
+                    VSim3->_principle_point2[1] = hcalib->cyl();
+                    VSim3->_focal_length2[0] = hcalib->fxl();
+                    VSim3->_focal_length2[1] = hcalib->fyl();
+                    optimizer.addVertex(VSim3);
+
+                    vpVertices[nIDi] = VSim3;
                     continue;
+                }
+
+                // if (pKF->isBad())
+                //     continue;
+
+                
                 g2o::VertexSim3Expmap *VSim3 = new g2o::VertexSim3Expmap();
 
-                const int nIDi = pKF->fs->KfId;
+                // const int nIDi = pKF->fs->KfId;
 
                 KeyFrameAndPose::const_iterator it = CorrectedSim3.find(pKF);
 
-                if (it != CorrectedSim3.end()) //these will contain all keyframes that were active at the time 
+                if (it != CorrectedSim3.end())
                 {
                     vScw[nIDi] = it->second;
                     VSim3->setEstimate(g2o::Sim3(it->second.rotationMatrix(), it->second.translation(), it->second.scale()));
@@ -562,6 +615,9 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                     VSim3->setFixed(false);
                 
                 if(std::find(actKFAtCand.begin(), actKFAtCand.end(), pKF) != actKFAtCand.end()) //this KF was active when the candidate was detected need to fix its pose!
+                    VSim3->setFixed(true);
+
+                if(pKF->fs->KfId > minActkfid)//maxKfIdatCand - 15)
                     VSim3->setFixed(true);
 
                 VSim3->setId(nIDi);
@@ -622,9 +678,14 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
             // Set normal edges
             for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
             {
-                std::shared_ptr<Frame> pKF = vpKFs[i];
+                const int nIDi = vpKFs[i]->KfId;
 
-                const int nIDi = pKF->fs->KfId;
+                if(nIDi > maxKfIdatCand)
+                    continue;
+                
+                std::shared_ptr<Frame> pKF = vpKFs[i]->frame;
+                if(!pKF)
+                    continue;
 
                 Sim3 tSwi;
 
@@ -667,6 +728,7 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                     // e->information() = matLambda;
                     e->setInformation(matLambda);
                     optimizer.addEdge(e);
+                    sInsertedEdges.insert(make_pair(min(nIDi, nIDj), max(nIDi, nIDj)));
                 }
 
                 // Loop edges
@@ -698,6 +760,7 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
 
                         // el->information() = matLambda;
                         optimizer.addEdge(el);
+                        sInsertedEdges.insert(make_pair(min(nIDi, (int)pLKF->fs->KfId), max(nIDi, (int)pLKF->fs->KfId)));
                     }
                 }
 
@@ -735,9 +798,54 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                             en->setInformation(matLambda);
                             // en->information() = matLambda;
                             optimizer.addEdge(en);
+                            sInsertedEdges.insert(make_pair(min(nIDi, (int)pKFn->fs->KfId), max(nIDi, (int)pKFn->fs->KfId)));
                         }
                     }
                 }
+            }
+
+            //setup Pose-Pose constraints
+            for (std::pair<uint64_t, Eigen::Vector2i> p : connectivity)
+            {
+                int host = (int)(p.first >> 32);
+                int target = (int)(p.first & (uint64_t)0xFFFFFFFF);
+                assert(host >= 0 && target >= 0);
+
+                if (host > maxKfIdatCand || target > maxKfIdatCand || host == target || host > target)
+                    continue;
+                if (sInsertedEdges.count(make_pair(std::min(host, target), std::max(host, target)))) //check that we did not add this edge yet.
+                    continue;
+                
+                //set host
+                Sim3 tSwi;
+                KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(keyframesByKFID[host]);
+                if (iti != NonCorrectedSim3.end())
+                    tSwi = (iti->second).inverse();
+                else
+                    tSwi = vScw[host].inverse();
+                g2o::Sim3 Swi = g2o::Sim3(tSwi.rotationMatrix(), tSwi.translation(), tSwi.scale());
+                
+                //set target pose
+                Sim3 tSnw;
+                KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(keyframesByKFID[target]);
+                if (itn != NonCorrectedSim3.end())
+                    tSnw = itn->second;
+                else
+                    tSnw = vScw[target];
+                g2o::Sim3 Snw = g2o::Sim3(tSnw.rotationMatrix(), tSnw.translation(), tSnw.scale());
+
+                //set measurement
+                g2o::Sim3 Sni = Snw * Swi;
+
+                g2o::EdgeSim3 *en = new g2o::EdgeSim3();
+                en->setId(index);
+                index++;
+                en->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(target)));
+                en->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(host)));
+                en->setMeasurement(Sni);
+                en->setInformation(matLambda);
+                // en->information() = matLambda;
+                optimizer.addEdge(en);
             }
 
             // lock.unlock();
@@ -751,16 +859,20 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
             // SE3 Pose Recovering. Sim3:[sR t;0 1] -> SE3:[R t/s;0 1]
             for (size_t i = 0; i < vpKFs.size(); i++)
             {
-                std::shared_ptr<Frame> pKFi = vpKFs[i];
+                const int nIDi = vpKFs[i]->KfId;
+                if(nIDi > maxKfIdatCand)
+                    continue;
+
+                // std::shared_ptr<Frame> pKFi = vpKFs[i]->frame;
+                
 
                 // if(pKFi->getState()== Frame::active)
                 //     continue;
 
-                const int nIDi = pKFi->fs->KfId;
 
                 g2o::VertexSim3Expmap *VSim3 = static_cast<g2o::VertexSim3Expmap *>(optimizer.vertex(nIDi));
-                if (VSim3->fixed())
-                    continue;
+                // if (VSim3->fixed())
+                //     continue;
                 g2o::Sim3 CorrectedSiw = VSim3->estimate();
                 // vCorrectedSwc[nIDi]=CorrectedSiw.inverse();
 
@@ -776,7 +888,7 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                 SE3 se3Corrected = SE3(CorrectedSiw.rotation().toRotationMatrix(), CorrectedSiw.translation());
                 Sim3 corrected = Sim3(se3Corrected.matrix());
                 corrected.setScale(CorrectedSiw.scale());
-                pKFi->fs->setPoseOpti(corrected);
+                vpKFs[i]->setPoseOpti(corrected);
             }
 
             // Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
@@ -786,8 +898,8 @@ void OptimizeEssentialGraph(std::vector<std::shared_ptr<Frame>> &vpKFs, std::vec
                 
                 // if(pMP->id > maxMPIdatCand)
                 //     continue;
-                
-                if (pMP->getDirStatus() == MapPoint::active || pMP->getDirStatus() == MapPoint::removed)
+                auto dirStat = pMP->getDirStatus();
+                if (dirStat == MapPoint::active || dirStat == MapPoint::removed)
                     continue;
 
                 if (pMP->isBad())
