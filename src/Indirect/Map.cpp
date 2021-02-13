@@ -186,8 +186,8 @@ namespace HSLAM
                     if (pKFi->mnLoopQuery != pKF->fs->KfId)
                     {
                         pKFi->mnLoopWords = 0;
-                        // if (!spConnectedKeyFrames.count(pKFi)) // if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
-                        if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
+                        if (!spConnectedKeyFrames.count(pKFi)) // if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
+                        // if (pKF->fs->KfId > (pKFi->fs->KfId + minKfIdDist_LoopCandidate))
                         {
                             pKFi->mnLoopQuery = pKF->fs->KfId;
                             lKFsSharingWords.push_back(pKFi);

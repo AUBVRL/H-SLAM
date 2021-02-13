@@ -315,7 +315,7 @@ int main(int argc, char **argv)
                     printf("RESETTING!\n");
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
-					usleep(10000); //hack - wait for display wrapper to clean up.
+					usleep(20000); //hack - wait for display wrapper to clean up.
 					if(fullSystem)
 					{
 						delete fullSystem;
@@ -324,10 +324,9 @@ int main(int argc, char **argv)
 						
 					fullSystem = new FullSystem();
 					fullSystem->setGammaFunction(reader->getPhotometricGamma());
-                    fullSystem->linearizeOperation = (playbackSpeed==0);
+					fullSystem->linearizeOperation = (playbackSpeed == 0);
 
-
-                    fullSystem->outputWrapper = wraps;
+					fullSystem->outputWrapper = wraps;
 
                     setting_fullResetRequested=false;
                 }
@@ -340,8 +339,9 @@ int main(int argc, char **argv)
             }
 
         }
-        fullSystem->blockUntilMappingIsFinished();
-        clock_t ended = clock();
+		// fullSystem->BAatExit();
+		fullSystem->blockUntilMappingIsFinished();
+		clock_t ended = clock();
         struct timeval tv_end;
         gettimeofday(&tv_end, NULL);
 

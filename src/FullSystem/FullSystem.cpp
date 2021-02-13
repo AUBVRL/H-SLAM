@@ -274,34 +274,34 @@ void FullSystem::printResult(std::string file, bool printSim)
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 	// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 	
-	SE3 Twc;
-	if(printSim)
-	{
-		std::ofstream myfile(file + "_loop");
-		myfile.open (file.c_str());
-		myfile << std::setprecision(15);
+	// SE3 Twc;
+	// if(printSim)
+	// {
+	// 	std::ofstream myfile(file + "_loop");
+	// 	myfile.open (file.c_str());
+	// 	myfile << std::setprecision(15);
 
-		Sim3 Swc;
-		for (FrameShell *s : allFrameHistory)
-		{
-			if(!s->poseValid) 
-			continue;
+	// 	Sim3 Swc;
+	// 	for (FrameShell *s : allFrameHistory)
+	// 	{
+	// 		if(!s->poseValid) 
+	// 		continue;
 
-			if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
-				continue;
+	// 		if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
+	// 			continue;
 			
-			Swc = s->getPoseOptiInv();
-			Twc = SE3(Swc.rotationMatrix(), Swc.translation());
+	// 		Swc = s->getPoseOptiInv();
+	// 		Twc = SE3(Swc.rotationMatrix(), Swc.translation());
 
-			myfile << s->timestamp <<
-			" " << Twc.translation().transpose()<<
-			" " << Twc.so3().unit_quaternion().x()<<
-			" " << Twc.so3().unit_quaternion().y()<<
-			" " << Twc.so3().unit_quaternion().z()<<
-			" " << Twc.so3().unit_quaternion().w() << "\n";
-		}
-		myfile.close();
-	}
+	// 		myfile << s->timestamp <<
+	// 		" " << Twc.translation().transpose()<<
+	// 		" " << Twc.so3().unit_quaternion().x()<<
+	// 		" " << Twc.so3().unit_quaternion().y()<<
+	// 		" " << Twc.so3().unit_quaternion().z()<<
+	// 		" " << Twc.so3().unit_quaternion().w() << "\n";
+	// 	}
+	// 	myfile.close();
+	// }
 
 	std::ofstream myfile;
 	myfile.open (file.c_str());
@@ -314,7 +314,8 @@ void FullSystem::printResult(std::string file, bool printSim)
 
 		if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) 
 			continue;
-		Twc = s->getPose();
+		SE3 Twc = s->getPose();
+		// Twc = s->getPose();
 
 		myfile << s->timestamp <<
 			" " << Twc.translation().transpose()<<
@@ -327,7 +328,7 @@ void FullSystem::printResult(std::string file, bool printSim)
 }
 
 
-Vec4 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
+Vec5 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
 {
 
 	assert(allFrameHistory.size() > 0);
@@ -519,7 +520,10 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
 						<< tryIterations << "\n";
 	}
 
-	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
+	
+	Vec5 Output;
+	Output << achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2], (double)(tryIterations > 1 ? -1.0: +1.0);
+	return Output;
 }
 
 void FullSystem::traceNewCoarse(FrameHessian* fh)
@@ -1027,7 +1031,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 
 		//perform joint optimization here
-		Vec4 tres = trackNewCoarse(fh, ! (isUsable && computedBoW) );
+		Vec5 tres = trackNewCoarse(fh, ! (isUsable && computedBoW) );
 		
 
 		int nFrametoLocalMapMatches = SearchLocalPoints(shell->frame);
@@ -1049,6 +1053,8 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		{
 			needToMakeKF = allFrameHistory.size() == 1 ||
 						   (fh->shell->timestamp - allKeyFramesHistory.back()->timestamp) > 0.95f / setting_keyframesPerSecond;
+			needToMakeKF = needToMakeKF && (tres[4] > 0.0);
+
 		}
 		else
 		{
@@ -1063,6 +1069,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 								   setting_kfGlobalWeight * setting_maxAffineWeight * fabs(logf((float)refToFh[0])) >
 							   1 ||
 						   2 * coarseTracker->firstCoarseRMSE < tres[0];
+			needToMakeKF = needToMakeKF && (tres[4] > 0.0);
 		}
 
 		//if frame succesfully tracked, update global motion model and set it to become the reference frame for the next frame
@@ -2400,6 +2407,25 @@ void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
 				}
 			}
 	}
+}
+
+void FullSystem::BAatExit()
+{
+	std::vector<std::shared_ptr<Frame>> allKFrames;
+	std::vector<std::shared_ptr<MapPoint>> allMapPoints;
+
+	globalMap->GetAllKeyFrames(allKFrames);
+	globalMap->GetAllMapPoints(allMapPoints);
+
+
+	bool stopGBA = false;
+
+	size_t currMaxKF = allKeyFramesHistory.back()->KfId;
+	size_t currMaxMp = globalMap->GetMaxMPid();
+
+	BundleAdjustment(allKFrames, allMapPoints, 10, &stopGBA, true, true, currMaxKF, currMaxKF - 15, currMaxMp);
+	for (auto it : allKeyFramesHistory)
+	    it->setRefresh(true);
 }
 
 

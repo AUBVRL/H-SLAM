@@ -458,14 +458,15 @@ namespace HSLAM {
     void LoopCloser::CorrectLoop()
     {
         cout << "Loop detected!" << endl;
+
         // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);  //
         auto gMap = globalMap.lock();
-        // std::vector<std::shared_ptr<Frame>> allKFrames;
+        std::vector<std::shared_ptr<Frame>> allKFrames;
         std::vector<std::shared_ptr<MapPoint>> allMapPoints;
 
         {
             // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);
-            // globalMap.lock()->GetAllKeyFrames(allKFrames);
+            globalMap.lock()->GetAllKeyFrames(allKFrames);
             globalMap.lock()->GetAllMapPoints(allMapPoints);
         }
 
@@ -475,130 +476,101 @@ namespace HSLAM {
 
         // Retrive keyframes connected to the current keyframe and compute corrected Sim3 pose by propagation
         mvpCurrentConnectedKFs = candidateKF->GetVectorCovisibleKeyFrames(); //currentKF
-        mvpCurrentConnectedKFs.push_back(candidateKF); //currentKF
+        mvpCurrentConnectedKFs.push_back(candidateKF);                       //currentKF
+
+        auto LatestConnected = currentKF->GetConnectedKeyFrames(); //currentKF
 
         KeyFrameAndPose CorrectedSim3, NonCorrectedSim3;
         CorrectedSim3[candidateKF] = mScw; //currentKF, mg2oScw
-       
+
         auto TempTwc = candidateKF->fs->getPoseOptiInv();
-        // TempTwc.setScale(1.0);
-       
-        // SE3 Twc = SE3(TempTwc.matrix()); //candidateKF->fs->getPose(); //currentKF and getPoseInverse
+
+        std::set<std::shared_ptr<Frame>> TempFixed; //these frames are old but found few matches to the latest KF- fix them here but don't fix them in poseGraph!
+
+        for (std::vector<std::shared_ptr<Frame>>::iterator vit = mvpCurrentConnectedKFs.begin(), vend = mvpCurrentConnectedKFs.end(); vit != vend; vit++)
         {
-            // Get Map Mutex
-            // boost::unique_lock<boost::mutex> lock(fullSystem->mapMutex);
+            std::shared_ptr<Frame> pKFi = *vit;
 
-            for (std::vector<std::shared_ptr<Frame>>::iterator vit = mvpCurrentConnectedKFs.begin(), vend = mvpCurrentConnectedKFs.end(); vit != vend; vit++)
+            if (pKFi->fs->KfId > currMaxKF) //make sure keyframes added after loop detection are not modified!!
+                continue;
+
+            if (pKFi->fs->KfId >= minActId) //if the connected keyframe to the loop candidate was recently added don't update its pose!! this is like a bubble that protects the recently added keyframes from being changed!
+                continue;
+
+            Sim3 TiwTemp = pKFi->fs->getPoseOpti();
+            
+            if (pKFi != candidateKF) //currentKF - below not changed..
             {
-                std::shared_ptr<Frame> pKFi = *vit;
+                Sim3 g2oSic = TiwTemp * TempTwc; //SE3 Tic = Tiw * Twc
 
-                if(pKFi->fs->KfId > currMaxKF) //make sure keyframes added after loop detection are not modified!!
-                    continue;
-
-                if(pKFi->fs->KfId > minActId ) //if the connected keyframe to the loop candidate was recently added don't update its pose!! this is like a bubble that protects the recently added keyframes from being changed! 
-                    continue;
-
-                Sim3 TiwTemp = pKFi->fs->getPoseOpti();
-                // TiwTemp.setScale(1.0);
-
-                // SE3 Tiw = SE3(TiwTemp.matrix()); //pKFi->fs->getPoseInverse(); //getPose
-
-                // if (pKFi != candidateKF) //currentKF - below not changed..
-                {
-                    Sim3 g2oSic = TiwTemp * TempTwc; //SE3 Tic = Tiw * Twc
-                    // Sim3 g2oSic = Sim3(Tic.matrix());
-                    
-                    
-                    // cv::Mat Ric = Tic.rowRange(0, 3).colRange(0, 3);
-                    // cv::Mat tic = Tic.rowRange(0, 3).col(3);
-                    // g2o::Sim3 g2oSic(Converter::toMatrix3d(Ric), Converter::toVector3d(tic), 1.0);
-                    // g2o::Sim3 g2oCorrectedSiw = g2oSic * mg2oScw;
-                    Sim3 g2oCorrectedSiw = g2oSic * mScw;
-                    //Pose corrected with the Sim3 of the loop closure
+                Sim3 g2oCorrectedSiw = g2oSic * mScw;
+                //Pose corrected with the Sim3 of the loop closure
+                // if (!LatestConnected.count(pKFi))
+                // if(LatestConnected.count(pKFi) == 0 )
                     CorrectedSim3[pKFi] = g2oCorrectedSiw;
-                }
+                // else
+                // {
+                    // CorrectedSim3[pKFi] = TiwTemp;
+                    // TempFixed.insert(pKFi);
+                // }
+            }
+            //Pose without correction
+            NonCorrectedSim3[pKFi] = TiwTemp;
+        }
 
-                // cv::Mat Riw = Tiw.rowRange(0, 3).colRange(0, 3);
-                // cv::Mat tiw = Tiw.rowRange(0, 3).col(3);
-                // g2o::Sim3 g2oSiw(Converter::toMatrix3d(Riw), Converter::toVector3d(tiw), 1.0);
-                Sim3 g2oSiw = TiwTemp; //Sim3(Tiw.matrix())
-                //Pose without correction
-                NonCorrectedSim3[pKFi] = g2oSiw;
+        // Correct all MapPoints obsrved by candidate keyframe and neighbors, so that they align with the other side of the loop
+        for (KeyFrameAndPose::iterator mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
+        {
+            std::shared_ptr<Frame> pKFi = mit->first;
+            Sim3 g2oCorrectedSiw = mit->second;
+            pKFi->fs->setPoseOpti(g2oCorrectedSiw);
+            Sim3 g2oSiw = NonCorrectedSim3[pKFi];
+
+            std::vector<std::shared_ptr<MapPoint>> vpMPsi = pKFi->getMapPointsV();
+            for (size_t iMP = 0, endMPi = vpMPsi.size(); iMP < endMPi; iMP++)
+            {
+                std::shared_ptr<MapPoint> pMPi = vpMPsi[iMP];
+                if (!pMPi)
+                    continue;
+
+                if (pMPi->id > currMaxMp || pMPi->sourceFrame->fs->KfId > currMaxKF) //prevent new data from being modified
+                    continue;
+
+                if (pMPi->isBad())
+                    continue;
+                if (pMPi->mnCorrectedByKF == pKFi->fs->KfId) 
+                    continue;
+
+                if (pMPi->getDirStatus() == MapPoint::active) //prevent active data from being modified!
+                    continue;
+                if (pMPi->sourceFrame->getState() == Frame::active)
+                    continue;
+
+                pMPi->updateGlobalPose();
+                pMPi->mnCorrectedByKF = pKFi->fs->KfId;
+                pMPi->mnCorrectedReference = currentKF->fs->KfId;
+                pMPi->UpdateNormalAndDepth();
             }
 
+            // Make sure connections are updated
+            pKFi->UpdateConnections();
+        }
 
-            // Correct all MapPoints obsrved by candidate keyframe and neighbors, so that they align with the other side of the loop
-            for (KeyFrameAndPose::iterator mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
+        // Start Loop Fusion
+        // Update matched map points and replace if duplicated
+        for (size_t i = 0; i < mvpCurrentMatchedPoints.size(); i++)
+        {
+            if (mvpCurrentMatchedPoints[i])
             {
-                std::shared_ptr<Frame> pKFi = mit->first;
-                Sim3 g2oCorrectedSiw = mit->second;
-                Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
-                pKFi->fs->setPoseOpti(g2oCorrectedSiw); 
-                Sim3 g2oSiw = NonCorrectedSim3[pKFi];
-
-                std::vector<std::shared_ptr<MapPoint>> vpMPsi = pKFi->getMapPointsV();
-                for (size_t iMP = 0, endMPi = vpMPsi.size(); iMP < endMPi; iMP++)
+                std::shared_ptr<MapPoint> pLoopMP = candidateKF->getMapPoint(i); //mvpCurrentMatchedPoints[i];
+                std::shared_ptr<MapPoint> pCurMP = mvpCurrentMatchedPoints[i];   //currentKF->getMapPoint(i);
+                if (pLoopMP)                                                     //pCurMP  //Replace old mapPoints with new ones! should experiment with the other way around!
+                    pLoopMP->Replace(pCurMP);                                    //pCurMP->Replace(pLoopMP);
+                else                                                             //if old kf does not contain match, add it!
                 {
-                    std::shared_ptr<MapPoint> pMPi = vpMPsi[iMP];
-                    if (!pMPi)
-                        continue;
-
-                    if (pMPi->id > currMaxMp || pMPi->sourceFrame->fs->KfId > currMaxKF) //prevent new data from being modified
-                        continue;
-
-                    if (pMPi->isBad())
-                        continue;
-                    if (pMPi->mnCorrectedByKF == pKFi->fs->KfId) //mpCurrentKF
-                        continue;
-
-                    
-                    if(pMPi->getDirStatus() == MapPoint::active) //prevent active data from being modified!
-                        continue;
-                    if(pMPi->sourceFrame->getState() == Frame::active)
-                        continue;
-
-                    // // Project with non-corrected pose and project back with corrected pose
-                    // Vec3 P3Dw = pMPi->getWorldPose().cast<double>();
-                    // // Eigen::Matrix<double, 3, 1> eigP3Dw = Converter::toVector3d(P3Dw);
-                    // Vec3 eigCorrectedP3Dw = g2oCorrectedSwi * ( g2oSiw * P3Dw); //eigP3Dw    g2oCorrectedSwi * (g2oSiw * P3Dw)
-
-                    // // cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
-                    pMPi->updateGlobalPose();
-                    pMPi->mnCorrectedByKF = pKFi->fs->KfId;           //mpCurrentKF->mnId
-                    pMPi->mnCorrectedReference = currentKF->fs->KfId; //pKFi->mnId;
-                    pMPi->UpdateNormalAndDepth();
-                }
-
-                // Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
-                // Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
-                // Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
-                // double s = g2oCorrectedSiw.scale();
-                // eigt *= (1. / s); //[R t/s;0 1]
-
-                // g2oCorrectedSiw.setScale(1.0);
-                // SE3 correctedTiw = SE3(g2oCorrectedSiw.matrix()); //Converter::toCvSE3(eigR, eigt);
-                // pKFi->fs->setPose(correctedTiw.inverse()); //correctedTiw
-
-                // Make sure connections are updated
-                pKFi->UpdateConnections();
-            }
-
-            // Start Loop Fusion
-            // Update matched map points and replace if duplicated
-            for (size_t i = 0; i < mvpCurrentMatchedPoints.size(); i++)
-            {
-                if (mvpCurrentMatchedPoints[i])
-                {
-                    std::shared_ptr<MapPoint> pLoopMP = candidateKF->getMapPoint(i); //mvpCurrentMatchedPoints[i];
-                    std::shared_ptr<MapPoint> pCurMP = mvpCurrentMatchedPoints[i]; //currentKF->getMapPoint(i);
-                    if (pLoopMP) //pCurMP  //Replace old mapPoints with new ones! should experiment with the other way around!
-                        pLoopMP->Replace(pCurMP); //pCurMP->Replace(pLoopMP);
-                    else //if old kf does not contain match, add it!
-                    {
-                        candidateKF->addMapPointMatch(pCurMP, i); //mpCurrentKF, pLoopMP
-                        pCurMP->AddObservation(candidateKF, i); // pLoopMP,  mpCurrentKF
-                        pCurMP->ComputeDistinctiveDescriptors(false); //pLoopMP
-                    }
+                    candidateKF->addMapPointMatch(pCurMP, i);     //mpCurrentKF, pLoopMP
+                    pCurMP->AddObservation(candidateKF, i);       // pLoopMP,  mpCurrentKF
+                    pCurMP->ComputeDistinctiveDescriptors(false); //pLoopMP
                 }
             }
         }
@@ -633,7 +605,7 @@ namespace HSLAM {
 
         // Optimize graph 
         //this allows future data captured since the candidate detection to also fix the gauge freedom and prevent unwanted errors!
-        OptimizeEssentialGraph(fullSystem->allKeyFramesHistory, allMapPoints, ActiveFrames, ActivePoints, currentKF ,candidateKF , NonCorrectedSim3, CorrectedSim3, LoopConnections, 
+        OptimizeEssentialGraph(fullSystem->allKeyFramesHistory, allMapPoints, TempFixed, currentKF ,candidateKF , NonCorrectedSim3, CorrectedSim3, LoopConnections, 
                                 fullSystem->ef->connectivityMap, currMaxKF, minActId, currMaxMp, false); //mpMatchedKF, mpCurrentKF,
         
         for (auto it : fullSystem->allKeyFramesHistory)
@@ -650,8 +622,10 @@ namespace HSLAM {
         mbStopGBA = false;
         // mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment, this, mpCurrentKF->mnId);
         
+        // boost::unique_lock<boost::mutex> lock(fullSystem->trackMutex);
+        
         // BundleAdjustment(allKFrames, allMapPoints, ActiveFrames, ActivePoints, 10, &mbStopGBA, true, true, maxKfId, currMaxKF, currMaxMp);
-
+        // BundleAdjustment(allKFrames, allMapPoints, 10, &mbStopGBA, true, true, currMaxKF, minActId, currMaxMp);
         // // Loop closed. Release Local Mapping.
         // mpLocalMapper->Release();
 

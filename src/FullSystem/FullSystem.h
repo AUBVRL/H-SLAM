@@ -154,6 +154,9 @@ public:
 	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
 	EnergyFunctional* ef;
 	std::vector<FrameShell*> allKeyFramesHistory;
+	boost::mutex trackMutex;
+	void BAatExit();
+
 
 private:
 
@@ -164,7 +167,7 @@ private:
 	double linAllPointSinle(PointHessian* point, float outlierTHSlack, bool plot);
 
 	// mainPipelineFunctions
-	Vec4 trackNewCoarse(FrameHessian *fh, bool writePose = false);
+	Vec5 trackNewCoarse(FrameHessian *fh, bool writePose = false);
 	void traceNewCoarse(FrameHessian* fh);
 	void activatePoints();
 	void activatePointsMT();
@@ -240,7 +243,6 @@ private:
 
 
 	// =================== changed by tracker-thread. protected by trackMutex ============
-	boost::mutex trackMutex;
 	std::vector<FrameShell*> allFrameHistory;
 	CoarseInitializer* coarseInitializer;
 	Vec5 lastCoarseRMSE;
@@ -318,7 +320,7 @@ private:
 	void KeyFrameCulling(std::shared_ptr<Frame> currKF);
 	// SE3 cumulativeForm();
 
-	
+
 	std::shared_ptr<FeatureDetector> detector;
 
 	size_t mnLastKeyFrameId;

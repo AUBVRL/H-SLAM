@@ -179,7 +179,7 @@ void PhotometricUndistorter::processFrame(float* image_in, ImageAndExposure* out
 			data[i] = factor*image_in[i];
 		}
 		output->exposure_time = exposure_time;
-		output->timestamp = 0;
+		// output->timestamp = 0;
 	}
 	else
 	{
@@ -195,7 +195,7 @@ void PhotometricUndistorter::processFrame(float* image_in, ImageAndExposure* out
 		}
 
 		output->exposure_time = exposure_time;
-		output->timestamp = 0;
+		// output->timestamp = 0;
 	}
 
 

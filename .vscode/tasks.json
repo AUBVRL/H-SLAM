@@ -14,7 +14,7 @@
                 "-vignette=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/vignette.png",
                 "-LoopClosure=True",
                 "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
-                "-preset=1",
+                "-preset=0",
                 "-mode=0",
                 "-quiet=True",
                 "-nolog=True",
@@ -33,8 +33,31 @@
             "type": "shell",
             "command": "${workspaceFolder}/build/bin/HSLAM",
             "args": [
-                "-files=/mnt/Drive/VSLAM_Datasets/EuroC/ICRA_2019/v2o1/data/", //mh01
+                "-files=/mnt/Drive/VSLAM_Datasets/EuroC/ICRA_2019/mh04/data", //mh01
                 "-calib=${workspaceFolder}/misc/EuroC/camera.txt",
+                "-LoopClosure=True",
+                "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
+                "-preset=0",
+                "-mode=1",
+                "-quiet=True",
+                "-nolog=True",
+                "-reverse=False",
+                "-nogui=False",
+                "-nomt=False",
+                "-preload=False",
+                "-startIndex=420", //950
+                "-endIndex=1925",
+                "-speed=2.0"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "HSLAM Kitti",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/bin/HSLAM",
+            "args": [
+                "-files=/mnt/Drive/VSLAM_Datasets/KittiDataset/sequences/00/image_0", //mh01
+                "-calib=${workspaceFolder}/misc/Kitti/Kitti00-02.txt",
                 "-LoopClosure=True",
                 "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
                 "-preset=1",
@@ -45,8 +68,8 @@
                 "-nogui=False",
                 "-nomt=False",
                 "-preload=False",
-                "-startIndex=200", //950
-                "-endIndex=999999999",
+                "-startIndex=0", //950
+                "-endIndex=99999999",
                 "-speed=0.0"
             ],
             "problemMatcher": []

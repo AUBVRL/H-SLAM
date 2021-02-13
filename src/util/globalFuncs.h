@@ -360,6 +360,9 @@ inline Vec3b makeRedGreen3B(float val)	// 0 = red, 1=green, 0.5=yellow.
 inline double getStdDev(std::vector<double> _in)
 {
 	size_t size = _in.size();
+	if(size == 0 )
+		return 1.0;
+		
 	double sum = std::accumulate(_in.begin(), _in.end(), 0.0);
 	double mean = sum / size;
 
@@ -410,4 +413,27 @@ inline double computeScale(std::vector<double>& _vec)
 		return 1.0;
 }
 
+template <typename Derived>
+bool writeVector(std::ostream &os, const Eigen::DenseBase<Derived> &b)
+{
+	for (int i = 0; i < b.size(); i++)
+		os << b(i) << " ";
+	return os.good();
 }
+
+template <typename Derived>
+bool readVector(std::istream &is, Eigen::DenseBase<Derived> &b)
+{
+	for (int i = 0; i < b.size() && is.good(); i++)
+		is >> b(i);
+	return is.good() || is.eof();
+}
+
+inline Vec2 project(const Vec3 &v)
+{
+	Vec2 res;
+	res(0) = v(0) / v(2);
+	res(1) = v(1) / v(2);
+	return res;
+}
+} // namespace HSLAM

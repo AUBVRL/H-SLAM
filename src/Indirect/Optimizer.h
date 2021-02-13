@@ -339,7 +339,7 @@ namespace HSLAM
     //                             const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections, const bool &bFixScale);
 
 
-    void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::shared_ptr<MapPoint>> &allMapPoints,  std::vector<std::shared_ptr<Frame>> &actKFAtCand, std::vector<std::shared_ptr<MapPoint>> &actMpAtCand,
+    void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::shared_ptr<MapPoint>> &allMapPoints,  std::set<std::shared_ptr<Frame>> &TempFixed, 
                                 std::shared_ptr<Frame> pLoopKF, std::shared_ptr<Frame> pCurKF,
                                 const KeyFrameAndPose &NonCorrectedSim3, const KeyFrameAndPose &CorrectedSim3,
                                 const std::map<std::shared_ptr<Frame>, std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>>, std::owner_less<std::shared_ptr<Frame>>> &LoopConnections,
@@ -349,10 +349,13 @@ namespace HSLAM
 
 
     void GlobalBundleAdjustemnt(std::shared_ptr<Map> pMap, int nIterations, bool *pbStopFlag, const unsigned long nLoopKF, const bool bRobust, const bool useSchurTrick);
+    // void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
+    //                       std::vector<std::shared_ptr<Frame>> &activeKfs, std::vector<std::shared_ptr<MapPoint>> &activeMps,
+    //                       int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
+    //                       int totalKfId, int currMaxKF, int currMaxMp);
     void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
-                          std::vector<std::shared_ptr<Frame>> &activeKfs, std::vector<std::shared_ptr<MapPoint>> &activeMps,
                           int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
-                          int totalKfId, int currMaxKF, int currMaxMp);
+                          const size_t maxKfIdatCand, const size_t minActkfid, const size_t maxMPIdatCand);
 } // namespace HSLAM
 
 #endif
