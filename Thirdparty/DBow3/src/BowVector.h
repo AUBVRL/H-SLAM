@@ -13,6 +13,7 @@
 #include <map>
 #include <vector>
 #include "exports.h"
+#include "ostream"
 #if _WIN32
 #include <cstdint>
 #endif

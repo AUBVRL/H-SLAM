@@ -75,6 +75,12 @@
         "valarray": "cpp",
         "strstream": "cpp"
     },
+    "cmake.environment": {
+        "PATH": "${env:PATH}"
+    },
+    "cmake.generator": "Ninja",
+
+    "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
 
     "files.exclude": {
         "**/.git": true,

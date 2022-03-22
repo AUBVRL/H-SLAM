@@ -6,12 +6,12 @@
         {
             "label": "HSLAM tumMono",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/HSLAM",
+            "command": "${workspaceFolder}/build/${command:cmake.buildType}/bin/HSLAM",
             "args": [
-                "-files=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/images.zip",
-                "-calib=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/camera.txt",
-                "-gamma=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/pcalib.txt",
-                "-vignette=/mnt/Drive/VSLAM_Datasets/TUM_Mono/sequence_30/vignette.png",
+                "-files=/home/gy/Downloads/sequence_01/images.zip",
+                "-calib=/home/gy/Downloads/sequence_01/camera.txt",
+                "-gamma=/home/gy/Downloads/sequence_01/pcalib.txt",
+                "-vignette=/home/gy/Downloads/sequence_01/vignette.png",
                 "-LoopClosure=True",
                 "-vocabPath=${workspaceFolder}/misc/orbvoc.dbow3",
                 "-preset=0",
@@ -73,6 +73,22 @@
                 "-speed=0.0"
             ],
             "problemMatcher": []
-        }
+        },
+        {
+            "type": "shell",
+            "label": "build task",
+            "command": "ninja",
+            "args": ["-C${workspaceFolder}/build/${command:cmake.buildType}"],
+            "options": {
+              "env": {
+                  "PATH": "/usr/local/bin:${env:PATH}",
+              }
+            },
+            "problemMatcher": [],
+            "group": {
+              "kind": "build",
+              "isDefault": true
+            }
+          }
     ]
 }
