@@ -177,8 +177,9 @@ int main(int argc, char **argv)
 	}
 	
 
-	ImageFolderReader* reader = new ImageFolderReader(source,calib, gammaCalib, vignette);
+	ImageFolderReader* reader = new ImageFolderReader(source, calib, gammaCalib, vignette);
 	reader->setGlobalCalibration();
+	set_frame_sz(reader->get_undist_width(), reader->get_undist_height());
 
 	if(setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0)
 	{

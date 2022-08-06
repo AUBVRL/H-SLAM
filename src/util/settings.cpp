@@ -37,11 +37,11 @@ int gridSize = 10;
 int mnGridCols = 64;
 int mnGridRows = 48;
 float mnMinX = 0;
-float mnMaxX = 640; //need to update these for image dimensions
+float mnMaxX = 640;
 float mnMinY = 0;
 float mnMaxY = 480;
 float mfGridElementWidthInv = (float)mnGridCols/(float)(mnMaxX-mnMinX);
-float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
+float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);
 
 int minKfIdDist_LoopCandidate = 50; // min nmbre of keyframes between current and candidate to consider the candidate as potential loop closure.
 int kfGap = 60; // minimum number of keyframes have passed since last loop closure performed.
@@ -61,9 +61,9 @@ int pyrLevelsUsed = PYR_LEVELS;
 /* Parameters controlling when KF's are taken */
 float setting_keyframesPerSecond = 0;   // if !=0, takes a fixed number of KF per second.
 bool setting_realTimeMaxKF = false;   // if true, takes as many KF's as possible (will break the system if the camera stays stationary)
-float setting_maxShiftWeightT= 0.04f * (640+480);
-float setting_maxShiftWeightR= 0.0f * (640+480);
-float setting_maxShiftWeightRT= 0.02f * (640+480);
+float setting_maxShiftWeightT= 0.04f * (mnMaxY + mnMaxX); //(640+480);
+float setting_maxShiftWeightR= 0.0f * (mnMaxY + mnMaxX);//(640+480);
+float setting_maxShiftWeightRT= 0.02f * (mnMaxY + mnMaxX);//(640+480);
 float setting_kfGlobalWeight = 1;   // general weight on threshold, the larger the more KF's are taken (e.g., 2 = double the amount of KF's).
 float setting_maxAffineWeight= 2;
 
@@ -250,6 +250,22 @@ void handleKey(char k)
 		break;
 	}
 
+}
+
+void set_frame_sz(int size_x, int size_y)
+{
+	mnGridCols = (int) size_x/gridSize;
+	mnGridRows = (int) size_y/gridSize;
+	mnMinX = 0;
+	mnMaxX = size_x;
+	mnMinY = 0;
+	mnMaxY = size_y;
+	mfGridElementWidthInv = (float)mnGridCols/(float)(mnMaxX-mnMinX);
+	mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);;
+
+	setting_maxShiftWeightT= 0.04f * (mnMaxY + mnMaxX);
+	setting_maxShiftWeightR= 0.0f * (mnMaxY + mnMaxX);
+	setting_maxShiftWeightRT= 0.02f * (mnMaxY + mnMaxX);
 }
 
 

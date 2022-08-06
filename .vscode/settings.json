@@ -73,12 +73,14 @@
         "future": "cpp",
         "cfenv": "cpp",
         "valarray": "cpp",
-        "strstream": "cpp"
+        "strstream": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp"
     },
     "cmake.environment": {
         "PATH": "${env:PATH}"
     },
-    "cmake.generator": "Ninja",
+    "cmake.generator": "Unix Makefiles",
 
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
 
@@ -87,6 +89,7 @@
         "**/.Thirdparty/CompiledLibs": true,
         "**/.build": true,
 
-    }
+    },
+    "cmake.configureOnOpen": true
     // "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }

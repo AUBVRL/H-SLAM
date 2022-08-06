@@ -204,6 +204,16 @@ public:
 		return files.size();
 	}
 
+	int get_undist_width()
+	{
+		return undistort->getSize()[0];
+	}
+
+	int get_undist_height()
+	{
+		return undistort->getSize()[1];
+	}
+
 	double getTimestamp(int id)
 	{
 		if(timestamps.size()==0) return id*0.04f; //0.1f = 10 Hz
