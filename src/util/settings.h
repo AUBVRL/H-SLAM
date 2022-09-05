@@ -3,13 +3,12 @@
 #include <string.h>
 #include <string>
 #include <cmath>
-#include "DBoW3/Vocabulary.h"
-
+#include "fbow/fbow.h"
 namespace HSLAM
 {
 
     extern bool Pause; //not a good idea:)
-    extern DBoW3::Vocabulary Vocab;
+    extern fbow::Vocabulary Vocab;
     extern bool LoopClosure;
     extern int gridSize;
     extern int mnGridCols, mnGridRows;

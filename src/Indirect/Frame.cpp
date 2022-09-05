@@ -232,11 +232,7 @@ namespace HSLAM
         boost::lock_guard<boost::mutex> l(BoVWmutex);
         if (mBowVec.empty())
         {
-            vector<cv::Mat> vDesc;
-            vDesc.reserve(Descriptors.rows);
-            for (int j = 0; j < Descriptors.rows; ++j)
-                vDesc.push_back(Descriptors.row(j));
-            Vocab.transform(vDesc, mBowVec, mFeatVec, 4);
+            Vocab.transform(Descriptors, 4, mBowVec, mFeatVec);
         }
     }
 

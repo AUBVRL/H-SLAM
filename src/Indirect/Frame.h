@@ -2,6 +2,7 @@
 #include "util/settings.h"
 #include "util/NumType.h"
 #include <boost/thread.hpp>
+#include "fbow/fbow.h"
 
 namespace HSLAM
 {
@@ -135,8 +136,8 @@ namespace HSLAM
 
         cv::Mat Descriptors;
         //BoW
-        DBoW3::BowVector mBowVec;
-        DBoW3::FeatureVector mFeatVec;
+        fbow::fBow mBowVec;
+        fbow::fBow2 mFeatVec;
 
         int nFeatures;
         bool isReduced;

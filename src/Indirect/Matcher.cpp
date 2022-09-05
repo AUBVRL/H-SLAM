@@ -2,7 +2,6 @@
 #include "Indirect/Frame.h"
 #include "util/FrameShell.h"
 #include "Indirect/MapPoint.h"
-#include "DBoW3/DBoW3.h"
 #include "FullSystem/HessianBlocks.h"
 
 #include <cmath>
@@ -22,7 +21,7 @@ namespace HSLAM
 
         vpMapPointMatches = std::vector<std::shared_ptr<MapPoint>>(F->nFeatures, nullptr);
 
-        const DBoW3::FeatureVector &vFeatVecKF = pKF->mFeatVec;
+        const fbow::fBow2 &vFeatVecKF = pKF->mFeatVec;
 
         int nmatches = 0;
 
@@ -32,10 +31,10 @@ namespace HSLAM
         const float factor = 1.0f / HISTO_LENGTH;
 
         // We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
-        DBoW3::FeatureVector::const_iterator KFit = vFeatVecKF.begin();
-        DBoW3::FeatureVector::const_iterator Fit = F->mFeatVec.begin();
-        DBoW3::FeatureVector::const_iterator KFend = vFeatVecKF.end();
-        DBoW3::FeatureVector::const_iterator Fend = F->mFeatVec.end();
+        fbow::fBow2::const_iterator KFit = vFeatVecKF.begin();
+        fbow::fBow2::const_iterator Fit = F->mFeatVec.begin();
+        fbow::fBow2::const_iterator KFend = vFeatVecKF.end();
+        fbow::fBow2::const_iterator Fend = F->mFeatVec.end();
 
         while (KFit != KFend && Fit != Fend)
         {
@@ -167,10 +166,10 @@ namespace HSLAM
 
         int nmatches = 0;
 
-        DBoW3::FeatureVector::const_iterator f1it = frame1->mFeatVec.begin();
-        DBoW3::FeatureVector::const_iterator f2it = frame2->mFeatVec.begin();
-        DBoW3::FeatureVector::const_iterator f1end = frame1->mFeatVec.end();
-        DBoW3::FeatureVector::const_iterator f2end = frame2->mFeatVec.end();
+        fbow::fBow2::const_iterator f1it = frame1->mFeatVec.begin();
+        fbow::fBow2::const_iterator f2it = frame2->mFeatVec.begin();
+        fbow::fBow2::const_iterator f1end = frame1->mFeatVec.end();
+        fbow::fBow2::const_iterator f2end = frame2->mFeatVec.end();
 
         while (f1it != f1end && f2it != f2end)
         {
@@ -1297,8 +1296,8 @@ namespace HSLAM
 
     int Matcher::searchWithEpipolar(shared_ptr<Frame> pKF1, shared_ptr<Frame> pKF2, vector<pair<size_t, size_t> > &vMatchedPairs, bool mbCheckOrientation)
     {
-        const DBoW3::FeatureVector &vFeatVec1 = pKF1->mFeatVec;
-        const DBoW3::FeatureVector &vFeatVec2 = pKF2->mFeatVec;
+        const fbow::fBow2 &vFeatVec1 = pKF1->mFeatVec;
+        const fbow::fBow2 &vFeatVec2 = pKF2->mFeatVec;
 
         //Compute epipole in second image
         Vec3 Cw = pKF1->fs->getCameraCenter();
@@ -1341,10 +1340,10 @@ namespace HSLAM
 
         const float factor = 1.0f / HISTO_LENGTH;
 
-        DBoW3::FeatureVector::const_iterator f1it = vFeatVec1.begin();
-        DBoW3::FeatureVector::const_iterator f2it = vFeatVec2.begin();
-        DBoW3::FeatureVector::const_iterator f1end = vFeatVec1.end();
-        DBoW3::FeatureVector::const_iterator f2end = vFeatVec2.end();
+        fbow::fBow2::const_iterator f1it = vFeatVec1.begin();
+        fbow::fBow2::const_iterator f2it = vFeatVec2.begin();
+        fbow::fBow2::const_iterator f1end = vFeatVec1.end();
+        fbow::fBow2::const_iterator f2end = vFeatVec2.end();
 
         while (f1it != f1end && f2it != f2end)
         {

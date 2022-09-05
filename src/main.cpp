@@ -20,7 +20,6 @@
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
-
 using namespace HSLAM;
 
 void my_exit_handler(int s)
@@ -125,10 +124,9 @@ int main(int argc, char **argv)
 
 	if(LoopClosure && !vocabPath.empty())
 	{
-		Vocab.load(vocabPath.c_str());
-
 		printf("loading Vocabulary from %s!\n", vocabPath.c_str());
-		if (Vocab.empty())
+		Vocab.readFromFile(vocabPath.c_str());
+		if (!Vocab.isValid())
 		{
 			printf("failed to load vocabulary! Exit\n");
 			exit(1);

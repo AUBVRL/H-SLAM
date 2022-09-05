@@ -5,7 +5,7 @@
 #include "Indirect/Matcher.h"
 #include "Indirect/Optimizer.h"
 #include "Indirect/Sim3Solver.h"
-
+#include "fbow/fbow.h"
 #include "FullSystem/FullSystem.h"
 #include <iostream>
 
@@ -139,17 +139,15 @@ namespace HSLAM {
         // This is the lowest score to a connected keyframe in the covisibility graph
         // We will impose loop candidates to have a higher similarity than this
         const std::vector<std::shared_ptr<Frame>> vpConnectedKeyFrames = currentKF->GetVectorCovisibleKeyFrames();
-        const DBoW3::BowVector &CurrentBowVec = currentKF->mBowVec;
+        fbow::fBow &CurrentBowVec = currentKF->mBowVec;
         float minScore = 1;
         for (size_t i = 0; i < vpConnectedKeyFrames.size(); i++)
         {
             std::shared_ptr<Frame> pKF = vpConnectedKeyFrames[i];
             if (pKF->isBad())
                 continue;
-            const DBoW3::BowVector &BowVec = pKF->mBowVec;
-
-            float score = Vocab.score(CurrentBowVec, BowVec);
-
+            const fbow::fBow &BowVec = pKF->mBowVec;
+            float score = fbow::fBow::score(CurrentBowVec, BowVec);
             if (score < minScore)
                 minScore = score;
         }
@@ -368,7 +366,7 @@ namespace HSLAM {
 
                     const int nInliers = OptimizeSim3(pKF, currentKF, vpMapPointMatches, gScm, 10, false); //def: currentKf, pKF
                     // If optimization is succesful stop ransacs and continue
-                    if (nInliers >= 30) //20
+                    if (nInliers >= 40) //20
                     {
                         bMatch = true;
                         candidateKF = pKF;

@@ -32,7 +32,7 @@ namespace HSLAM
 
 bool Pause = false;
 bool LoopClosure = false;
-DBoW3::Vocabulary Vocab;
+fbow::Vocabulary Vocab;
 int gridSize = 10;
 int mnGridCols = 64;
 int mnGridRows = 48;
@@ -266,6 +266,10 @@ void set_frame_sz(int size_x, int size_y)
 	setting_maxShiftWeightT= 0.04f * (mnMaxY + mnMaxX);
 	setting_maxShiftWeightR= 0.0f * (mnMaxY + mnMaxX);
 	setting_maxShiftWeightRT= 0.02f * (mnMaxY + mnMaxX);
+
+	// indFeaturesToExtract = (size_x + size_y);
+	// setting_desiredPointDensity = 2 * (size_x + size_y);
+	// setting_desiredImmatureDensity = 1.5 * (size_x + size_y);
 }
 
 

@@ -22,7 +22,7 @@ find_package(Eigen3 REQUIRED)
 find_package(Boost COMPONENTS system thread) 
 find_package(OpenCV 3.4.6 REQUIRED)
 find_package(G2O REQUIRED)
-find_package(DBoW3 REQUIRED)
+find_package(fbow REQUIRED)
 
 # optional libraries
 find_package(LibZip QUIET)
@@ -38,7 +38,7 @@ add_definitions("-DThreadCount=${NUMTHREADS}")
 
 set(CMAKE_GENERATOR "Unix Makefiles")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -Wno-deprecated -Wno-deprecated-declarations" #-fopenmp is added if g2o is compiled with openmp capabilities
+   "${SSE_FLAGS} -O3 -g -std=c++0x -march=native -Wno-deprecated -Wno-deprecated-declarations -Wno-ignored-attributes" #-fopenmp is added if g2o is compiled with openmp capabilities
 #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
@@ -85,6 +85,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/Thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
   ${G2O_INCLUDE_DIR}
+  ${fbow_INCLUDE_DIRS}
 ) 
 
 
@@ -150,11 +151,11 @@ set(LIBS
   ${G2O_LIBS}
   ${LIBZIP_LIBRARY} 
   ${Pangolin_LIBRARIES}
-  ${DBoW3_LIB_DIR}/libDBoW3.so
   ${BOOST_THREAD_LIBRARY}
   boost_system
   cxsparse
   cholmod
+  ${fbow_LIBS}
 )
 
 # build main executable (only if we have both OpenCV and Pangolin)

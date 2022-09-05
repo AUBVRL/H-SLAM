@@ -75,7 +75,11 @@
         "valarray": "cpp",
         "strstream": "cpp",
         "hash_map": "cpp",
-        "hash_set": "cpp"
+        "hash_set": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "span": "cpp",
+        "geometry": "cpp"
     },
     "cmake.environment": {
         "PATH": "${env:PATH}"

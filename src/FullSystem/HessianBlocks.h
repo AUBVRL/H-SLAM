@@ -211,10 +211,14 @@ struct FrameHessian
 		release(); instanceCounter--;
 		for (int i = 0; i < pyrLevelsUsed; i++)
 		{
-			if (dIp[i])
+			if (dIp[i]){
 				delete[] dIp[i];
-			if (absSquaredGrad[i])
+				dIp[i] = NULL;
+			}
+			if (absSquaredGrad[i]){
 				delete[] absSquaredGrad[i];
+				absSquaredGrad[i] = NULL;
+			}
 		}
 
 		if(debugImage != 0) delete debugImage;

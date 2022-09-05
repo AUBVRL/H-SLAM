@@ -125,42 +125,25 @@ namespace HSLAM
     //KEYFRAMEDATABSE
     KeyFrameDatabase::KeyFrameDatabase()
     {
-        mvInvertedFile.resize(Vocab.size());
     }
 
     void KeyFrameDatabase::add(shared_ptr<Frame> pKF)
     {
         boost::lock_guard<boost::mutex> l(mMutex);
-  
-        for (DBoW3::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
-            mvInvertedFile[vit->first].push_back(pKF);
+        for(auto &w: pKF->mBowVec)  
+            mvInvertedFile[w.first].insert(pKF);
     }
 
     void KeyFrameDatabase::erase(shared_ptr<Frame> pKF)
     {
         boost::lock_guard<boost::mutex> l(mMutex);
-
         // Erase elements in the Inverse File for the entry
-        for (DBoW3::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
-        {
-            // List of keyframes that share the word
-            list<shared_ptr<Frame>> &lKFs = mvInvertedFile[vit->first];
-
-            for (list<shared_ptr<Frame>>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
-            {
-                if (pKF == *lit)
-                {
-                    lKFs.erase(lit);
-                    break;
-                }
-            }
-        }
+        for(auto &w : pKF->mBowVec) mvInvertedFile[w.first].erase(pKF);        
     }
 
     void KeyFrameDatabase::clear()
     {
         mvInvertedFile.clear();
-        mvInvertedFile.resize(Vocab.size());
     }
 
     vector<shared_ptr<Frame>> KeyFrameDatabase::DetectLoopCandidates(shared_ptr<Frame> pKF, float minScore)
@@ -175,14 +158,11 @@ namespace HSLAM
         // Discard keyframes connected to the query keyframe
         {
             boost::lock_guard<boost::mutex> l(mMutex);
-
-            for (DBoW3::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
-            {
-                list<shared_ptr<Frame>> &lKFs = mvInvertedFile[vit->first];
-
-                for (list<shared_ptr<Frame>>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
-                {
-                    shared_ptr<Frame> pKFi = *lit;
+            int maxCommonWords = 0;
+            for(auto &w : pKF->mBowVec){
+                if ( !mvInvertedFile.count(w.first)) continue;
+                const std::set<std::shared_ptr<HSLAM::Frame>> &lKFs=mvInvertedFile.at(w.first);
+                for (auto &pKFi:lKFs){
                     if (pKFi->mnLoopQuery != pKF->fs->KfId)
                     {
                         pKFi->mnLoopWords = 0;
@@ -194,6 +174,8 @@ namespace HSLAM
                         }
                     }
                     pKFi->mnLoopWords++;
+                    if ((pKFi)->mnLoopWords > maxCommonWords)
+                        maxCommonWords = pKFi->mnLoopWords;
                 }
             }
         }
@@ -224,8 +206,7 @@ namespace HSLAM
             {
                 nscores++;
 
-                float si = Vocab.score(pKF->mBowVec, pKFi->mBowVec); //mpVoc->score
-
+                float si = fbow::fBow::score(pKF->mBowVec, pKFi->mBowVec);
                 pKFi->mLoopScore = si;
                 if (si >= minScore)
                     lScoreAndMatch.push_back(make_pair(si, pKFi));

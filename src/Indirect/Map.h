@@ -90,7 +90,7 @@ namespace HSLAM
     protected:
 
         // Inverted file
-        std::vector<std::list<std::shared_ptr<Frame>>> mvInvertedFile;
+        std::map<uint32_t,std::set<std::shared_ptr<Frame>>> mvInvertedFile;
 
         // Mutex
         boost::mutex mMutex;
