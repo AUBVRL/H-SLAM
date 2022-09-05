@@ -368,7 +368,7 @@ namespace HSLAM {
 
                     const int nInliers = OptimizeSim3(pKF, currentKF, vpMapPointMatches, gScm, 10, false); //def: currentKf, pKF
                     // If optimization is succesful stop ransacs and continue
-                    if (nInliers >= 15) //20
+                    if (nInliers >= 30) //20
                     {
                         bMatch = true;
                         candidateKF = pKF;

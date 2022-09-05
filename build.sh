@@ -15,7 +15,13 @@ InstallDir=$SCRIPTPATH/Thirdparty/CompiledLibs
 
 #install system wide dependencies
 #================================
-sudo apt install libgl1-mesa-dev libglew-dev libsuitesparse-dev libeigen3-dev libboost-all-dev cmake build-essential git libzip-dev ccache freeglut3-dev libgoogle-glog-dev libatlas-base-dev libceres-dev ninja-build
+sudo apt install libgl1-mesa-dev libglew-dev libsuitesparse-dev libeigen3-dev libboost-all-dev cmake build-essential git libzip-dev ccache freeglut3-dev libgoogle-glog-dev libatlas-base-dev ninja-build
+
+#install libceres for compatibility with ubuntu 22:
+cd $SCRIPTPATH/Thirdparty/
+wget ceres-solver.org/ceres-solver-1.14.0.tar.gz
+tar -zxf ceres-solver-1.14.0.tar.gz && cd ceres-solver-1.14.0 && mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$InstallDir -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF -DCXX11=ON && make -j && make install && cd .. && rm -r build && cd .. && rm ceres-solver-1.14.0.tar.gz && rm -r ceres-solver-1.14.0
 
 #optional libs to record pangolin gui
 sudo apt install ffmpeg libavcodec-dev libavutil-dev libavformat-dev libswscale-dev libavdevice-dev
@@ -31,7 +37,7 @@ if [ ! -d "$SCRIPTPATH/Thirdparty/opencv-${cvVersion}" ]; then
   wget -O opencv_contrib.zip -nc "${DL_contrib}" && unzip opencv_contrib.zip && rm opencv_contrib.zip
 fi
 
-cd $SCRIPTPATH/Thirdparty/opencv-${cvVersion} && mkdir -p build && cd build &&cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DWITH_V4L=ON -DWITH_CUDA=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DWITH_QT=ON -DCMAKE_CXX_FLAGS=-std=c++11 -DWITH_OPENGL=ON -DOPENCV_EXTRA_MODULES_PATH=$SCRIPTPATH/Thirdparty/opencv-${cvVersion}/opencv_contrib-${cvVersion}/modules -DOPENCV_ENABLE_NONFREE=ON && make -j $(nproc) && make install && cd .. && rm -r build
+cd $SCRIPTPATH/Thirdparty/opencv-${cvVersion} && mkdir -p build && cd build &&cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DWITH_V4L=ON -DWITH_CUDA=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DWITH_QT=ON -DCMAKE_CXX_FLAGS=-std=c++11 -DWITH_OPENGL=ON -DOPENCV_EXTRA_MODULES_PATH=$SCRIPTPATH/Thirdparty/opencv-${cvVersion}/opencv_contrib-${cvVersion}/modules -DOPENCV_ENABLE_NONFREE=ON -DCeres_DIR=$InstallDir/lib/cmake/Ceres && make -j $(nproc) && make install && cd .. && rm -r build
 #end comment out OpenCV
 
 #Build Thirdparty libs	
@@ -62,8 +68,8 @@ fi
 
 #build SLAM
 #==========
-cmake_prefix=$InstallDir/lib/cmake
-cd $SCRIPTPATH && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType && make -j $(nproc)
+#cmake_prefix=$InstallDir/lib/cmake
+#cd $SCRIPTPATH && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType && make -j $(nproc)
 
 
 

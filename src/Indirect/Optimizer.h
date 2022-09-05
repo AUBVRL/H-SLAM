@@ -10,12 +10,17 @@
 
 #include <g2o/types/sba/types_six_dof_expmap.h>
 
+namespace g2o{
+    struct Sim3;
+}
+
 namespace HSLAM
 {
     class Frame;
     class Map;
     class MapPoint;
     class FullSystem;
+    class Sim3Vertex;
 
     namespace OptimizationStructs
     {
@@ -24,7 +29,7 @@ namespace HSLAM
 
         inline Vec3 invert_depth(const Vec3 &x)
             {
-                Vector3 res;
+                g2o::Vector3 res;
                 res(0) = x(0);
                 res(1) = x(1);
                 res(2) = 1;
@@ -134,7 +139,7 @@ namespace HSLAM
                 principle_point[0] = cx;
                 principle_point[1] = cx;
             }
-            Vec2 cam_map(const Vector3 &trans_xyz) const
+            Vec2 cam_map(const g2o::Vector3 &trans_xyz) const
             {
                 Vec2 proj;
                 proj[0] = trans_xyz[0] / trans_xyz[2];
@@ -247,7 +252,7 @@ namespace HSLAM
                 const VertexSE3Expmap *T_anchor_from_world = static_cast<const VertexSE3Expmap *>(_vertices[2]);
                 const camParams *cam = static_cast<const camParams *>(parameter(0));
 
-                Vector2 obs(_measurement);
+                g2o::Vector2 obs(_measurement);
                 // _error = obs - cam->cam_map(T_p_from_world->estimate() * T_anchor_from_world->estimate().inverse() * invert_depth(psi->estimate()));
                 _error = obs - cam->cam_map(T_p_from_world->estimate() * T_anchor_from_world->estimate().inverse() * invert_depth( cam->camInvMap(psi->UV) * (1.0/ psi->estimate()) ));
                 
@@ -330,6 +335,9 @@ namespace HSLAM
         };
 
     } // namespace OptimizationStructs
+
+    HSLAM::Sim3 g2oSim3_to_sophusSim3(HSLAM::Sim3Vertex &g2o_sim3);
+    g2o::Sim3 sophusSim3_to_g2oSim3(HSLAM::Sim3 sophus_sim3);
 
     bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose = true);
     int checkOutliers(std::shared_ptr<Frame> pFrame, CalibHessian* calib);

@@ -5,6 +5,7 @@
 #include "util/NumType.h"
 #include <g2o/core/base_vertex.h>
 #include "g2o/core/base_binary_edge.h"
+#include "g2o/types/sim3/sim3.h"
 #include "util/globalFuncs.h"
 
 namespace HSLAM
@@ -34,12 +35,12 @@ namespace HSLAM
         }
     };
 
-    class Sim3Vertex : public g2o::BaseVertex<7, Sim3>
+    class Sim3Vertex : public g2o::BaseVertex<7, g2o::Sim3>
     {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-        Sim3Vertex() : g2o::BaseVertex<7, Sim3>() {}
+        Sim3Vertex() : g2o::BaseVertex<7, g2o::Sim3>() {}
 
         void setData(double _fx, double _fy, double _cx, double _cy, bool _fixScale = false)
         {
@@ -66,13 +67,13 @@ namespace HSLAM
                 is >> cam2world[i];
             is >> fx; is >> fy; is >> cx; is >> cy; is >> fixScale;
             is >> fx2; is >> fy2; is >> cx2; is >> cy2;
-            setEstimate(Sim3::exp(cam2world).inverse());
+            setEstimate(g2o::Sim3(cam2world).inverse());
             return true;
         }
 
         virtual bool write(std::ostream &os) const
         {
-            Sim3 cam2world(estimate().inverse());
+            g2o::Sim3 cam2world(estimate().inverse()); //    estimate().inverse());
             Vec7 lv = cam2world.log();
             for (int i = 0; i < 7; i++)
                 os << lv[i] << " ";
@@ -83,7 +84,7 @@ namespace HSLAM
 
         virtual void setToOriginImpl() override
         {
-            _estimate = Sim3();
+            _estimate = g2o::Sim3();
         }
 
         virtual void oplusImpl(const double *update_) override
@@ -91,8 +92,12 @@ namespace HSLAM
             Eigen::Map<Vec7> update(const_cast<double*>(update_));
             if (fixScale)
                 update[6] = 0;
-          
-            _estimate = Sim3::exp(update) * _estimate;
+            // // std::cout<<update[6]<<std::endl;
+            // if(update[6] < -1e-3){
+            //     _is_invalid = true;
+            //     update[6] = 0.;
+            // }
+            _estimate = g2o::Sim3(update) * _estimate;
         }
 
         Vec2 cam_map(const Vec2 &v) const
@@ -106,6 +111,7 @@ namespace HSLAM
         }
 
         bool fixScale = false;
+        bool _is_invalid = false;
         double cx, cy, fx, fy;
         double cx2, cy2, fx2, fy2;
 
@@ -125,7 +131,7 @@ namespace HSLAM
             const VertexXYZPt *v2 = static_cast<const VertexXYZPt *>(_vertices[0]);
 
             Vec2 obs(_measurement);
-            _error = obs - v1->cam_map( project( v1->estimate() * v2->estimate()));
+            _error = obs - v1->cam_map( project( v1->estimate().map(v2->estimate())));
         }
         // virtual void linearizeOplus();
     };
@@ -193,13 +199,13 @@ namespace HSLAM
             const VertexXYZPt *v2 = static_cast<const VertexXYZPt *>(_vertices[0]);
 
             Vec2 obs(_measurement);
-            _error = obs - v1->cam_map2(project(v1->estimate().inverse() * v2->estimate()));
+            _error = obs - v1->cam_map2(project(v1->estimate().inverse().map(v2->estimate())));
         }
         // virtual void linearizeOplus();
     };
 
 
-    class EdgeSim3 : public g2o::BaseBinaryEdge<7, Sim3, Sim3Vertex, Sim3Vertex>
+    class EdgeSim3 : public g2o::BaseBinaryEdge<7, g2o::Sim3, Sim3Vertex, Sim3Vertex>
     {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -209,7 +215,7 @@ namespace HSLAM
             Vec7 v7;
             for (int i = 0; i < 7; i++)
                 is >> v7[i];
-            setMeasurement(Sim3::exp(v7).inverse());
+            setMeasurement(g2o::Sim3(v7).inverse());
 
             for (int i = 0; i < 7; i++)
                 for (int j = i; j < 7; j++)
@@ -222,7 +228,7 @@ namespace HSLAM
         }
         virtual bool write(std::ostream &os) const
         {
-            Sim3 cam2world(measurement().inverse());
+            g2o::Sim3 cam2world(measurement().inverse());
             Vec7 v7 = cam2world.log();
             for (int i = 0; i < 7; i++)
             {
@@ -241,8 +247,8 @@ namespace HSLAM
             const Sim3Vertex *v1 = static_cast<const Sim3Vertex *>(_vertices[0]);
             const Sim3Vertex *v2 = static_cast<const Sim3Vertex *>(_vertices[1]);
 
-            Sim3 C(_measurement);
-            Sim3 error_ = C * v1->estimate() * v2->estimate().inverse();
+            g2o::Sim3 C(_measurement);
+            g2o::Sim3 error_ = C * v1->estimate() * v2->estimate().inverse();
             _error = error_.log();
         }
 

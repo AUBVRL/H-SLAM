@@ -17,7 +17,7 @@
 #include "FullSystem/FullSystem.h"
 
 
-#include "Indirect/Sim3.h"
+#include "Indirect/Sim3_impl.h"
 #include "Indirect/Se3.h"
 // #include <g2o/types/sim3/types_seven_dof_expmap.h>
 #include <g2o/types/sba/types_six_dof_expmap.h>
@@ -29,21 +29,25 @@
 
 namespace HSLAM
 {
-    
-
     using namespace std;
     using namespace OptimizationStructs;
 
+    HSLAM::Sim3 g2oSim3_to_sophusSim3(Sim3Vertex &g2o_sim3)
+    {
+        Mat44 sim_transform;
+        sim_transform.topLeftCorner(3, 3) = g2o_sim3.estimate().rotation().toRotationMatrix();
+        sim_transform.topRightCorner(3, 1) = g2o_sim3.estimate().translation();
+        sim_transform.topLeftCorner(3, 3) *= g2o_sim3.estimate().scale();
+        return Sim3(sim_transform);
+    }
+
+    g2o::Sim3 sophusSim3_to_g2oSim3(HSLAM::Sim3 sophus_sim3)
+    {
+        return g2o::Sim3(sophus_sim3.rotationMatrix(), sophus_sim3.translation(), sophus_sim3.scale());
+    }
+
     bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose)
     {
-
-        // g2o::SparseOptimizer optimizer;
-        // g2o::BlockSolver_6_3::LinearSolverType *linearSolver;
-        // linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
-        // g2o::BlockSolver_6_3 *solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-        // g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-        // optimizer.setAlgorithm(solver);
-
         g2o::SparseOptimizer optimizer;
         auto linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>>();
         g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
@@ -309,10 +313,10 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
     vSim3->setData(pKF1->HCalib->fxl(), pKF1->HCalib->fyl(), pKF1->HCalib->cxl(), pKF1->HCalib->cyl(), bFixScale);
     vSim3->setData2(pKF2->HCalib->fxl(), pKF2->HCalib->fyl(), pKF2->HCalib->cxl(), pKF2->HCalib->cyl());
     vSim3->setId(id);
-    id++;
     vSim3->setFixed(false);
+    vSim3->setEstimate(g2o::Sim3(g2oS12.rotationMatrix(), g2oS12.translation(), g2oS12.scale()));
     optimizer.addVertex(vSim3);
-
+    id++;
     // Set MapPoint vertices
     const int N = vpMatches1.size();
     const vector<std::shared_ptr<MapPoint>> vpMapPoints1 = pKF1->getMapPointsV();
@@ -415,6 +419,8 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
     // Optimize!
     optimizer.initializeOptimization(0);
     optimizer.optimize(10);
+    if(static_cast<Sim3Vertex*>(optimizer.vertex(0))->_is_invalid)
+        return 0;
 
     // Check inliers
     int nBad=0;
@@ -450,6 +456,8 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
 
     optimizer.initializeOptimization(0);
     optimizer.optimize(nMoreIterations);
+    if(static_cast<Sim3Vertex*>(optimizer.vertex(0))->_is_invalid)
+        return 0;
 
     int nIn = 0;
     for(size_t i=0; i<vpEdges12.size();i++)
@@ -470,7 +478,8 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
 
     // Recover optimized Sim3
     Sim3Vertex* vSim3_recov = static_cast<Sim3Vertex*>(optimizer.vertex(0));
-    g2oS12 = vSim3_recov->estimate();
+    g2oS12 = g2oSim3_to_sophusSim3(*vSim3_recov);
+    // g2oS12 = Sim3(vSim3_recov->estimate().rotation().toRotationMatrix().to ;
 
     return nIn;
 }
@@ -490,7 +499,7 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
             optimizer.setAlgorithm(solver);
 
             const size_t nMaxKFid = vpKFs.size();
-            std::vector<Sim3, Eigen::aligned_allocator<Sim3>> vScw(nMaxKFid + 1);
+            std::vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3>> vScw(nMaxKFid + 1);
             std::map<int, std::shared_ptr<Frame>> keyframesByKFID;
 
             const int minFeat = 100;
@@ -519,7 +528,7 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 keyframesByKFID[nIDi] = pKF;
 
                 Sim3Vertex *VSim3 = new Sim3Vertex();
-                auto TempSiw = vpKFs[i]->getPoseOpti();
+                auto TempSiw = sophusSim3_to_g2oSim3(vpKFs[i]->getPoseOpti());
                 vScw[nIDi] = TempSiw; //Siw
                 VSim3->setEstimate(TempSiw);
                 VSim3->setFixed(false);
@@ -560,8 +569,8 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
 
                 const long unsigned int nIDi = pKF->fs->KfId;
                 const std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> &spConnections = mit->second;
-                const Sim3 Siw = vScw[nIDi];
-                const Sim3 Swi = Siw.inverse();
+                const g2o::Sim3 Siw = vScw[nIDi];
+                const g2o::Sim3 Swi = Siw.inverse();
 
                 for (std::set<std::shared_ptr<Frame>>::const_iterator sit = spConnections.begin(), send = spConnections.end(); sit != send; sit++)
                 {
@@ -569,8 +578,8 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                     if ((nIDi != pCurKF->fs->KfId || nIDj != pLoopKF->fs->KfId) && pKF->GetWeight(*sit) < minFeat)
                         continue;
 
-                    const Sim3 Sjw = vScw[nIDj];
-                    const Sim3 Sji = Sjw * Swi;
+                    const g2o::Sim3 Sjw = vScw[nIDj];
+                    const g2o::Sim3 Sji = Sjw * Swi;
 
                     EdgeSim3 *e = new EdgeSim3();
                     e->setId(index);
@@ -598,16 +607,16 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 if(!pKF)
                     continue;
 
-                Sim3 tSwi;
+                g2o::Sim3 tSwi;
 
                 KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(pKF);
 
                 if (iti != NonCorrectedSim3.end())
-                    tSwi = (iti->second).inverse();
+                    tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
                 else
                     tSwi = vScw[nIDi].inverse();
 
-                Sim3 Swi = tSwi;
+                g2o::Sim3 Swi = tSwi;
 
                 std::shared_ptr<Frame> pParentKF = pKF->GetParent();
 
@@ -616,18 +625,18 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 {
                     int nIDj = pParentKF->fs->KfId;
 
-                    Sim3 tSjw;
+                    g2o::Sim3 tSjw;
 
                     KeyFrameAndPose::const_iterator itj = NonCorrectedSim3.find(pParentKF);
 
                     if (itj != NonCorrectedSim3.end())
-                        tSjw = itj->second;
+                        tSjw = sophusSim3_to_g2oSim3(itj->second);
                     else
                         tSjw = vScw[nIDj];
 
-                    Sim3 Sjw = tSjw;
+                    g2o::Sim3 Sjw = tSjw;
 
-                    Sim3 Sji = Sjw * Swi;
+                    g2o::Sim3 Sji = Sjw * Swi;
 
                     EdgeSim3 *e = new EdgeSim3();
                     e->setId(index);
@@ -648,18 +657,18 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                     std::shared_ptr<Frame> pLKF = *sit;
                     if (pLKF->fs->KfId < pKF->fs->KfId)
                     {
-                        Sim3 tSlw;
+                        g2o::Sim3 tSlw;
 
                         KeyFrameAndPose::const_iterator itl = NonCorrectedSim3.find(pLKF);
 
                         if (itl != NonCorrectedSim3.end())
-                            tSlw = itl->second;
+                            tSlw = sophusSim3_to_g2oSim3(itl->second);
                         else
                             tSlw = vScw[pLKF->fs->KfId];
 
-                       Sim3 Slw = tSlw;
+                       g2o::Sim3 Slw = tSlw;
 
-                        Sim3 Sli = Slw * Swi;
+                        g2o::Sim3 Sli = Slw * Swi;
                         EdgeSim3 *el = new EdgeSim3();
                         el->setId(index);
                         index++;
@@ -685,18 +694,18 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                             if (sInsertedEdges.count(make_pair(std::min(pKF->fs->KfId, pKFn->fs->KfId), std::max(pKF->fs->KfId, pKFn->fs->KfId))))
                                 continue;
 
-                            Sim3 tSnw;
+                            g2o::Sim3 tSnw;
 
                             KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(pKFn);
 
                             if (itn != NonCorrectedSim3.end())
-                                tSnw = itn->second;
+                                tSnw = sophusSim3_to_g2oSim3(itn->second);
                             else
                                 tSnw = vScw[pKFn->fs->KfId];
 
-                            Sim3 Snw = tSnw;
+                            g2o::Sim3 Snw = tSnw;
 
-                            Sim3 Sni = Snw * Swi;
+                            g2o::Sim3 Sni = Snw * Swi;
 
                             EdgeSim3 *en = new EdgeSim3();
                             en->setId(index);
@@ -726,27 +735,27 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                     continue;
                 
                 //set host
-                Sim3 tSwi;
+                g2o::Sim3 tSwi;
                 KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(keyframesByKFID[host]);
                 if (iti != NonCorrectedSim3.end())
-                    tSwi = (iti->second).inverse();
+                    tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
                 else
                     tSwi = vScw[host].inverse();
 
-                Sim3 Swi = tSwi;
+                g2o::Sim3 Swi = tSwi;
 
                 //set target pose
-                Sim3 tSnw;
+                g2o::Sim3 tSnw;
                 KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(keyframesByKFID[target]);
                 if (itn != NonCorrectedSim3.end())
-                    tSnw = itn->second;
+                    tSnw = sophusSim3_to_g2oSim3(itn->second);
                 else
                     tSnw = vScw[target];
 
-                Sim3 Snw = tSnw;
+                g2o::Sim3 Snw = tSnw;
 
                 //set measurement
-                Sim3 Sni = Snw * Swi;
+                g2o::Sim3 Sni = Snw * Swi;
 
                 EdgeSim3 *en = new EdgeSim3();
                 en->setId(index);
@@ -769,7 +778,8 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                     continue;
 
                 Sim3Vertex *VSim3 = static_cast<Sim3Vertex *>(optimizer.vertex(nIDi));
-                vpKFs[i]->setPoseOpti(VSim3->estimate());
+                vpKFs[i]->setPoseOpti(g2oSim3_to_sophusSim3(*VSim3));
+                // vpKFs[i]->setPoseOpti(VSim3->estimate());
             }
 
             // Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
