@@ -1247,7 +1247,9 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	{
 		// boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		fh->setEvalPT_scaled(fh->shell->getPoseInverse(),fh->shell->aff_g2l);
-		fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
+		// fh->shell->setPoseOpti(Sim3(fh->shell->getPoseInverse().matrix()));
+		auto shell_pose_inverse = fh->shell->getPoseInverse();
+		fh->shell->setPoseOpti(Sim3(shell_pose_inverse.rotationMatrix(), shell_pose_inverse.translation(), 1.));
 	}
 
 
@@ -1467,8 +1469,9 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		firstFrame->shell->setPose(SE3());
 		firstFrame->shell->aff_g2l = AffLight(0,0);
 		firstFrame->setEvalPT_scaled(firstFrame->shell->getPose().inverse(),firstFrame->shell->aff_g2l);
-		firstFrame->shell->setPoseOpti(Sim3(firstFrame->shell->getPoseInverse().matrix()));
-
+		// firstFrame->shell->setPoseOpti(Sim3(firstFrame->shell->getPoseInverse().matrix()));
+		auto pose_inv = firstFrame->shell->getPoseInverse();
+		firstFrame->shell->setPoseOpti(Sim3(pose_inv.rotationMatrix(), pose_inv.translation(), 1.));
 		newFrame->shell->setPose(firstToNew.inverse());
 		newFrame->shell->aff_g2l = AffLight(0,0);
 		newFrame->setEvalPT_scaled(newFrame->shell->getPose().inverse(),newFrame->shell->aff_g2l);

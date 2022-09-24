@@ -27,6 +27,13 @@ namespace HSLAM {
         LoopCloser(FullSystem *fullSystem);
 
         ~LoopCloser() {
+            ActivePoints.clear();
+            mvConsistentGroups.clear();
+            mvpEnoughConsistentCandidates.clear();
+            mvpCurrentConnectedKFs.clear();
+            mvpCurrentMatchedPoints.clear();
+            mvpLoopMapPoints.clear();
+            ActiveFrames.clear();
         }
 
         void InsertKeyFrame(std::shared_ptr<Frame> &frame, int maxMpId);

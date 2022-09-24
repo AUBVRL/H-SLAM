@@ -32,19 +32,19 @@ namespace HSLAM
     using namespace std;
     using namespace OptimizationStructs;
 
-    HSLAM::Sim3 g2oSim3_to_sophusSim3(Sim3Vertex &g2o_sim3)
-    {
-        Mat44 sim_transform;
-        sim_transform.topLeftCorner(3, 3) = g2o_sim3.estimate().rotation().toRotationMatrix();
-        sim_transform.topRightCorner(3, 1) = g2o_sim3.estimate().translation();
-        sim_transform.topLeftCorner(3, 3) *= g2o_sim3.estimate().scale();
-        return Sim3(sim_transform);
-    }
+    // HSLAM::Sim3 g2oSim3_to_sophusSim3(Sim3Vertex &g2o_sim3)
+    // {
+    //     Mat44 sim_transform;
+    //     sim_transform.topLeftCorner(3, 3) = g2o_sim3.estimate().rotation().toRotationMatrix();
+    //     sim_transform.topRightCorner(3, 1) = g2o_sim3.estimate().translation();
+    //     sim_transform.topLeftCorner(3, 3) *= g2o_sim3.estimate().scale();
+    //     return Sim3(sim_transform);
+    // }
 
-    g2o::Sim3 sophusSim3_to_g2oSim3(HSLAM::Sim3 sophus_sim3)
-    {
-        return g2o::Sim3(sophus_sim3.rotationMatrix(), sophus_sim3.translation(), sophus_sim3.scale());
-    }
+    // g2o::Sim3 sophusSim3_to_g2oSim3(HSLAM::Sim3 sophus_sim3)
+    // {
+    //     return g2o::Sim3(sophus_sim3.rotationMatrix(), sophus_sim3.translation(), sophus_sim3.scale());
+    // }
 
     bool PoseOptimization(std::shared_ptr<Frame> pFrame, CalibHessian *calib, bool updatePose)
     {
@@ -300,11 +300,13 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
     optimizer.setAlgorithm(solver);
     
     auto PKF1Pose = pKF1->fs->getPoseOpti();
-    auto R1w = PKF1Pose.rotationMatrix();
+    // auto R1w = PKF1Pose.rotationMatrix();
+    auto R1w = PKF1Pose.rotation().toRotationMatrix();
     auto t1w = PKF1Pose.translation();
 
     auto PKF2Pose = pKF2->fs->getPoseOpti();  
-    auto R2w = PKF2Pose.rotationMatrix();
+    // auto R2w = PKF2Pose.rotationMatrix();
+    auto R2w = PKF2Pose.rotation().toRotationMatrix();
     auto t2w = PKF2Pose.translation();
 
     size_t id = 0;
@@ -314,7 +316,8 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
     vSim3->setData2(pKF2->HCalib->fxl(), pKF2->HCalib->fyl(), pKF2->HCalib->cxl(), pKF2->HCalib->cyl());
     vSim3->setId(id);
     vSim3->setFixed(false);
-    vSim3->setEstimate(g2o::Sim3(g2oS12.rotationMatrix(), g2oS12.translation(), g2oS12.scale()));
+    // vSim3->setEstimate(g2o::Sim3(g2oS12.rotationMatrix(), g2oS12.translation(), g2oS12.scale()));
+    vSim3->setEstimate(g2oS12);
     optimizer.addVertex(vSim3);
     id++;
     // Set MapPoint vertices
@@ -478,7 +481,7 @@ int OptimizeSim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::
 
     // Recover optimized Sim3
     Sim3Vertex* vSim3_recov = static_cast<Sim3Vertex*>(optimizer.vertex(0));
-    g2oS12 = g2oSim3_to_sophusSim3(*vSim3_recov);
+    g2oS12 = vSim3_recov->estimate();// g2oS12 = g2oSim3_to_sophusSim3(*vSim3_recov);
     // g2oS12 = Sim3(vSim3_recov->estimate().rotation().toRotationMatrix().to ;
 
     return nIn;
@@ -528,7 +531,9 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 keyframesByKFID[nIDi] = pKF;
 
                 Sim3Vertex *VSim3 = new Sim3Vertex();
-                auto TempSiw = sophusSim3_to_g2oSim3(vpKFs[i]->getPoseOpti());
+                // auto TempSiw = sophusSim3_to_g2oSim3(vpKFs[i]->getPoseOpti());
+                auto TempSiw = vpKFs[i]->getPoseOpti();
+
                 vScw[nIDi] = TempSiw; //Siw
                 VSim3->setEstimate(TempSiw);
                 VSim3->setFixed(false);
@@ -612,7 +617,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(pKF);
 
                 if (iti != NonCorrectedSim3.end())
-                    tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
+                {
+                    // tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
+                    tSwi = iti->second.inverse();
+                } 
                 else
                     tSwi = vScw[nIDi].inverse();
 
@@ -629,8 +637,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
 
                     KeyFrameAndPose::const_iterator itj = NonCorrectedSim3.find(pParentKF);
 
-                    if (itj != NonCorrectedSim3.end())
-                        tSjw = sophusSim3_to_g2oSim3(itj->second);
+                    if (itj != NonCorrectedSim3.end()){
+                        // tSjw = sophusSim3_to_g2oSim3(itj->second);
+                        tSjw = itj->second;
+                    }
                     else
                         tSjw = vScw[nIDj];
 
@@ -661,8 +671,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
 
                         KeyFrameAndPose::const_iterator itl = NonCorrectedSim3.find(pLKF);
 
-                        if (itl != NonCorrectedSim3.end())
-                            tSlw = sophusSim3_to_g2oSim3(itl->second);
+                        if (itl != NonCorrectedSim3.end()){
+                            // tSlw = sophusSim3_to_g2oSim3(itl->second);
+                            tSlw = itl->second;
+                        }
                         else
                             tSlw = vScw[pLKF->fs->KfId];
 
@@ -698,8 +710,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
 
                             KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(pKFn);
 
-                            if (itn != NonCorrectedSim3.end())
-                                tSnw = sophusSim3_to_g2oSim3(itn->second);
+                            if (itn != NonCorrectedSim3.end()){
+                                // tSnw = sophusSim3_to_g2oSim3(itn->second);
+                                tSnw = itn->second;
+                            }
                             else
                                 tSnw = vScw[pKFn->fs->KfId];
 
@@ -737,8 +751,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 //set host
                 g2o::Sim3 tSwi;
                 KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(keyframesByKFID[host]);
-                if (iti != NonCorrectedSim3.end())
-                    tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
+                if (iti != NonCorrectedSim3.end()){
+                    // tSwi = sophusSim3_to_g2oSim3((iti->second).inverse());
+                    tSwi = (iti->second).inverse();
+                }
                 else
                     tSwi = vScw[host].inverse();
 
@@ -747,8 +763,10 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                 //set target pose
                 g2o::Sim3 tSnw;
                 KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(keyframesByKFID[target]);
-                if (itn != NonCorrectedSim3.end())
-                    tSnw = sophusSim3_to_g2oSim3(itn->second);
+                if (itn != NonCorrectedSim3.end()){
+                    // tSnw = sophusSim3_to_g2oSim3(itn->second);
+                    tSnw = itn->second;
+                }
                 else
                     tSnw = vScw[target];
 
@@ -778,8 +796,8 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
                     continue;
 
                 Sim3Vertex *VSim3 = static_cast<Sim3Vertex *>(optimizer.vertex(nIDi));
-                vpKFs[i]->setPoseOpti(g2oSim3_to_sophusSim3(*VSim3));
-                // vpKFs[i]->setPoseOpti(VSim3->estimate());
+                // vpKFs[i]->setPoseOpti(g2oSim3_to_sophusSim3(*VSim3));
+                vpKFs[i]->setPoseOpti(VSim3->estimate());
             }
 
             // Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
@@ -857,7 +875,8 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         // vSE3->setEstimate(SE3(Pose.rotationMatrix(), Pose.translation()));
 
         // auto Pose = pKF->fs->getPoseInverse(); 
-        vSE3->setEstimate(g2o::SE3Quat(Pose.rotationMatrix(), Pose.translation()));
+        // vSE3->setEstimate(g2o::SE3Quat(Pose.rotationMatrix(), Pose.translation()));
+        vSE3->setEstimate(g2o::SE3Quat(Pose.rotation().toRotationMatrix(), Pose.translation()));
 
         
 
@@ -1004,11 +1023,11 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         if(vSE3->fixed())
             continue;
         double scale = pKF->fs->getPoseOpti().scale();
-        // auto PoseSim3 = Sim3(vSE3->estimate().matrix());
-        auto PoseSim3 = Sim3(SE3(vSE3->estimate().rotation().toRotationMatrix(), vSE3->estimate().translation()).matrix());
+        // // auto PoseSim3 = Sim3(vSE3->estimate().matrix());
+        // auto PoseSim3 = Sim3(SE3(vSE3->estimate().rotation().toRotationMatrix(), vSE3->estimate().translation()).matrix());
 
-        PoseSim3.setScale(scale);
-        pKF->fs->setPoseOpti(PoseSim3);
+        // PoseSim3.setScale(scale);
+        pKF->fs->setPoseOpti(Sim3(vSE3->estimate().rotation(), vSE3->estimate().translation(), scale));
       
     }
 

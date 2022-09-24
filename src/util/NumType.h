@@ -3,6 +3,7 @@
 #include "Eigen/Core"
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
+#include "g2o/types/sim3/sim3.h"
 #include <memory>
 #include <vector>
 #include <chrono>
@@ -31,7 +32,7 @@ namespace HSLAM
 
 
 typedef Sophus::SE3d SE3;
-typedef Sophus::Sim3d Sim3;
+typedef g2o::Sim3 Sim3; // typedef Sophus::Sim3d Sim3;
 typedef Sophus::SO3d SO3;
 
 

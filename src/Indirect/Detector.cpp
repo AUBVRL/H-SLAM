@@ -47,7 +47,7 @@ void FeatureDetector::ExtractFeatures(cv::Mat &Image, cv::Mat &Occupancy, std::v
     ImageBlurred.setTo(0);
 
 
-    cv::GaussianBlur(Image, ImageBlurred, cv::Size(5, 5), 0.5, 0.5, cv::BORDER_REFLECT_101);
+    cv::GaussianBlur(Image, ImageBlurred, cv::Size(7, 7), 1, 1, cv::BORDER_REFLECT_101); // 5,5   0.5 0.5
     vector<cv::KeyPoint> FASTselection;
     cv::FAST(ImageBlurred, FASTselection, minThFAST, true);
     sort(FASTselection.begin(), FASTselection.end(), [](const cv::KeyPoint &a, const cv::KeyPoint &b) -> bool { return a.response > b.response; });

@@ -361,12 +361,13 @@ namespace HSLAM {
                     // cv::waitKey(1);
                     // std::cout << "candid: " << i << " inliers: " << numatches << " count " << count << std::endl;
 
-                    Sim3 gScm = Sim3(SE3(R.cast<double>(), t.cast<double>()).matrix());
-                    gScm.setScale(s);
+                    Sim3 gScm = Sim3(R.cast<double>(), t.cast<double>(), s);
+                    // Sim3 gScm = Sim3(SE3(R.cast<double>(), t.cast<double>()).matrix());
+                    // gScm.setScale(s);
 
                     const int nInliers = OptimizeSim3(pKF, currentKF, vpMapPointMatches, gScm, 10, false); //def: currentKf, pKF
                     // If optimization is succesful stop ransacs and continue
-                    if (nInliers >= 40) //20
+                    if (nInliers >= 30) //20
                     {
                         bMatch = true;
                         candidateKF = pKF;
@@ -457,7 +458,8 @@ namespace HSLAM {
     {
         cout << "Loop detected!" << endl;
 
-        // boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);  //
+        boost::unique_lock<boost::mutex> lck(fullSystem->mapMutex);  //
+        boost::unique_lock<boost::mutex> lck2(fullSystem->trackMutex);
         auto gMap = globalMap.lock();
         std::vector<std::shared_ptr<Frame>> allKFrames;
         std::vector<std::shared_ptr<MapPoint>> allMapPoints;

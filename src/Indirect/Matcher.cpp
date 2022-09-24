@@ -373,12 +373,14 @@ namespace HSLAM
 
         // Camera 1 from world
         auto poseKf1 = pKF1->fs->getPoseOpti(); //getPoseInverse();
-        Mat33f R1w = poseKf1.rotationMatrix().cast<float>();
+        // Mat33f R1w = poseKf1.rotationMatrix().cast<float>();
+         Mat33f R1w = poseKf1.rotation().toRotationMatrix().cast<float>();
         Vec3f t1w = poseKf1.translation().cast<float>();
 
         //Camera 2 from world
         auto poseKf2 = pKF2->fs->getPoseOpti(); //getPoseInverse();
-        Mat33f R2w = poseKf2.rotationMatrix().cast<float>();
+        // Mat33f R2w = poseKf2.rotationMatrix().cast<float>();
+        Mat33f R2w = poseKf2.rotation().toRotationMatrix().cast<float>();
         Vec3f t2w = poseKf2.translation().cast<float>();
 
         //Transformation between cameras
@@ -600,8 +602,9 @@ namespace HSLAM
         const float &cy = pKF->HCalib->cyl();
 
         // Decompose Scw
-        Mat44 sim3Transform = Scw.matrix();
-        Mat33 Rcw = Scw.rotationMatrix();
+        // Mat44 sim3Transform = Scw.matrix();
+        // Mat33 Rcw = Scw.rotationMatrix();
+        Mat33 Rcw = Scw.rotation().toRotationMatrix();
 
         Vec3 tcw = Scw.translation(); // / Scw.scale();
         Vec3 Ow = -Rcw.transpose() * tcw;
@@ -720,7 +723,8 @@ namespace HSLAM
         const float &cy = pKF->HCalib->cyl();
 
         // Decompose Scw
-        Mat33f sRcw = Scw.rotationMatrix().cast<float>();
+        // Mat33f sRcw = Scw.rotationMatrix().cast<float>();
+        Mat33f sRcw = Scw.rotation().toRotationMatrix().cast<float>();
         // float scw = sRcw.row(0).dot(sRcw.row(0));
         // if (scw != 1.0)
         //     sRcw = sRcw / scw;
@@ -848,8 +852,9 @@ namespace HSLAM
     {
 
         //Mat33f Rcw = pKF->fs->getPoseInverse().rotationMatrix().cast<float>();
-        Mat33f Rcw = pKF->fs->getPoseOpti().rotationMatrix().cast<float>();
-
+        // Mat33f Rcw = pKF->fs->getPoseOpti().rotationMatrix().cast<float>();
+        Mat33f Rcw = pKF->fs->getPoseOpti().rotation().toRotationMatrix().cast<float>();
+        
         // Vec3f tcw = pKF->fs->getPoseInverse().translation().cast<float>();
         Vec3f tcw = pKF->fs->getPoseOpti().translation().cast<float>();
 

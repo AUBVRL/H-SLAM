@@ -94,8 +94,8 @@ namespace HSLAM
 			boost::lock_guard<boost::mutex> l(shellPoseMutex);
 			worldToCamOpti = Scw;
 			worldToCamOptiInv = Scw.inverse();
-
-			camToWorld = SE3(worldToCamOptiInv.rotationMatrix(), worldToCamOptiInv.translation());
+			camToWorld = SE3(worldToCamOptiInv.rotation().toRotationMatrix(), worldToCamOptiInv.translation());
+			// camToWorld = SE3(worldToCamOptiInv.rotationMatrix(), worldToCamOptiInv.translation());
 			Tcw = camToWorld.inverse();
 			Ow = -camToWorld.rotationMatrix() * Tcw.translation();
 			needRefresh = true;

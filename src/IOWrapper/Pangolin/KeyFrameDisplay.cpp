@@ -324,8 +324,10 @@ void KeyFrameDisplay::drawCam(float lineWidth, float* color, float sizeFactor,  
 	if(width == 0 || !originFrame)
 		return;
 
-	if (drawOrig)
-		camToWorld = Sim3(originFrame->getPose().matrix());
+	if (drawOrig){
+		auto tmp = originFrame->getPose();
+		camToWorld = Sim3(tmp.rotationMatrix(), tmp.translation(), 1.);
+	}
 	else if (drawOrig == false)
 		camToWorld = originFrame->getPoseOptiInv();
 
@@ -333,7 +335,10 @@ void KeyFrameDisplay::drawCam(float lineWidth, float* color, float sizeFactor,  
 
 	glPushMatrix();
 
-		Sophus::Matrix4f m = camToWorld.matrix().cast<float>();
+		// Sophus::Matrix4f m = camToWorld.matrix().cast<float>();
+		Mat44f m = Mat44f::Identity();
+		m.topLeftCorner(3, 3) = camToWorld.rotation().toRotationMatrix().cast<float>();
+		m.topRightCorner(3, 1) = camToWorld.translation().cast<float>();
 		glMultMatrixf((GLfloat*)m.data());
 
 		if(color == 0)
@@ -382,7 +387,11 @@ void KeyFrameDisplay::drawPC(float pointSize)
 
 	glPushMatrix();
 
-		Sophus::Matrix4f m = camToWorld.matrix().cast<float>();
+		// Sophus::Matrix4f m = camToWorld.matrix().cast<float>();
+		Mat44f m = Mat44f::Identity();
+		m.topLeftCorner(3, 3) = camToWorld.rotation().toRotationMatrix().cast<float>();
+		m.topRightCorner(3, 1) = camToWorld.translation().cast<float>();
+
 		glMultMatrixf((GLfloat*)m.data());
 
 		glPointSize(pointSize);

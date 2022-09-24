@@ -327,6 +327,11 @@ private:
 				timestamps.push_back(stamp);
 				exposures.push_back(exposure);
 			}
+			else if(1 == sscanf(buf, "%lf", &stamp)){
+				if(stamp > 1e8)
+					stamp *= 1e-9;
+				timestamps.push_back(stamp);
+			}
 		}
 		tr.close();
 
