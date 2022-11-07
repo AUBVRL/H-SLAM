@@ -417,7 +417,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 
 
 		float refColor = lpc_color[i];
-        Vec3f hitColor = getInterpolatedElement33(dINewl, Ku, Kv, wl);
+        Vec3f hitColor = getInterpolatedElement33(dINewl, Ku, Kv, wl, hl);
         if(!std::isfinite((float)hitColor[0])) continue;
         float residual = hitColor[0] - (float)(affLL[0] * refColor + affLL[1]);
         float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);

@@ -136,8 +136,10 @@ namespace HSLAM
 
         cv::Mat Descriptors;
         //BoW
-        fbow::fBow mBowVec;
-        fbow::fBow2 mFeatVec;
+        fbow::fBow f_mBowVec;
+        fbow::fBow2 f_mFeatVec;
+        DBoW3::BowVector d_mBowVec;
+        DBoW3::FeatureVector d_mFeatVec;
 
         int nFeatures;
         bool isReduced;

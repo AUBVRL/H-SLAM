@@ -230,9 +230,17 @@ namespace HSLAM
     void Frame::ComputeBoVW()
     {
         boost::lock_guard<boost::mutex> l(BoVWmutex);
-        if (mBowVec.empty())
+        if (f_mBowVec.empty() && d_mBowVec.empty())
         {
-            Vocab.transform(Descriptors, 4, mBowVec, mFeatVec);
+            if(fbow_Vocab.isValid())
+                fbow_Vocab.transform(Descriptors, 4, f_mBowVec, f_mFeatVec);
+            else {
+                vector<cv::Mat> vDesc;
+                vDesc.reserve(Descriptors.rows);
+                for (int j = 0; j < Descriptors.rows; ++j)
+                    vDesc.push_back(Descriptors.row(j));
+                dbow_Vocab.transform(vDesc, d_mBowVec, d_mFeatVec, 4);
+            }
         }
     }
 
@@ -620,8 +628,10 @@ namespace HSLAM
 
         globalMap->EraseKeyFrame(thisptr);
         globalMap->KfDB->erase(thisptr);
-        mFeatVec.clear();
-        mBowVec.clear();
+        f_mFeatVec.clear();
+        f_mBowVec.clear();
+        d_mFeatVec.clear();
+        d_mBowVec.clear();
         Descriptors.release();
         releaseVec(mvbOutlier);
         releaseVec(tMapPoints);

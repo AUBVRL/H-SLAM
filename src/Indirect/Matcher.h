@@ -77,14 +77,16 @@ namespace HSLAM
         Matcher(){}
         ~Matcher() {}
 
-        int SearchByBoWTracking(std::shared_ptr<Frame> pKF, std::shared_ptr<Frame> F, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &vpMapPointMatches);
-        int SearchByBow(std::shared_ptr<Frame> frame1, std::shared_ptr<Frame> frame2, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &matches);
+        int SearchByFBoWTracking(std::shared_ptr<Frame> pKF, std::shared_ptr<Frame> F, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &vpMapPointMatches);
+        int SearchByFBow(std::shared_ptr<Frame> frame1, std::shared_ptr<Frame> frame2, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &matches);
+        int SearchByDBoWTracking(std::shared_ptr<Frame> pKF, std::shared_ptr<Frame> F, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &vpMapPointMatches);
+        int SearchByDBow(std::shared_ptr<Frame> frame1, std::shared_ptr<Frame> frame2, float nnRatio, bool mbCheckOrientation, std::vector<std::shared_ptr<MapPoint>> &matches);
 
         int SearchBySim3(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::shared_ptr<MapPoint>> &vpMatches12, const float &s12, const Mat33f &R12, const Vec3f &t12, const float th);
         int SearchBySim3Projection(std::shared_ptr<Frame> pKF, Sim3 Scw, const std::vector<std::shared_ptr<MapPoint>> &vpPoints, std::vector<std::shared_ptr<MapPoint>> &vpMatched, int th);
 
 
-        int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vMatchedPairs, bool mbCheckOrientation = true);
+        // int searchWithEpipolar(std::shared_ptr<Frame> pKF1, std::shared_ptr<Frame> pKF2, std::vector<std::pair<size_t, size_t>> &vMatchedPairs, bool mbCheckOrientation = true);
         int SearchByProjection(std::shared_ptr<Frame> &CurrentFrame, std::shared_ptr<Frame> &pKF, const std::set<std::shared_ptr<MapPoint>> &sAlreadyFound, const float th, const int ORBdist, bool mbCheckOrientation = true);
         bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, Mat33f &F12);
 

@@ -128,7 +128,7 @@ public:
 
 	float optimize(int mnumOptIts);
 
-	void printResult(std::string file, bool printSim = false);
+	void printResult(std::string file, std::string stats_file, double mem_usage, int lost_at_idx, bool printSim = false);
 
 	void debugPlot(std::string name);
 
@@ -156,6 +156,16 @@ public:
 	std::vector<FrameShell*> allKeyFramesHistory;
 	boost::mutex trackMutex;
 	void BAatExit();
+
+	void updateLocalKeyframes(std::shared_ptr<Frame> frame);
+	void updateLocalKeyframesOld(std::shared_ptr<Frame> frame);
+	void updateLocalPoints(std::shared_ptr<Frame> frame);
+	void updateLocalPointsOld(std::shared_ptr<Frame> frame);
+
+	Timer loopCorrTime = Timer("loopCorr"); 
+	Timer loopDetTime = Timer("loopDet"); 
+	Timer trackingTime = Timer ("tracking"); 
+	Timer mappingTime = Timer("Mapping"); 
 
 
 private:
@@ -309,10 +319,7 @@ private:
 	void IndirectMapper(std::shared_ptr<Frame> frame);
 	bool TrackLocalMap(std::shared_ptr<Frame> frame);
 
-	void updateLocalKeyframes(std::shared_ptr<Frame> frame);
-	void updateLocalKeyframesOld(std::shared_ptr<Frame> frame);
-	void updateLocalPoints(std::shared_ptr<Frame> frame);
-	void updateLocalPointsOld(std::shared_ptr<Frame> frame);
+
 	void CheckReplacedInLastFrame();
 	int SearchLocalPoints(std::shared_ptr<Frame> frame, int th = 1, float nnratio = 0.8);
 	int updatePoseOptimizationData(std::shared_ptr<Frame> frame, int & nmatches, bool istrackingLastFrame = true);

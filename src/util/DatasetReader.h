@@ -216,7 +216,7 @@ public:
 
 	double getTimestamp(int id)
 	{
-		if(timestamps.size()==0) return id*0.04f; //0.1f = 10 Hz
+		if(timestamps.size()==0) return id*0.04f; //0.1f = 10 Hz // 0.04 = 25fps
 		if(id >= (int)timestamps.size()) return 0;
 		if(id < 0) return 0;
 		return timestamps[id];
@@ -256,8 +256,10 @@ private:
 	{
 		if(!isZipped)
 		{
-			// CHANGE FOR ZIP FILE
-			return IOWrap::readImageBW_8U(files[id]);
+			if(raw_img_16bit)
+				return IOWrap::readImageBW_16U_to_8U(files[id]);
+			else
+				return IOWrap::readImageBW_8U(files[id]); // CHANGE FOR ZIP FILE
 		}
 		else
 		{
@@ -281,6 +283,10 @@ private:
 				}
 			}
 			zip_fclose(fle);
+			if(raw_img_16bit){
+				std::cout<<"16 bit zipped files are not suppoted!!! exit!\n"<<std::endl;
+				exit(0);
+			}
 			return IOWrap::readStreamBW_8U(databuffer, readbytes);
 #else
 			printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
@@ -296,7 +302,7 @@ private:
 		ImageAndExposure* ret2 = undistort->undistort<unsigned char>(
 				minimg,
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
-				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
+				(timestamps.size() == 0 ? getTimestamp(id) : timestamps[id]));
 		delete minimg;
 		return ret2;
 	}

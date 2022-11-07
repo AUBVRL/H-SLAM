@@ -245,7 +245,7 @@ void FullSystem::setGammaFunction(float* BInv)
 
 
 
-void FullSystem::printResult(std::string file, bool printSim)
+void FullSystem::printResult(std::string file, std::string stats_file, double mem_usage, int lost_at_idx, bool printSim)
 {
 	int removed = 0;
 	int marginalized = 0;
@@ -304,7 +304,24 @@ void FullSystem::printResult(std::string file, bool printSim)
 	// }
 
 	std::ofstream myfile;
-	myfile.open (file.c_str());
+	
+	// // file exists!
+	std::size_t dotPos = file.rfind('.');
+    int res_idx = 0;
+	if(dotPos != std::string::npos){
+		std::string substring = file.substr(dotPos - 2, 2);
+		res_idx = std::stoi(substring); 
+	}
+	
+	// while(std::ifstream(file)){
+	// 	char buff[100];
+	// 	new_int = new_int + 1;
+  	// 	snprintf(buff, sizeof(buff), "results_%02d.txt", new_int);
+	// 	file.clear();
+  	// 	file = buff;
+	// }
+
+	myfile.open(file.c_str());
 	myfile << std::setprecision(15);
 
 	for(FrameShell* s : allFrameHistory)
@@ -317,15 +334,36 @@ void FullSystem::printResult(std::string file, bool printSim)
 		SE3 Twc = s->getPose();
 		// Twc = s->getPose();
 
-		myfile << s->timestamp <<
-			" " << Twc.translation().transpose()<<
-			" " << Twc.so3().unit_quaternion().x()<<
-			" " << Twc.so3().unit_quaternion().y()<<
-			" " << Twc.so3().unit_quaternion().z()<<
-			" " << Twc.so3().unit_quaternion().w() << "\n";
+		// tum mono output:
+		// myfile << s->timestamp <<
+		// 	" " << Twc.translation().transpose()<<
+		// 	" " << Twc.so3().unit_quaternion().x()<<
+		// 	" " << Twc.so3().unit_quaternion().y()<<
+		// 	" " << Twc.so3().unit_quaternion().z()<<
+		// 	" " << Twc.so3().unit_quaternion().w() << "\n";
+
+		// // kitti format
+		myfile << s->incoming_id << " ";
+		for(int i = 0; i < 3; i++)
+			for(int j = 0; j < 4; j++){
+				myfile << Twc.matrix3x4().coeff(i, j); 
+				if(j + i*4 != 11) myfile << " ";
+			}
+		myfile<<"\n";
+	
+	
 	}
 	myfile.close();
-}
+
+	myfile.open(stats_file.c_str(), std::ios_base::app);
+
+	myfile << std::setprecision(3);
+	myfile << res_idx <<" "<< globalMap->KeyFramesInMap() << " "<< globalMap->MapPointsInMap() << " " << mem_usage << " " << trackingTime.get_mean() << " " << trackingTime.get_stdDev() <<  " "<<
+	mappingTime.get_mean() << " " << mappingTime.get_stdDev() << " " << loopDetTime.get_mean() << " " << loopDetTime.get_stdDev() << " " << loopCorrTime.get_mean()<< " "<< 
+	loopCorrTime.get_stdDev() << " "<< globalMap->GetLastBigChangeIdx() << " " << lost_at_idx <<"\n";
+	myfile.close();
+	
+	}
 
 
 Vec5 FullSystem::trackNewCoarse(FrameHessian* fh, bool writePose)
@@ -930,7 +968,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
-
+	trackingTime.startTime();
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
 	FrameShell* shell = new FrameShell();
@@ -1004,23 +1042,35 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		
 		CheckReplacedInLastFrame();
 
-		int nMatches;
+		int nMatches = 0;
 		
 		nMatches = matcher->SearchByProjectionFrameToFrame(shell->frame, mLastFrame, 15, true);
 
 		if (nMatches < 20)
 		{
-			nMatches  = matcher->SearchByBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
-			computedBoW = true;
+			if(fbow_Vocab.isValid()){
+				nMatches  = matcher->SearchByFBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
+				computedBoW = true;
+			}
+			else if (!dbow_Vocab.empty()){
+				nMatches  = matcher->SearchByDBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
+				computedBoW = true;
+			}
 		}
 
 		isUsable = PoseOptimization(shell->frame, &Hcalib);
 
 		if (!isUsable && !computedBoW)
 		{
-			nMatches  = matcher->SearchByBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
-			isUsable = PoseOptimization(shell->frame, &Hcalib);
-			computedBoW = true;
+			if(fbow_Vocab.isValid()){
+				nMatches  = matcher->SearchByFBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
+				isUsable = PoseOptimization(shell->frame, &Hcalib);
+				computedBoW = true;
+			} else if (!dbow_Vocab.empty()){
+				nMatches  = matcher->SearchByDBoWTracking(mpReferenceKF, shell->frame, 0.7, true, shell->frame->tMapPoints);
+				isUsable = PoseOptimization(shell->frame, &Hcalib);
+				computedBoW = true;
+			}
 		}
 
 		nIndmatches = updatePoseOptimizationData(shell->frame, nMatches, true);
@@ -1080,6 +1130,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		mLastFrame = shell->frame;
 
 
+		trackingTime.endTime();
 
 		for (IOWrap::Output3DWrapper *ow : outputWrapper)
 		{
@@ -1252,13 +1303,14 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		fh->shell->setPoseOpti(Sim3(shell_pose_inverse.rotationMatrix(), shell_pose_inverse.translation(), 1.));
 	}
 
-
-
+	Timer trace_time("trace_time"); 
+	trace_time.startTime();
 	traceNewCoarse(fh);
-
-	
+	trace_time.endTime();
 
 	boost::unique_lock<boost::mutex> lock(mapMutex);
+	mappingTime.startTime();
+	
 	
 	// =========================== Flag Frames to be Marginalized. =========================
 	flagFramesForMarginalization(fh);
@@ -1387,14 +1439,6 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 
-    for(IOWrap::Output3DWrapper* ow : outputWrapper)
-    {
-        ow->publishGraph(ef->connectivityMap);
-        ow->publishKeyframes(frameHessians, false, &Hcalib);
-		ow->publishGlobalMap(globalMap);
-	}
-
-
 	// =========================== Marginalize Frames =========================
 
 	for (unsigned int i = 0; i < frameHessians.size(); i++)
@@ -1412,6 +1456,13 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	updateLocalPoints(fh->shell->frame);
 
 	printLogLine();
+	mappingTime.endTime(false, trace_time.get_mean());
+	for(IOWrap::Output3DWrapper* ow : outputWrapper)
+    {
+        ow->publishGraph(ef->connectivityMap);
+        ow->publishKeyframes(frameHessians, false, &Hcalib);
+		ow->publishGlobalMap(globalMap);
+	}
 	//printEigenValLine();
 }
 
@@ -1560,8 +1611,10 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 	newFrame->pointHessiansOut.reserve(numPointsTotal*1.2f);
 
 	SE3 Tcw = newFrame->shell->getPoseInverse();
-	for (int y = patternPadding + 1; y < hG[0] - patternPadding - 2; y++)
-		for (int x = patternPadding + 1; x < wG[0] - patternPadding - 2; x++)
+	// for (int y = patternPadding + 1; y < hG[0] - patternPadding - 2; y++)
+	// 	for (int x = patternPadding + 1; x < wG[0] - patternPadding - 2; x++)
+	for (int y = patternPadding + 2; y < hG[0] - patternPadding - 3; y++)
+		for (int x = patternPadding + 2; x < wG[0] - patternPadding - 3; x++)
 		{
 			int i = x + y * wG[0];
 			if (selectionMap[i] == 0)
@@ -2414,10 +2467,10 @@ void FullSystem::KeyFrameCulling(std::shared_ptr<Frame> currKF)
 
 void FullSystem::BAatExit()
 {
-	std::vector<std::shared_ptr<Frame>> allKFrames;
+	// std::vector<std::shared_ptr<Frame>> allKFrames;
 	std::vector<std::shared_ptr<MapPoint>> allMapPoints;
 
-	globalMap->GetAllKeyFrames(allKFrames);
+	// globalMap->GetAllKeyFrames(allKFrames);
 	globalMap->GetAllMapPoints(allMapPoints);
 
 
@@ -2425,8 +2478,9 @@ void FullSystem::BAatExit()
 
 	size_t currMaxKF = allKeyFramesHistory.back()->KfId;
 	size_t currMaxMp = globalMap->GetMaxMPid();
-
-	BundleAdjustment(allKFrames, allMapPoints, 10, &stopGBA, true, true, currMaxKF, currMaxKF - 15, currMaxMp);
+	
+	BundleAdjustment(allKeyFramesHistory , allMapPoints, 10, &stopGBA, true, true, ef->connectivityMap, currMaxKF, currMaxKF - 15, currMaxMp);
+	std::set<std::shared_ptr<Frame>> TempFixed;
 	for (auto it : allKeyFramesHistory)
 	    it->setRefresh(true);
 }

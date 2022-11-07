@@ -36,7 +36,7 @@ MinimalImageB* readImageBW_8U(std::string filename);
 MinimalImageB3* readImageRGB_8U(std::string filename);
 MinimalImage<unsigned short>* readImageBW_16U(std::string filename);
 
-
+MinimalImageB* readImageBW_16U_to_8U(std::string filename);
 MinimalImageB* readStreamBW_8U(char* data, int numBytes);
 
 void writeImage(std::string filename, MinimalImageB* img);

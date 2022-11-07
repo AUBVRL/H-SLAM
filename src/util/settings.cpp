@@ -32,7 +32,11 @@ namespace HSLAM
 
 bool Pause = false;
 bool LoopClosure = false;
-fbow::Vocabulary Vocab;
+fbow::Vocabulary fbow_Vocab;
+DBoW3::Vocabulary dbow_Vocab;
+int offsetVOcabSize = 0;
+bool raw_img_16bit = false;
+
 int gridSize = 10;
 int mnGridCols = 64;
 int mnGridRows = 48;
@@ -44,13 +48,13 @@ float mfGridElementWidthInv = (float)mnGridCols/(float)(mnMaxX-mnMinX);
 float mfGridElementHeightInv = (float)mnGridRows/(float)(mnMaxY-mnMinY);
 
 int minKfIdDist_LoopCandidate = 50; // min nmbre of keyframes between current and candidate to consider the candidate as potential loop closure.
-int kfGap = 60; // minimum number of keyframes have passed since last loop closure performed.
-int mnCovisibilityConsistencyTh = 1; //nbre of candidates connected to the loop candidate must also confirm for loop closure to take place
+int kfGap = 60;//60; //350 for kitti = 60 for euroc minimum number of keyframes have passed since last loop closure performed.
+int mnCovisibilityConsistencyTh = 2; //nbre of candidates connected to the loop candidate must also confirm for loop closure to take place (past 1)
 
 int EDGE_THRESHOLD = 19; //15?
 
 int minThFAST = 7; //8
-int minIndDist = 2; //9x9 
+int minIndDist = 3; // 9x9 (past 2)
 int minDirDist = 1; //3x3
 int indFeaturesToExtract = 1000;
 
@@ -266,6 +270,8 @@ void set_frame_sz(int size_x, int size_y)
 	setting_maxShiftWeightT= 0.04f * (mnMaxY + mnMaxX);
 	setting_maxShiftWeightR= 0.0f * (mnMaxY + mnMaxX);
 	setting_maxShiftWeightRT= 0.02f * (mnMaxY + mnMaxX);
+
+	offsetVOcabSize = fbow_Vocab.isValid() ? 98 : dbow_Vocab.empty() ? 0 : 439; //98 fbow //439.2; //the BovW model used is about 450 MB when loaded
 
 	// indFeaturesToExtract = (size_x + size_y);
 	// setting_desiredPointDensity = 2 * (size_x + size_y);

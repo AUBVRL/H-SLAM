@@ -48,7 +48,7 @@ namespace HSLAM {
                     usleep(5000);
                     continue;
                 }
-                
+                fullSystem->loopDetTime.startTime();
                 if (KFqueue.size() > 5)
                 { //can happen if optimization took too long!! in this case just add the accumulated kfs to the database and move on
                     
@@ -71,15 +71,20 @@ namespace HSLAM {
                 KFqueue.pop_front(); 
 
             }
+            bool loopDetected = false;
+            if(fbow_Vocab.isValid())
+                loopDetected = DetectF_Loop();
+            else if(!dbow_Vocab.empty()){
+                loopDetected = DetectD_Loop();
+            }
+            fullSystem->loopDetTime.endTime();
 
-            bool loopDetected = DetectLoop();
             if (loopDetected)
             {
-
+                fullSystem->loopCorrTime.startTime();
                 if (computeSim3())
                 {
-                    static Timer loopCorrTime("loopCorr");
-                    loopCorrTime.startTime();
+                    // static Timer loopCorrTime("loopCorr");
                     auto gMap = globalMap.lock();
                     if (gMap->isIdle()) //prevent from doing a loop closure correction when another is taking place!
                     {
@@ -87,8 +92,9 @@ namespace HSLAM {
                         CorrectLoop();
                         gMap->setBusy(false);
                     }
-                    loopCorrTime.endTime(true);
+                    fullSystem->loopCorrTime.endTime(true);
                 }
+                
             }
 
             usleep(5000);
@@ -123,9 +129,8 @@ namespace HSLAM {
     }
 
 
-    bool LoopCloser::DetectLoop()
+    bool LoopCloser::DetectF_Loop()
     {
-
         auto gMap = globalMap.lock();
         //If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
         if (currentKF->fs->KfId < mLastLoopKFid + kfGap)
@@ -139,21 +144,24 @@ namespace HSLAM {
         // This is the lowest score to a connected keyframe in the covisibility graph
         // We will impose loop candidates to have a higher similarity than this
         const std::vector<std::shared_ptr<Frame>> vpConnectedKeyFrames = currentKF->GetVectorCovisibleKeyFrames();
-        fbow::fBow &CurrentBowVec = currentKF->mBowVec;
+        fbow::fBow &CurrentBowVec = currentKF->f_mBowVec;
         float minScore = 1;
         for (size_t i = 0; i < vpConnectedKeyFrames.size(); i++)
         {
             std::shared_ptr<Frame> pKF = vpConnectedKeyFrames[i];
             if (pKF->isBad())
                 continue;
-            const fbow::fBow &BowVec = pKF->mBowVec;
+            const fbow::fBow &BowVec = pKF->f_mBowVec;
             float score = fbow::fBow::score(CurrentBowVec, BowVec);
             if (score < minScore)
                 minScore = score;
         }
 
         // Query the database imposing the minimum score
-        std::vector<std::shared_ptr<Frame>> vpCandidateKFs = gMap->KfDB->DetectLoopCandidates(currentKF, minScore);
+        std::vector<std::shared_ptr<Frame>> vpCandidateKFs;
+       
+        vpCandidateKFs = gMap->KfDB->DetectF_LoopCandidates(currentKF, minScore);
+
         // If there are no loop candidates, just add new keyframe and return false
         if (vpCandidateKFs.empty())
         {
@@ -241,6 +249,124 @@ namespace HSLAM {
         return false;
     }
 
+bool LoopCloser::DetectD_Loop()
+{
+    auto gMap = globalMap.lock();
+    //If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
+    if (currentKF->fs->KfId < mLastLoopKFid + kfGap)
+    {
+        gMap->KfDB->add(currentKF);
+        currentKF->SetErase();
+        return false;
+    }
+
+    // Compute reference BoW similarity score
+    // This is the lowest score to a connected keyframe in the covisibility graph
+    // We will impose loop candidates to have a higher similarity than this
+    const std::vector<std::shared_ptr<Frame>> vpConnectedKeyFrames = currentKF->GetVectorCovisibleKeyFrames();
+    const DBoW3::BowVector &CurrentBowVec = currentKF->d_mBowVec;
+    float minScore = 1;
+    for (size_t i = 0; i < vpConnectedKeyFrames.size(); i++)
+    {
+        std::shared_ptr<Frame> pKF = vpConnectedKeyFrames[i];
+        if (pKF->isBad())
+            continue;
+        const DBoW3::BowVector &BowVec = pKF->d_mBowVec;
+        float score = dbow_Vocab.score(CurrentBowVec, BowVec);
+        if (score < minScore)
+            minScore = score;
+    }
+
+    // Query the database imposing the minimum score
+    std::vector<std::shared_ptr<Frame>> vpCandidateKFs = gMap->KfDB->DetectD_LoopCandidates(currentKF, minScore);
+    
+    // If there are no loop candidates, just add new keyframe and return false
+    if (vpCandidateKFs.empty())
+    {
+        gMap->KfDB->add(currentKF);
+        mvConsistentGroups.clear();
+        currentKF->SetErase();
+        return false;
+    }
+
+    // For each loop candidate check consistency with previous loop candidates
+    // Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
+    // A group is consistent with a previous group if they share at least a keyframe
+    // We must detect a consistent loop in several consecutive keyframes to accept it
+    mvpEnoughConsistentCandidates.clear();
+
+    std::vector<ConsistentGroup> vCurrentConsistentGroups;
+    std::vector<bool> vbConsistentGroup(mvConsistentGroups.size(), false);
+    for (size_t i = 0, iend = vpCandidateKFs.size(); i < iend; i++)
+    {
+        std::shared_ptr<Frame> pCandidateKF = vpCandidateKFs[i];
+
+        std::set<std::shared_ptr<Frame>, std::owner_less<std::shared_ptr<Frame>>> spCandidateGroup = pCandidateKF->GetConnectedKeyFrames();
+        spCandidateGroup.insert(pCandidateKF);
+
+        bool bEnoughConsistent = false;
+        bool bConsistentForSomeGroup = false;
+        for (size_t iG = 0, iendG = mvConsistentGroups.size(); iG < iendG; iG++)
+        {
+            std::set<std::shared_ptr<Frame>,std::owner_less<std::shared_ptr<Frame>>> sPreviousGroup = mvConsistentGroups[iG].first;
+
+            bool bConsistent = false;
+            for (std::set<std::shared_ptr<Frame>,std::owner_less<std::shared_ptr<Frame>>>::iterator sit = spCandidateGroup.begin(), send = spCandidateGroup.end(); sit != send; sit++)
+            {
+                if (sPreviousGroup.count(*sit))
+                {
+                    bConsistent = true;
+                    bConsistentForSomeGroup = true;
+                    break;
+                }
+            }
+
+            if (bConsistent)
+            {
+                int nPreviousConsistency = mvConsistentGroups[iG].second;
+                int nCurrentConsistency = nPreviousConsistency + 1;
+                if (!vbConsistentGroup[iG])
+                {
+                    ConsistentGroup cg = std::make_pair(spCandidateGroup, nCurrentConsistency);
+                    vCurrentConsistentGroups.push_back(cg);
+                    vbConsistentGroup[iG] = true; //this avoid to include the same group more than once
+                }
+                if (nCurrentConsistency >= mnCovisibilityConsistencyTh && !bEnoughConsistent)
+                {
+                    mvpEnoughConsistentCandidates.push_back(pCandidateKF);
+                    bEnoughConsistent = true; //this avoid to insert the same candidate more than once
+                }
+            }
+        }
+
+        // If the group is not consistent with any previous group insert with consistency counter set to zero
+        if (!bConsistentForSomeGroup)
+        {
+            ConsistentGroup cg = std::make_pair(spCandidateGroup, 0);
+            vCurrentConsistentGroups.push_back(cg);
+        }
+    }
+
+    // Update Covisibility Consistent Groups
+    mvConsistentGroups = vCurrentConsistentGroups;
+
+    // Add Current Keyframe to database
+    gMap->KfDB->add(currentKF);
+
+    if (mvpEnoughConsistentCandidates.empty())
+    {
+        currentKF->SetErase();
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+
+    currentKF->SetErase();
+    return false;
+}
+
     bool LoopCloser::computeSim3()
     {
         const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
@@ -272,8 +398,14 @@ namespace HSLAM {
             }
 
             std::vector<std::shared_ptr<MapPoint>> matches;
-            int nmatches = matcher->SearchByBow(pKF, currentKF , 0.75, true, vvpMapPointMatches[i]); //0.75 def currentKF, pKF
-            if (nmatches < 20)
+            int nmatches = 0;
+            if(fbow_Vocab.isValid()){
+                nmatches = matcher->SearchByFBow(pKF, currentKF , 0.75, true, vvpMapPointMatches[i]); //0.75 def currentKF, pKF
+            } else if (!dbow_Vocab.empty()){
+                nmatches = matcher->SearchByDBow(pKF, currentKF , 0.75, true, vvpMapPointMatches[i]); //0.75 def currentKF, pKF
+            }
+            
+            if (nmatches < 35)
             {
                 vbDiscarded[i] = true;
                 continue;
@@ -367,7 +499,7 @@ namespace HSLAM {
 
                     const int nInliers = OptimizeSim3(pKF, currentKF, vpMapPointMatches, gScm, 10, false); //def: currentKf, pKF
                     // If optimization is succesful stop ransacs and continue
-                    if (nInliers >= 30) //20
+                    if (nInliers >= 40) //20
                     {
                         bMatch = true;
                         candidateKF = pKF;
@@ -421,7 +553,7 @@ namespace HSLAM {
                 nTotalMatches++;
         }
 
-        if (nTotalMatches >= 20) //20
+        if (nTotalMatches >= 40) //20
         {
             for (int i = 0; i < nInitialCandidates; i++)
                 if (mvpEnoughConsistentCandidates[i] != candidateKF)

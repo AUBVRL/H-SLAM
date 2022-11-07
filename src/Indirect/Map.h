@@ -85,12 +85,15 @@ namespace HSLAM
         void clear();
 
         // Loop Detection
-        std::vector<std::shared_ptr<Frame>> DetectLoopCandidates(std::shared_ptr<Frame> pKF, float minScore);
+        std::vector<std::shared_ptr<Frame>> DetectF_LoopCandidates(std::shared_ptr<Frame> pKF, float minScore);
+        std::vector<std::shared_ptr<Frame>> DetectD_LoopCandidates(std::shared_ptr<Frame> pKF, float minScore);
+
 
     protected:
 
         // Inverted file
-        std::map<uint32_t,std::set<std::shared_ptr<Frame>>> mvInvertedFile;
+        std::map<uint32_t,std::set<std::shared_ptr<Frame>>> f_mvInvertedFile;
+        std::vector<std::list<std::shared_ptr<Frame>>> d_mvInvertedFile;
 
         // Mutex
         boost::mutex mMutex;

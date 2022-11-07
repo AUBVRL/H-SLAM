@@ -4,11 +4,17 @@
 #include <string>
 #include <cmath>
 #include "fbow/fbow.h"
+#include "DBoW3/Vocabulary.h"
+
 namespace HSLAM
 {
 
     extern bool Pause; //not a good idea:)
-    extern fbow::Vocabulary Vocab;
+    extern fbow::Vocabulary fbow_Vocab;
+    extern DBoW3::Vocabulary dbow_Vocab;
+    extern int offsetVOcabSize;
+    extern bool raw_img_16bit;
+
     extern bool LoopClosure;
     extern int gridSize;
     extern int mnGridCols, mnGridRows;

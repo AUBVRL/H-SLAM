@@ -51,9 +51,9 @@ cd $SCRIPTPATH/Thirdparty/g2o
 mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DCMAKE_RELWITHDEBINFO_POSTFIX="" -DCMAKE_MINSIZEREL_POSTFIX="" -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF -DBUILD_WITH_MARCH_NATIVE=ON -DG2O_USE_OPENMP=OFF
 make -j $(nproc) && make install && cd .. && rm -r build && rm -r bin && rm -r lib
 
-# echo -e "Compiling DBoW3\n"
-# cd $SCRIPTPATH/Thirdparty/DBow3
-# mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DBUILD_UTILS=OFF -DCMAKE_CXX_FLAGS=-std=c++11 -DUSE_CONTRIB=true -DOpenCV_DIR=$InstallDir/share/OpenCV && make -j $(nproc) && make install && cd .. && rm -r build
+echo -e "Compiling DBoW3\n"
+cd $SCRIPTPATH/Thirdparty/DBow3
+mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=$BuildType -DCMAKE_INSTALL_PREFIX=$InstallDir -DBUILD_UTILS=OFF -DCMAKE_CXX_FLAGS=-std=c++11 -DUSE_CONTRIB=true -DOpenCV_DIR=$InstallDir/share/OpenCV && make -j $(nproc) && make install && cd .. && rm -r build
 
 echo -e "Compiling FBOW\n"
 cd $SCRIPTPATH/Thirdparty/fbow

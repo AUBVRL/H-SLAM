@@ -18,6 +18,7 @@
 
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
+#include "util/memUsage.h"
 
 using namespace HSLAM;
 
@@ -59,6 +60,9 @@ const cv::String keys =
 	"{endIndex        |100000| Last image to be processed }"
 	"{mode            | 0    | system mode: 0: use precalibrated gamma and vignette -1: photometric mode without calibration - 2: photometric mode with perfect images}"
 	"{preset          | 0    | preset configuration}"
+	"{statsdir        |      | path to write/append stats in}"
+	"{resultsdir      |      | path to write trajectory results}"
+	"{rawimg16        | False| set to true if raw imgs are 16bit depth}"
 	"{speed           | 0.0  | Enforce playback Speed to real-time}";
 
 int main(int argc, char **argv)
@@ -69,6 +73,9 @@ int main(int argc, char **argv)
 	std::string vignette = parser.get<std::string>("vignette");
 	std::string gammaCalib = parser.get<std::string>("gamma");
 	std::string source = parser.get<std::string>("files");
+	std::string stats_dir = parser.get<std::string>("statsdir");
+	std::string results_dir = parser.get<std::string>("resultsdir");
+	std::cout<<"RESULTS DIR: "<< results_dir <<std::endl;
 	std::string calib = parser.get<std::string>("calib");
 	std::string vocabPath = parser.get<std::string>("vocabPath");
 	LoopClosure = parser.get<bool>("LoopClosure");
@@ -84,6 +91,7 @@ int main(int argc, char **argv)
 	int endIndex = parser.get<int>("endIndex");
 	int preset = parser.get<int>("preset");
 	int mode = parser.get<int>("mode");
+	raw_img_16bit = parser.get<bool>("rawimg16");
 	float playbackSpeed = parser.get<float>("speed"); // 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
 
 	if (parser.has("help") || parser.has("h") || parser.has("usage") || parser.has("?"))
@@ -137,11 +145,16 @@ int main(int argc, char **argv)
 		break;
 	}
 
-	if (LoopClosure && !vocabPath.empty())
+	if (!vocabPath.empty()) // LoopClosure &&
 	{
 		printf("loading Vocabulary from %s!\n", vocabPath.c_str());
-		Vocab.readFromFile(vocabPath.c_str());
-		if (!Vocab.isValid())
+		if(strstr(vocabPath.c_str(), ".fbow")){
+			fbow_Vocab.readFromFile(vocabPath.c_str());
+		} else if(strstr(vocabPath.c_str(), ".dbow3")){
+			dbow_Vocab.load(vocabPath.c_str());
+		}
+		
+		if (!fbow_Vocab.isValid() && dbow_Vocab.empty())
 		{
 			printf("failed to load vocabulary! Exit\n");
 			exit(1);
@@ -264,8 +277,8 @@ int main(int argc, char **argv)
 															gettimeofday(&tv_start, NULL);
 															clock_t started = clock();
 															double sInitializerOffset = 0;
-
-															for (int ii = 0; ii < (int)idsToPlay.size(); ii++)
+															int ii;
+															for (ii = 0; ii < (int)idsToPlay.size(); ii++)
 															{
 																while (Pause)
 																{
@@ -343,13 +356,18 @@ int main(int argc, char **argv)
 																	break;
 																}
 															}
+															double memUse = (getCurrentRSS() / 1048576) - offsetVOcabSize;
 															// fullSystem->BAatExit();
 															fullSystem->blockUntilMappingIsFinished();
 															clock_t ended = clock();
 															struct timeval tv_end;
 															gettimeofday(&tv_end, NULL);
+															if(stats_dir.empty())
+																stats_dir = "res_stats.txt";
+															if(results_dir.empty())
+																results_dir = "00.txt";
 
-															fullSystem->printResult("result.txt");
+															fullSystem->printResult(results_dir, stats_dir, memUse, fullSystem->isLost ? idsToPlay[ii] : -1);
 
 															int numFramesProcessed = abs(idsToPlay[0] - idsToPlay.back());
 															double numSecondsProcessed = fabs(reader->getTimestamp(idsToPlay[0]) - reader->getTimestamp(idsToPlay.back()));

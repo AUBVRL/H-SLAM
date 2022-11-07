@@ -47,7 +47,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement43(const Eigen::Vector
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
 
-EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Eigen::Vector3f* const mat, const float x, const float y, const int width, const int height)
 {
 	int ix = (int)x;
 	int iy = (int)y;
@@ -55,7 +55,8 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Eigen::Vector
 	float dy = y - iy;
 	float dxdy = dx*dy;
 	const Eigen::Vector3f* bp = mat +ix+iy*width;
-
+	if(ix > width -2|| ix < 0 || iy < 0 || iy > height - 2)
+		return Eigen::Vector3f(NAN, NAN, NAN);
 
 	return dxdy * *(const Eigen::Vector3f*)(bp+1+width)
 	        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+width)
@@ -98,7 +99,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33OverOr(const Eigen::
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
 
-EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
+EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Eigen::Vector3f* const mat, const float x, const float y, const int width, const int height)
 {
 	int ix = (int)x;
 	int iy = (int)y;
@@ -106,6 +107,9 @@ EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Eigen::Vector3f* const 
 	float dy = y - iy;
 	float dxdy = dx*dy;
 	const Eigen::Vector3f* bp = mat +ix+iy*width;
+
+	if(ix > width -2|| ix < 0 || iy < 0 || iy > height - 2)
+		return NAN;
 
 
 	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0]

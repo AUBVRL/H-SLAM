@@ -23,6 +23,7 @@ find_package(Boost COMPONENTS system thread)
 find_package(OpenCV 3.4.6 REQUIRED)
 find_package(G2O REQUIRED)
 find_package(fbow REQUIRED)
+find_package(DBoW3 REQUIRED)
 
 # optional libraries
 find_package(LibZip QUIET)
@@ -149,6 +150,7 @@ set(LIBS
   ${OpenCV_LIBS}
   ${EIGEN3_LIBS}
   ${G2O_LIBS}
+  ${DBoW3_LIB_DIR}/libDBoW3.so
   ${LIBZIP_LIBRARY} 
   ${Pangolin_LIBRARIES}
   ${BOOST_THREAD_LIBRARY}

@@ -86,6 +86,29 @@ MinimalImage<unsigned short>* readImageBW_16U(std::string filename)
 	return img;
 }
 
+MinimalImageB* readImageBW_16U_to_8U(std::string filename)
+{
+	cv::Mat m = cv::imread(filename, CV_LOAD_IMAGE_UNCHANGED);
+	if(m.rows*m.cols==0)
+	{
+		printf("cv::imread could not read image %s! this may segfault. \n", filename.c_str());
+		return 0;
+	}
+	if(m.type() != CV_16U)
+	{
+		printf("readImageBW_16U called on image that is not a 16bit grayscale image. this may segfault. \n");
+		return 0;
+	}
+	// cv::Mat m8(m.size().width, m.size().height, CV_8U);
+	m.convertTo(m, CV_8U, 1.0/257.0);
+	// cv::normalize(m, m8, cv::NORM_MINMAX, 0, 255);
+
+	MinimalImageB* img = new MinimalImageB(m.cols, m.rows);
+	memcpy(img->data, m.data, m.rows*m.cols);
+	m.release();
+	return img;
+}
+
 MinimalImageB* readStreamBW_8U(char* data, int numBytes)
 {
 	cv::Mat m = cv::imdecode(cv::Mat(numBytes,1,CV_8U, data), CV_LOAD_IMAGE_GRAYSCALE);

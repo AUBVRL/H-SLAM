@@ -200,19 +200,38 @@ class Timer: std::chrono::high_resolution_clock
 		Timer(std::string _name) : name(_name){};
 		void startTime()
 		{
-			start_time =  now();
+			this->start_time =  now();
 		}
-		void endTime(bool print = false)
+		void endTime(bool print = false, float offset=0.)
 		{
-			vtime.emplace_back(std::chrono::duration_cast<std::chrono::microseconds>(now() - start_time).count()/1000.0f);
-			currEstimate = (float)std::accumulate(vtime.begin(), vtime.end(), 0.0f) / vtime.size();
-			if (print)
-				printf("%s %f \n", name.c_str(), currEstimate);
+			this->vtime.emplace_back(std::chrono::duration_cast<std::chrono::microseconds>(now() - this->start_time).count()/1000.0f + offset);
+			if (print){
+				this->currEstimate = (float)std::accumulate(this->vtime.begin(), this->vtime.end(), 0.0f) / this->vtime.size();
+				printf("%s %f \n", name.c_str(), this->currEstimate);
+			}
 		}
 
-		float currEstimate = 0;
+		float get_stdDev(){
+			if(this->vtime.size() < 2)
+				return 0;
+			this->currEstimate = (float)std::accumulate(this->vtime.begin(), this->vtime.end(), 0.0f) / this->vtime.size();
+			float accum = 0.0;
+			std::for_each (std::begin(this->vtime), std::end(this->vtime), [&](const double d) {
+				accum += (d - this->currEstimate) * (d - this->currEstimate);
+			});
+			float stdev = sqrt(accum / (this->vtime.size()-1));
+			return stdev;
+		}
+
+		float get_mean(){
+			this->currEstimate = (float)std::accumulate(this->vtime.begin(), this->vtime.end(), 0.0f) / this->vtime.size();
+			return this->currEstimate;
+		}
+
 
 	private:
+		float currEstimate; // mean
+
 		std::vector<float> vtime;
 		time_point start_time;
 		std::string name;

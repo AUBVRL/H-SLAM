@@ -361,8 +361,9 @@ namespace HSLAM
     //                       std::vector<std::shared_ptr<Frame>> &activeKfs, std::vector<std::shared_ptr<MapPoint>> &activeMps,
     //                       int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
     //                       int totalKfId, int currMaxKF, int currMaxMp);
-    void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
+    void BundleAdjustment(const std::vector<FrameShell*> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP,
                           int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
+                          const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity,
                           const size_t maxKfIdatCand, const size_t minActkfid, const size_t maxMPIdatCand);
 } // namespace HSLAM
 

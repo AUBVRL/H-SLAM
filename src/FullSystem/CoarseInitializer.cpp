@@ -370,11 +370,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
+			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl, hl);
 			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
 
 			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
-			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
+			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl, hl);
 
 			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
 			{

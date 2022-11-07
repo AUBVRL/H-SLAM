@@ -828,13 +828,15 @@ void OptimizeEssentialGraph(std::vector<FrameShell*> & vpKFs, std::vector<std::s
 // }
 
 
-void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP, 
+void BundleAdjustment(const std::vector<FrameShell*> &vpKFs, const std::vector<std::shared_ptr<MapPoint>> &vpMP, 
                         int nIterations, bool *pbStopFlag, const bool bRobust, const bool useSchurTrick,
+                        const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity,
                         const size_t maxKfIdatCand, const size_t minActkfid,const size_t maxMPIdatCand)
 {
-     if(vpKFs.size() < 2  || vpMP.size() < 10)
+    if(vpKFs.size() < 2  || vpMP.size() < 10)
         return;
 
+    const int minFeat = 100;
 
     g2o::SparseOptimizer optimizer;
     g2o::OptimizationAlgorithmLevenberg *solver;
@@ -844,7 +846,7 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
         solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolverX>(g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>>()));
     
     optimizer.setAlgorithm(solver);
-    HSLAM::camParams *cam_params = new HSLAM::camParams(vpKFs[0]->HCalib->fxl(), vpKFs[0]->HCalib->fyl(), vpKFs[0]->HCalib->cxl(), vpKFs[0]->HCalib->cyl());
+    HSLAM::camParams *cam_params = new HSLAM::camParams(vpKFs[0]->frame->HCalib->fxl(), vpKFs[0]->frame->HCalib->fyl(), vpKFs[0]->frame->HCalib->cxl(), vpKFs[0]->frame->HCalib->cyl());
     cam_params->setId(0);
     if (!optimizer.addParameter(cam_params))
     {
@@ -860,18 +862,17 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
     // Set KeyFrame vertices
     for (size_t i = 0; i < vpKFs.size(); i++)
     {
-        std::shared_ptr<Frame> pKF = vpKFs[i];
-        if (pKF->isBad())
-            continue;
+        // std::shared_ptr<Frame> pKF = vpKFs[i]->frame;
 
-        if (pKF->fs->KfId > maxKfIdatCand)
+
+        if (vpKFs[i]->KfId > maxKfIdatCand)
             continue;
 
         // SE3Vertex *vSE3 = new SE3Vertex();
         g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
 
 
-        auto Pose = pKF->fs->getPoseOpti(); 
+        auto Pose = vpKFs[i]->getPoseOpti(); 
         // vSE3->setEstimate(SE3(Pose.rotationMatrix(), Pose.translation()));
 
         // auto Pose = pKF->fs->getPoseInverse(); 
@@ -880,14 +881,14 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
 
         
 
-        vSE3->setId(pKF->fs->KfId);
+        vSE3->setId(vpKFs[i]->KfId);
 
-        if(pKF->fs->KfId >= minActkfid - 5)
+        if(vpKFs[i]->KfId >= minActkfid - 5)
             vSE3->setFixed(true);
 
         optimizer.addVertex(vSE3);
-        if (pKF->fs->KfId > maxKFid)
-            maxKFid = pKF->fs->KfId;
+        if (vpKFs[i]->KfId > maxKFid)
+            maxKFid = vpKFs[i]->KfId;
     }
 
     const float thHuber2D = sqrt(5.991); //1.345
@@ -904,7 +905,7 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
     vInfoOnce.reserve(vpMP.size());
     vector<double> vInformation;
     vInformation.reserve(4*vpMP.size());
-
+    long unsigned int maxMPId = 0;
     // Set MapPoint vertices
     for (size_t i = 0; i < vpMP.size(); i++)
     {
@@ -927,6 +928,7 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
 
         const int id = pMP->id + maxKFid + 1;
         vPoint->setId(id);
+        if(id > maxMPId) maxMPId = id;
 
         if (useSchurTrick)
             vPoint->setMarginalized(true);
@@ -998,8 +1000,85 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
 
     double stdDev = getStdDev(vInfoOnce);
     for (int i = 0, iend = edges.size(); i < iend; ++i)
-        edges[i]->setInformation(Eigen::Matrix2d::Identity() * (vInformation[i] / (stdDev + 0.00001)));  //* invSigma2); //set this to take into account depth variance!
+        edges[i]->setInformation(Eigen::Matrix2d::Identity());// * (vInformation[i] / (stdDev + 0.00001)));  //* invSigma2); //set this to take into account depth variance!
 
+    // Covisibility graph edges
+    std::set<pair<long unsigned int, long unsigned int>> sInsertedEdges;
+    const Mat66 matLambda = Mat66::Identity();
+    int index = maxMPId + 1;
+    for (size_t i = 0, iend = vpKFs.size(); i < iend; i++)
+    {
+        std::shared_ptr<Frame> pKF = vpKFs[i]->frame;
+        if(!pKF)
+            continue;
+        std::shared_ptr<Frame> pParentKF = pKF->GetParent();
+        const vector<std::shared_ptr<Frame>> vpConnectedKFs = pKF->GetCovisiblesByWeight(minFeat);
+        SE3 Swi = pKF->fs->getPoseInverse();//  vScw[nIDi].inverse();
+        const int nIDi = vpKFs[i]->KfId;
+    
+        for (vector<std::shared_ptr<Frame>>::const_iterator vit = vpConnectedKFs.begin(); vit != vpConnectedKFs.end(); vit++)
+        {
+            std::shared_ptr<Frame> pKFn = *vit;
+            if (pKFn && pKFn != pParentKF && !pKF->hasChild(pKFn))
+            {
+                if (!pKFn->isBad() && pKFn->fs->KfId < pKF->fs->KfId)
+                {
+                    if (sInsertedEdges.count(make_pair(std::min(pKF->fs->KfId, pKFn->fs->KfId), std::max(pKF->fs->KfId, pKFn->fs->KfId))))
+                        continue;
+
+                    SE3 Snw = pKFn->fs->getPose();
+
+                    SE3 Sni = (Snw * Swi).inverse();
+
+                    EdgeSE3Expmap *en = new EdgeSE3Expmap();
+
+                    en->setId(index);
+                    index++;
+                    en->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(pKFn->fs->KfId)));
+                    en->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(nIDi)));
+                    en->setMeasurement(g2o::SE3Quat(Sni.rotationMatrix(), Sni.translation()));
+                    en->setInformation(matLambda);
+
+                    optimizer.addEdge(en);
+                    sInsertedEdges.insert(make_pair(min(nIDi, (int)pKFn->fs->KfId), max(nIDi, (int)pKFn->fs->KfId)));
+                }
+            }
+        }
+    }
+    
+
+    //setup Pose-Pose constraints
+    for (std::pair<uint64_t, Eigen::Vector2i> p : connectivity)
+    {
+        int host = (int)(p.first >> 32);
+        int target = (int)(p.first & (uint64_t)0xFFFFFFFF);
+        assert(host >= 0 && target >= 0);
+
+        if (host > maxKfIdatCand || target > maxKfIdatCand || host == target || host > target)
+            continue;
+        if (sInsertedEdges.count(make_pair(std::min(host, target), std::max(host, target)))) //check that we did not add this edge yet.
+            continue;
+        
+        //set host
+        assert(vpKFs[host]->KfId == host);
+        SE3 Swi = vpKFs[host]->getPoseInverse();
+
+        //set target pose
+        assert(vpKFs[target]->KfId == target);
+        SE3 Snw = vpKFs[target]->getPose();
+  
+        //set measurement
+        SE3 Sni = (Snw * Swi).inverse();
+
+        EdgeSE3Expmap *en = new EdgeSE3Expmap();
+        en->setId(index);
+        index++;
+        en->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(target)));
+        en->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(host)));
+        en->setMeasurement(g2o::SE3Quat(Sni.rotationMatrix(), Sni.translation()));
+        en->setInformation(matLambda);
+        optimizer.addEdge(en);
+    }
 
     optimizer.setVerbose(true);
 
@@ -1010,24 +1089,24 @@ void BundleAdjustment(const std::vector<std::shared_ptr<Frame>> &vpKFs, const st
     //  Keyframes
     for (size_t i = 0; i < vpKFs.size(); i++)
     {
-        std::shared_ptr<Frame> pKF = vpKFs[i];
-        if (pKF->isBad() || pKF->fs->KfId > maxKfIdatCand) //pKF->getState() == Frame::active ||
+        // std::shared_ptr<Frame> pKF = vpKFs[i]->frame;
+        if(vpKFs[i]->KfId > maxKfIdatCand) //pKF->getState() == Frame::active ||
             continue;
 
         // if (std::find(activeKfs.begin(), activeKfs.end(), pKF) != activeKfs.end()) //this KF was active when the candidate was detected need to fix its pose!
         //     continue;
         
         // SE3Vertex *vSE3 = static_cast<SE3Vertex *>(optimizer.vertex(pKF->fs->KfId));
-        VertexSE3Expmap *vSE3 = static_cast<VertexSE3Expmap *>(optimizer.vertex(pKF->fs->KfId));
+        VertexSE3Expmap *vSE3 = static_cast<VertexSE3Expmap *>(optimizer.vertex(vpKFs[i]->KfId));
         
         if(vSE3->fixed())
             continue;
-        double scale = pKF->fs->getPoseOpti().scale();
+        double scale = vpKFs[i]->getPoseOpti().scale();
         // // auto PoseSim3 = Sim3(vSE3->estimate().matrix());
         // auto PoseSim3 = Sim3(SE3(vSE3->estimate().rotation().toRotationMatrix(), vSE3->estimate().translation()).matrix());
 
         // PoseSim3.setScale(scale);
-        pKF->fs->setPoseOpti(Sim3(vSE3->estimate().rotation(), vSE3->estimate().translation(), scale));
+        vpKFs[i]->setPoseOpti(Sim3(vSE3->estimate().rotation(), vSE3->estimate().translation(), scale));
       
     }
 

@@ -37,7 +37,8 @@ namespace HSLAM {
         }
 
         void InsertKeyFrame(std::shared_ptr<Frame> &frame, int maxMpId);
-        bool DetectLoop();
+        bool DetectF_Loop();
+        bool DetectD_Loop();
         bool computeSim3();
         void CorrectLoop();
         void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap);

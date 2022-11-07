@@ -159,7 +159,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		projectedTo[idx][1] = Kv;
 
 
-        Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
+        Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0], hG[0]));
         float residual = hitColor[0] - (float)(affLL[0] * color[idx] + affLL[1]);
 
 

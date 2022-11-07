@@ -79,7 +79,7 @@ public:
     virtual void reset() override;
 
 	bool isDead = false;
-	
+	pangolin::Var<double> *memUse;
 
 private:
 	bool needReset;
@@ -166,7 +166,6 @@ private:
 
 	pangolin::Var<double> *settings_trackFps;
 	pangolin::Var<double> *settings_mapFps;
-	pangolin::Var<double> *memUse;
 
 	pangolin::Var<int> *Mps;
 	pangolin::Var<int> *Kfs;
