@@ -1,4 +1,7 @@
-# FSLAM 
+# HSLAM (Hybrid-SLAM)
+
+This branch holds clear instructions on how to resolve all dependency issues and build & run Hybrid-SLAM on datasets.
+For an implementation of HSLAM with live camera feed (utilizing ROS) refer to repository flsam_ros_docker.
 
 
 ### Related Publications:
