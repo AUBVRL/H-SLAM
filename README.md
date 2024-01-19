@@ -1,4 +1,4 @@
-# FSLAM
+# H-SLAM
 
 if you are using virtual environments such as parallels, you need to do the following steps before you run build.sh:
 
